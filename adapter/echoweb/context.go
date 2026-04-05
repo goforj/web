@@ -53,8 +53,16 @@ func (c *contextAdapter) Get(key string) any {
 	return c.echo.Get(key)
 }
 
+func (c *contextAdapter) SetHeader(name string, value string) {
+	c.echo.Response().Header().Set(name, value)
+}
+
 func (c *contextAdapter) JSON(code int, payload any) error {
 	return c.echo.JSON(code, payload)
+}
+
+func (c *contextAdapter) Blob(code int, contentType string, body []byte) error {
+	return c.echo.Blob(code, contentType, body)
 }
 
 func (c *contextAdapter) Text(code int, body string) error {

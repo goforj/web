@@ -89,3 +89,28 @@ func TestWrapMiddlewareBridgesEchoMiddleware(t *testing.T) {
 		t.Fatalf("X-Echo-MW = %q", got)
 	}
 }
+
+func TestContextSupportsHeadersAndBlobResponses(t *testing.T) {
+	adapter := New()
+	adapter.Router().Get("/blob", func(r web.Context) error {
+		r.SetHeader("Cache-Control", "public, max-age=60")
+		return r.Blob(http.StatusOK, "image/x-icon", []byte{1, 2, 3})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/blob", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "public, max-age=60" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "image/x-icon" {
+		t.Fatalf("Content-Type = %q", got)
+	}
+	if body := rec.Body.String(); body != string([]byte{1, 2, 3}) {
+		t.Fatalf("body = %q", body)
+	}
+}
