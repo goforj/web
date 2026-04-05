@@ -150,6 +150,94 @@ func TestBasicAuthRejectsInvalidBase64(t *testing.T) {
 	}
 }
 
+func TestKeyAuthAcceptsBearerFromHeader(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(KeyAuth(func(auth string, r web.Context) (bool, error) {
+		r.Set("auth", auth)
+		return auth == "token-123", nil
+	}))
+	router.GET("/key", func(r web.Context) error {
+		if got := r.Get("auth"); got != "token-123" {
+			t.Fatalf("auth = %#v", got)
+		}
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/key", nil)
+	req.Header.Set("Authorization", "Bearer token-123")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestKeyAuthAcceptsQueryLookup(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(KeyAuthWithConfig(KeyAuthConfig{
+		KeyLookup: "query:token",
+		Validator: func(auth string, r web.Context) (bool, error) {
+			return auth == "q-token", nil
+		},
+	}))
+	router.GET("/key", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/key?token=q-token", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestKeyAuthRejectsMissingKey(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(KeyAuth(func(auth string, r web.Context) (bool, error) {
+		return true, nil
+	}))
+	router.GET("/key", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/key", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); !strings.Contains(body, "missing key") {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestKeyAuthRejectsInvalidKey(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(KeyAuth(func(auth string, r web.Context) (bool, error) {
+		return false, nil
+	}))
+	router.GET("/key", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/key", nil)
+	req.Header.Set("Authorization", "Bearer nope")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
