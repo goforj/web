@@ -11,21 +11,27 @@ import (
 
 // ServerConfig configures an Echo-backed web server.
 type ServerConfig struct {
-	Addr        string
-	RouteGroups []web.RouteGroup
-	Mounts      []web.RouterMount
+	Addr            string
+	RouteGroups     []web.RouteGroup
+	Mounts          []web.RouterMount
+	ShutdownTimeout time.Duration
 }
 
 // Server owns adapter bootstrap plus HTTP lifecycle management.
 type Server struct {
-	adapter    *Adapter
-	httpServer *http.Server
+	adapter         *Adapter
+	httpServer      *http.Server
+	shutdownTimeout time.Duration
 }
 
 // NewServer creates an Echo-backed server from web route groups and mounts.
 func NewServer(config ServerConfig) (*Server, error) {
 	adapter := New()
 	router := adapter.Router()
+	shutdownTimeout := config.ShutdownTimeout
+	if shutdownTimeout <= 0 {
+		shutdownTimeout = 30 * time.Second
+	}
 
 	if err := web.MountRouter(router, config.Mounts); err != nil {
 		return nil, err
@@ -40,6 +46,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 			Addr:    config.Addr,
 			Handler: adapter,
 		},
+		shutdownTimeout: shutdownTimeout,
 	}, nil
 }
 
@@ -78,7 +85,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		}
 		return err
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
 		defer cancel()
 
 		if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
