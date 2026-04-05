@@ -138,6 +138,8 @@ func createExtractors(lookups string, authScheme string) ([]valuesExtractor, err
 			out = append(out, headerExtractor(name, cutPrefix))
 		case "query":
 			out = append(out, queryExtractor(name))
+		case "param":
+			out = append(out, paramExtractor(name))
 		case "cookie":
 			out = append(out, cookieExtractor(name))
 		case "form":
@@ -202,6 +204,16 @@ func queryExtractor(name string) valuesExtractor {
 	}
 }
 
+func paramExtractor(name string) valuesExtractor {
+	return func(r web.Context) ([]string, error) {
+		value := strings.TrimSpace(r.Param(name))
+		if value == "" {
+			return nil, errors.New("missing key in path params")
+		}
+		return []string{value}, nil
+	}
+}
+
 func cookieExtractor(name string) valuesExtractor {
 	return func(r web.Context) ([]string, error) {
 		cookie, err := r.Cookie(name)
@@ -214,8 +226,8 @@ func cookieExtractor(name string) valuesExtractor {
 
 func formExtractor(name string) valuesExtractor {
 	return func(r web.Context) ([]string, error) {
-		req, ok := nativeRequest(r)
-		if !ok {
+		req := r.Request()
+		if req == nil {
 			return nil, errFormExtractorValueMissing
 		}
 		if err := req.ParseForm(); err != nil {

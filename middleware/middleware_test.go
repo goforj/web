@@ -709,6 +709,71 @@ func TestBodyDumpCapturesRequestAndResponseBodies(t *testing.T) {
 	}
 }
 
+func TestCSRFSetsTokenCookieAndContextOnSafeRequest(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(CSRF())
+	router.GET("/csrf", func(r web.Context) error {
+		token, _ := r.Get("csrf").(string)
+		return r.Text(http.StatusOK, token)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/csrf", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if token := strings.TrimSpace(rec.Body.String()); token == "" {
+		t.Fatal("csrf token missing from context output")
+	}
+	if got := rec.Header().Get("Set-Cookie"); !strings.Contains(got, "_csrf=") {
+		t.Fatalf("Set-Cookie = %q", got)
+	}
+}
+
+func TestCSRFAcceptsMatchingHeaderToken(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(CSRF())
+	router.POST("/csrf", func(r web.Context) error {
+		return r.NoContent(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/csrf", nil)
+	req.AddCookie(&http.Cookie{Name: "_csrf", Value: "known-token"})
+	req.Header.Set("X-CSRF-Token", "known-token")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCSRFFailsOnMissingOrInvalidToken(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(CSRF())
+	router.POST("/csrf", func(r web.Context) error {
+		return r.NoContent(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/csrf", nil)
+	req.AddCookie(&http.Cookie{Name: "_csrf", Value: "known-token"})
+	req.Header.Set("X-CSRF-Token", "wrong-token")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := strings.TrimSpace(rec.Body.String()); body != `{"error":"invalid csrf token"}` {
+		t.Fatalf("body = %q", body)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
