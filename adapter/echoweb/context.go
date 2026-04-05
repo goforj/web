@@ -30,6 +30,10 @@ func (c *contextAdapter) Path() string {
 	return c.echo.Path()
 }
 
+func (c *contextAdapter) Host() string {
+	return c.echo.Request().Host
+}
+
 func (c *contextAdapter) Param(name string) string {
 	return c.echo.Param(name)
 }

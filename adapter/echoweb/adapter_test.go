@@ -21,13 +21,16 @@ func TestRouterRegistersRouteAndContext(t *testing.T) {
 		if got := r.Path(); got != "/users/:id" {
 			t.Fatalf("path = %q", got)
 		}
+		if got := r.Host(); got != "example.com" {
+			t.Fatalf("host = %q", got)
+		}
 		return r.JSON(http.StatusOK, map[string]any{
 			"id":     r.Param("id"),
 			"method": r.Method(),
 		})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/users/42", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/users/42", nil)
 	rec := httptest.NewRecorder()
 	adapter.Echo().ServeHTTP(rec, req)
 

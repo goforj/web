@@ -10,6 +10,7 @@ type Context interface {
 	Context() context.Context
 	Method() string
 	Path() string
+	Host() string
 	Param(name string) string
 	Query(name string) string
 	Header(name string) string
