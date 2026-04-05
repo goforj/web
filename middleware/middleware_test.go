@@ -431,6 +431,49 @@ func TestRewriteWithRegexRulesPreservesQuery(t *testing.T) {
 	}
 }
 
+func TestSecureSetsExpectedHeaders(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(SecureWithConfig(SecureConfig{
+		XSSProtection:         "1; mode=block",
+		ContentTypeNosniff:    "nosniff",
+		XFrameOptions:         "SAMEORIGIN",
+		HSTSMaxAge:            3600,
+		ContentSecurityPolicy: "default-src 'self'",
+		ReferrerPolicy:        "same-origin",
+	}))
+	router.GET("/secure", func(r web.Context) error {
+		return r.NoContent(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/secure", nil)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := rec.Header().Get("X-XSS-Protection"); got != "1; mode=block" {
+		t.Fatalf("X-XSS-Protection = %q", got)
+	}
+	if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("X-Content-Type-Options = %q", got)
+	}
+	if got := rec.Header().Get("X-Frame-Options"); got != "SAMEORIGIN" {
+		t.Fatalf("X-Frame-Options = %q", got)
+	}
+	if got := rec.Header().Get("Strict-Transport-Security"); got != "max-age=3600; includeSubDomains" {
+		t.Fatalf("Strict-Transport-Security = %q", got)
+	}
+	if got := rec.Header().Get("Content-Security-Policy"); got != "default-src 'self'" {
+		t.Fatalf("Content-Security-Policy = %q", got)
+	}
+	if got := rec.Header().Get("Referrer-Policy"); got != "same-origin" {
+		t.Fatalf("Referrer-Policy = %q", got)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
