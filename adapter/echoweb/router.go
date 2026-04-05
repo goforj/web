@@ -23,8 +23,10 @@ type groupLike interface {
 }
 
 type routerAdapter struct {
-	engine *echo.Echo
-	group  groupLike
+	engine      *echo.Echo
+	group       groupLike
+	parent      *routerAdapter
+	middlewares []web.Middleware
 }
 
 var _ web.Router = (*routerAdapter)(nil)
@@ -37,59 +39,102 @@ func (r *routerAdapter) Pre(middleware ...web.Middleware) {
 }
 
 func (r *routerAdapter) Use(middleware ...web.Middleware) {
-	r.group.Use(mustAdaptMiddlewares(middleware)...)
+	r.middlewares = append(r.middlewares, cleanMiddlewares(middleware)...)
 }
 
 func (r *routerAdapter) CONNECT(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.CONNECT(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.CONNECT(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) DELETE(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.DELETE(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.DELETE(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) GET(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.GET(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.GET(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) GETWS(path string, handler web.WebSocketHandler, middleware ...web.Middleware) {
-	r.group.GET(path, adaptWebSocketHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.GET(path, adaptWebSocketHandler(applyWebSocketMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) HEAD(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.HEAD(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.HEAD(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) OPTIONS(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.OPTIONS(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.OPTIONS(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) PATCH(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.PATCH(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.PATCH(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) POST(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.POST(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.POST(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) PUT(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.PUT(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.PUT(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) TRACE(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.TRACE(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.TRACE(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) Any(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.Any(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.Any(path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) Match(methods []string, path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.Match(methods, path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+	r.group.Match(methods, path, adaptHandler(applyMiddlewares(handler, middleware...)))
 }
 
 func (r *routerAdapter) Group(prefix string, middleware ...web.Middleware) web.Router {
-	return &routerAdapter{engine: r.engine, group: r.group.Group(prefix, mustAdaptMiddlewares(middleware)...)}
+	child := &routerAdapter{
+		engine:      r.engine,
+		parent:      r,
+		middlewares: cleanMiddlewares(middleware),
+	}
+	child.group = r.group.Group(prefix, adaptRouterMiddlewares(child))
+	return child
+}
+
+func adaptRouterMiddlewares(r *routerAdapter) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			if len(r.middlewares) == 0 {
+				return next(c)
+			}
+			adaptedCtx := acquireContextAdapter(c)
+			defer releaseContextAdapter(adaptedCtx)
+			adapted := func(ctx web.Context) error {
+				native, ok := UnwrapContext(ctx)
+				if !ok {
+					return echo.ErrInternalServerError
+				}
+				return next(native)
+			}
+			return applyMiddlewares(adapted, r.middlewares...)(adaptedCtx)
+		}
+	}
+}
+
+func applyMiddlewares(handler web.Handler, middleware ...web.Middleware) web.Handler {
+	applied := handler
+	clean := cleanMiddlewares(middleware)
+	for i := len(clean) - 1; i >= 0; i-- {
+		applied = clean[i](applied)
+	}
+	return applied
+}
+
+func applyWebSocketMiddlewares(handler web.WebSocketHandler, middleware ...web.Middleware) web.WebSocketHandler {
+	return func(ctx web.Context, conn web.WebSocketConn) error {
+		return applyMiddlewares(func(inner web.Context) error {
+			return handler(inner, conn)
+		}, middleware...)(ctx)
+	}
 }
 
 func adaptHandler(handler web.Handler) echo.HandlerFunc {
@@ -113,7 +158,7 @@ func adaptWebSocketHandler(handler web.WebSocketHandler) echo.HandlerFunc {
 	}
 }
 
-func mustAdaptMiddlewares(middleware []web.Middleware) []echo.MiddlewareFunc {
+func cleanMiddlewares(middleware []web.Middleware) []web.Middleware {
 	if len(middleware) == 0 {
 		return nil
 	}
@@ -124,6 +169,11 @@ func mustAdaptMiddlewares(middleware []web.Middleware) []echo.MiddlewareFunc {
 		}
 		clean = append(clean, item)
 	}
+	return clean
+}
+
+func mustAdaptMiddlewares(middleware []web.Middleware) []echo.MiddlewareFunc {
+	clean := cleanMiddlewares(middleware)
 	if len(clean) == 0 {
 		return nil
 	}

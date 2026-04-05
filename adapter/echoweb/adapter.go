@@ -14,9 +14,11 @@ type Adapter struct {
 // New creates a new Echo-backed web adapter.
 func New() *Adapter {
 	engine := echo.New()
+	router := &routerAdapter{engine: engine, group: engine}
+	engine.Use(adaptRouterMiddlewares(router))
 	return &Adapter{
 		engine: engine,
-		router: &routerAdapter{engine: engine, group: engine},
+		router: router,
 	}
 }
 
@@ -25,9 +27,11 @@ func Wrap(engine *echo.Echo) *Adapter {
 	if engine == nil {
 		engine = echo.New()
 	}
+	router := &routerAdapter{engine: engine, group: engine}
+	engine.Use(adaptRouterMiddlewares(router))
 	return &Adapter{
 		engine: engine,
-		router: &routerAdapter{engine: engine, group: engine},
+		router: router,
 	}
 }
 
