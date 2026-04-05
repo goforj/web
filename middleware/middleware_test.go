@@ -943,6 +943,45 @@ func TestCreateExtractorsReadsHeaderQueryCookieAndFormValues(t *testing.T) {
 	}
 }
 
+func TestErrorBodyDumpCapturesOnlyFailedResponses(t *testing.T) {
+	var capturedStatus int
+	var capturedBody []byte
+
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(ErrorBodyDump(func(r web.Context, status int, body []byte) {
+		capturedStatus = status
+		capturedBody = append([]byte(nil), body...)
+	}))
+	router.GET("/ok", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+	router.GET("/fail", func(r web.Context) error {
+		return r.Text(http.StatusBadGateway, "boom")
+	})
+
+	okReq := httptest.NewRequest(http.MethodGet, "/ok", nil)
+	okRec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(okRec, okReq)
+	if capturedStatus != 0 || len(capturedBody) != 0 {
+		t.Fatalf("unexpected capture on ok response: status=%d body=%q", capturedStatus, string(capturedBody))
+	}
+
+	failReq := httptest.NewRequest(http.MethodGet, "/fail", nil)
+	failRec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(failRec, failReq)
+
+	if failRec.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d body=%s", failRec.Code, failRec.Body.String())
+	}
+	if capturedStatus != http.StatusBadGateway {
+		t.Fatalf("captured status = %d", capturedStatus)
+	}
+	if string(capturedBody) != "boom" {
+		t.Fatalf("captured body = %q", string(capturedBody))
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
