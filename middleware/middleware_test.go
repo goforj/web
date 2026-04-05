@@ -282,6 +282,48 @@ func TestBodyLimitAllowsSmallBody(t *testing.T) {
 	}
 }
 
+func TestMethodOverrideFromHeader(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(MethodOverride())
+	router.POST("/method", func(r web.Context) error {
+		return r.Text(http.StatusOK, r.Method())
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/method", nil)
+	req.Header.Set("X-HTTP-Method-Override", http.MethodDelete)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != http.MethodDelete {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestMethodOverrideDoesNotChangeNonPost(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(MethodOverride())
+	router.GET("/method", func(r web.Context) error {
+		return r.Text(http.StatusOK, r.Method())
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/method", nil)
+	req.Header.Set("X-HTTP-Method-Override", http.MethodDelete)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != http.MethodGet {
+		t.Fatalf("body = %q", body)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
