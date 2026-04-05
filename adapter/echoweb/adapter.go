@@ -1,6 +1,8 @@
 package echoweb
 
 import (
+	"net/http"
+
 	"github.com/goforj/web"
 	echo "github.com/labstack/echo/v4"
 )
@@ -49,4 +51,13 @@ func (a *Adapter) Router() web.Router {
 		return nil
 	}
 	return a.router
+}
+
+// ServeHTTP exposes the adapter as a standard http.Handler.
+func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if a == nil || a.engine == nil {
+		http.NotFound(w, r)
+		return
+	}
+	a.engine.ServeHTTP(w, r)
 }
