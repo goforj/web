@@ -11,6 +11,7 @@ type Context interface {
 	Method() string
 	Path() string
 	URI() string
+	Scheme() string
 	Host() string
 	Param(name string) string
 	Query(name string) string

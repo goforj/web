@@ -16,7 +16,7 @@ func New() *Adapter {
 	engine := echo.New()
 	return &Adapter{
 		engine: engine,
-		router: &routerAdapter{group: engine},
+		router: &routerAdapter{engine: engine, group: engine},
 	}
 }
 
@@ -27,7 +27,7 @@ func Wrap(engine *echo.Echo) *Adapter {
 	}
 	return &Adapter{
 		engine: engine,
-		router: &routerAdapter{group: engine},
+		router: &routerAdapter{engine: engine, group: engine},
 	}
 }
 

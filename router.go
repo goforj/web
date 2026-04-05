@@ -2,6 +2,7 @@ package web
 
 // Router is the app-facing route registration contract.
 type Router interface {
+	Pre(...Middleware)
 	Use(...Middleware)
 	CONNECT(path string, handler Handler, middleware ...Middleware)
 	DELETE(path string, handler Handler, middleware ...Middleware)

@@ -24,6 +24,9 @@ func TestRouterRegistersRouteAndContext(t *testing.T) {
 		if got := r.URI(); got != "/users/42" {
 			t.Fatalf("uri = %q", got)
 		}
+		if got := r.Scheme(); got != "http" {
+			t.Fatalf("scheme = %q", got)
+		}
 		if got := r.Host(); got != "example.com" {
 			t.Fatalf("host = %q", got)
 		}
@@ -103,6 +106,34 @@ func TestWrapMiddlewareBridgesEchoMiddleware(t *testing.T) {
 	}
 	if got := rec.Header().Get("X-Echo-MW"); got != "on" {
 		t.Fatalf("X-Echo-MW = %q", got)
+	}
+}
+
+func TestRouterPreRunsBeforeRouting(t *testing.T) {
+	adapter := New()
+	router := adapter.Router()
+	router.Pre(func(next web.Handler) web.Handler {
+		return func(r web.Context) error {
+			req := r.Request()
+			req.URL.Path = "/ready"
+			req.RequestURI = "/ready"
+			r.SetRequest(req)
+			return next(r)
+		}
+	})
+	router.GET("/ready", func(r web.Context) error {
+		return r.Text(http.StatusOK, "pre")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/pending", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "pre" {
+		t.Fatalf("body = %q", body)
 	}
 }
 

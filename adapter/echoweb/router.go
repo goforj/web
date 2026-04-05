@@ -23,10 +23,18 @@ type groupLike interface {
 }
 
 type routerAdapter struct {
-	group groupLike
+	engine *echo.Echo
+	group  groupLike
 }
 
 var _ web.Router = (*routerAdapter)(nil)
+
+func (r *routerAdapter) Pre(middleware ...web.Middleware) {
+	if r.engine == nil {
+		return
+	}
+	r.engine.Pre(mustAdaptMiddlewares(middleware)...)
+}
 
 func (r *routerAdapter) Use(middleware ...web.Middleware) {
 	r.group.Use(mustAdaptMiddlewares(middleware)...)
@@ -81,7 +89,7 @@ func (r *routerAdapter) Match(methods []string, path string, handler web.Handler
 }
 
 func (r *routerAdapter) Group(prefix string, middleware ...web.Middleware) web.Router {
-	return &routerAdapter{group: r.group.Group(prefix, mustAdaptMiddlewares(middleware)...)}
+	return &routerAdapter{engine: r.engine, group: r.group.Group(prefix, mustAdaptMiddlewares(middleware)...)}
 }
 
 func adaptHandler(handler web.Handler) echo.HandlerFunc {

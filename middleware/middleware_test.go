@@ -324,6 +324,66 @@ func TestMethodOverrideDoesNotChangeNonPost(t *testing.T) {
 	}
 }
 
+func TestHTTPSRedirectRedirectsToHTTPS(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Pre(HTTPSRedirect())
+	router.GET("/redirect", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/redirect?x=1", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMovedPermanently {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := rec.Header().Get("Location"); got != "https://example.com/redirect?x=1" {
+		t.Fatalf("Location = %q", got)
+	}
+}
+
+func TestAddTrailingSlashRedirectsWhenConfigured(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Pre(AddTrailingSlashWithConfig(TrailingSlashConfig{RedirectCode: http.StatusTemporaryRedirect}))
+	router.GET("/docs/", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/docs?x=1", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := rec.Header().Get("Location"); got != "/docs/?x=1" {
+		t.Fatalf("Location = %q", got)
+	}
+}
+
+func TestRemoveTrailingSlashMutatesRequestWhenNotRedirecting(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Pre(RemoveTrailingSlash())
+	router.Any("/resource", func(r web.Context) error {
+		return r.Text(http.StatusOK, r.URI())
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/resource/?x=1", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "/resource?x=1" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
@@ -417,6 +477,7 @@ func (c *stubContext) Context() context.Context                  { return contex
 func (c *stubContext) Method() string                            { return http.MethodGet }
 func (c *stubContext) Path() string                              { return "/" }
 func (c *stubContext) URI() string                               { return "/" }
+func (c *stubContext) Scheme() string                            { return "http" }
 func (c *stubContext) Host() string                              { return "example.com" }
 func (c *stubContext) Param(name string) string                  { return "" }
 func (c *stubContext) Query(name string) string                  { return "" }

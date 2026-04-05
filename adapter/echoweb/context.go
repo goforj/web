@@ -31,7 +31,11 @@ func (c *contextAdapter) Path() string {
 }
 
 func (c *contextAdapter) URI() string {
-	return c.echo.Request().RequestURI
+	return c.echo.Request().URL.RequestURI()
+}
+
+func (c *contextAdapter) Scheme() string {
+	return c.echo.Scheme()
 }
 
 func (c *contextAdapter) Host() string {
