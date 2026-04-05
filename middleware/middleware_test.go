@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -774,6 +775,68 @@ func TestCSRFFailsOnMissingOrInvalidToken(t *testing.T) {
 	}
 }
 
+func TestStaticServesFilesAndHTML5Fallback(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(pathJoin(root, "index.html"), []byte("index"), 0o644); err != nil {
+		t.Fatalf("WriteFile index: %v", err)
+	}
+	if err := os.WriteFile(pathJoin(root, "app.js"), []byte("console.log('ok')"), 0o644); err != nil {
+		t.Fatalf("WriteFile app.js: %v", err)
+	}
+
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(StaticWithConfig(StaticConfig{
+		Root:  root,
+		HTML5: true,
+	}))
+	router.GET("/api/ping", func(r web.Context) error {
+		return r.Text(http.StatusOK, "pong")
+	})
+
+	fileReq := httptest.NewRequest(http.MethodGet, "/app.js", nil)
+	fileRec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(fileRec, fileReq)
+	if fileRec.Code != http.StatusOK || fileRec.Body.String() != "console.log('ok')" {
+		t.Fatalf("file response = %d %q", fileRec.Code, fileRec.Body.String())
+	}
+
+	html5Req := httptest.NewRequest(http.MethodGet, "/dashboard/monitors", nil)
+	html5Rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(html5Rec, html5Req)
+	if html5Rec.Code != http.StatusOK || html5Rec.Body.String() != "index" {
+		t.Fatalf("html5 response = %d %q", html5Rec.Code, html5Rec.Body.String())
+	}
+}
+
+func TestStaticBrowseListsDirectoryContents(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(pathJoin(root, "a.txt"), []byte("a"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if err := os.Mkdir(pathJoin(root, "nested"), 0o755); err != nil {
+		t.Fatalf("Mkdir: %v", err)
+	}
+
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(StaticWithConfig(StaticConfig{
+		Root:   root,
+		Browse: true,
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "a.txt") || !strings.Contains(rec.Body.String(), "nested/") {
+		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
@@ -895,3 +958,7 @@ func (c *stubContext) NoContent(code int) error             { return nil }
 func (c *stubContext) Redirect(code int, url string) error  { return nil }
 func (c *stubContext) StatusCode() int                      { return http.StatusOK }
 func (c *stubContext) Native() any                          { return nil }
+
+func pathJoin(parts ...string) string {
+	return strings.Join(parts, string(os.PathSeparator))
+}
