@@ -617,6 +617,65 @@ func TestDecompressInflatesGzipRequestBody(t *testing.T) {
 	}
 }
 
+func TestGzipCompressesResponseWhenAccepted(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(Gzip())
+	router.GET("/gzip", func(r web.Context) error {
+		return r.Text(http.StatusOK, strings.Repeat("gopher", 8))
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/gzip", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Encoding"); got != "gzip" {
+		t.Fatalf("Content-Encoding = %q", got)
+	}
+
+	zr, err := gzip.NewReader(bytes.NewReader(rec.Body.Bytes()))
+	if err != nil {
+		t.Fatalf("NewReader: %v", err)
+	}
+	defer zr.Close()
+
+	body, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if got := string(body); got != strings.Repeat("gopher", 8) {
+		t.Fatalf("body = %q", got)
+	}
+}
+
+func TestGzipLeavesShortResponsePlainWhenBelowMinLength(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(GzipWithConfig(GzipConfig{MinLength: 128}))
+	router.GET("/gzip", func(r web.Context) error {
+		return r.Text(http.StatusOK, "tiny")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/gzip", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("Content-Encoding"); got != "" {
+		t.Fatalf("Content-Encoding = %q", got)
+	}
+	if body := rec.Body.String(); body != "tiny" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
