@@ -9,9 +9,11 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/goforj/web"
 	"github.com/goforj/web/adapter/echoweb"
+	"golang.org/x/time/rate"
 )
 
 func TestRequestIDUsesIncomingOrGeneratedValue(t *testing.T) {
@@ -471,6 +473,66 @@ func TestSecureSetsExpectedHeaders(t *testing.T) {
 	}
 	if got := rec.Header().Get("Referrer-Policy"); got != "same-origin" {
 		t.Fatalf("Referrer-Policy = %q", got)
+	}
+}
+
+func TestRateLimiterAllowsThenDenies(t *testing.T) {
+	store := NewRateLimiterMemoryStoreWithConfig(RateLimiterMemoryStoreConfig{
+		Rate:      rate.Limit(1),
+		Burst:     1,
+		ExpiresIn: time.Minute,
+	})
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(RateLimiter(store))
+	router.GET("/limited", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	firstReq := httptest.NewRequest(http.MethodGet, "/limited", nil)
+	firstReq.Header.Set("X-Forwarded-For", "203.0.113.10")
+	firstRec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(firstRec, firstReq)
+
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("first status = %d body=%s", firstRec.Code, firstRec.Body.String())
+	}
+
+	secondReq := httptest.NewRequest(http.MethodGet, "/limited", nil)
+	secondReq.Header.Set("X-Forwarded-For", "203.0.113.10")
+	secondRec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(secondRec, secondReq)
+
+	if secondRec.Code != http.StatusTooManyRequests {
+		t.Fatalf("second status = %d body=%s", secondRec.Code, secondRec.Body.String())
+	}
+	if body := strings.TrimSpace(secondRec.Body.String()); body != `{"error":"rate limit exceeded"}` {
+		t.Fatalf("second body = %q", body)
+	}
+}
+
+func TestRateLimiterCustomExtractorErrorHandler(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(RateLimiterWithConfig(RateLimiterConfig{
+		Store: NewRateLimiterMemoryStore(rate.Limit(1)),
+		IdentifierExtractor: func(r web.Context) (string, error) {
+			return "", errors.New("boom")
+		},
+	}))
+	router.GET("/limited", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/limited", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := strings.TrimSpace(rec.Body.String()); body != `{"error":"error while extracting identifier"}` {
+		t.Fatalf("body = %q", body)
 	}
 }
 
