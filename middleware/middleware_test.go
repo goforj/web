@@ -536,6 +536,27 @@ func TestRateLimiterCustomExtractorErrorHandler(t *testing.T) {
 	}
 }
 
+func TestContextTimeoutReturnsServiceUnavailableOnDeadlineExceeded(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(ContextTimeout(5 * time.Millisecond))
+	router.GET("/timeout", func(r web.Context) error {
+		<-r.Request().Context().Done()
+		return r.Request().Context().Err()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/timeout", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := strings.TrimSpace(rec.Body.String()); body != `{"error":"service unavailable"}` {
+		t.Fatalf("body = %q", body)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
