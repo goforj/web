@@ -1,4 +1,4 @@
-package middleware
+package webmiddleware
 
 import (
 	"encoding/base64"

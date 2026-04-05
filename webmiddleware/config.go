@@ -1,4 +1,4 @@
-package middleware
+package webmiddleware
 
 import "github.com/goforj/web"
 
