@@ -5,7 +5,12 @@ go 1.25.0
 require github.com/labstack/echo/v4 v4.13.4
 
 require (
-	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/goforj/str v1.2.0
+	github.com/gorilla/websocket v1.5.3
+	golang.org/x/time v0.15.0
+)
+
+require (
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -15,5 +20,4 @@ require (
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
 )
