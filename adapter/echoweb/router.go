@@ -8,11 +8,17 @@ import (
 
 type groupLike interface {
 	Use(middleware ...echo.MiddlewareFunc)
+	CONNECT(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
+	DELETE(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
 	GET(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
+	HEAD(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
+	OPTIONS(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
 	POST(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
 	PUT(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
 	PATCH(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	DELETE(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
+	TRACE(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
+	Any(path string, handler echo.HandlerFunc, middleware ...echo.MiddlewareFunc) []*echo.Route
+	Match(methods []string, path string, handler echo.HandlerFunc, middleware ...echo.MiddlewareFunc) []*echo.Route
 	Group(prefix string, middleware ...echo.MiddlewareFunc) *echo.Group
 }
 
@@ -26,28 +32,52 @@ func (r *routerAdapter) Use(middleware ...web.Middleware) {
 	r.group.Use(mustAdaptMiddlewares(middleware)...)
 }
 
-func (r *routerAdapter) Get(path string, handler web.Handler, middleware ...web.Middleware) {
+func (r *routerAdapter) CONNECT(path string, handler web.Handler, middleware ...web.Middleware) {
+	r.group.CONNECT(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+}
+
+func (r *routerAdapter) DELETE(path string, handler web.Handler, middleware ...web.Middleware) {
+	r.group.DELETE(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+}
+
+func (r *routerAdapter) GET(path string, handler web.Handler, middleware ...web.Middleware) {
 	r.group.GET(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
 }
 
-func (r *routerAdapter) GetWS(path string, handler web.WebSocketHandler, middleware ...web.Middleware) {
+func (r *routerAdapter) GETWS(path string, handler web.WebSocketHandler, middleware ...web.Middleware) {
 	r.group.GET(path, adaptWebSocketHandler(handler), mustAdaptMiddlewares(middleware)...)
 }
 
-func (r *routerAdapter) Post(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.POST(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+func (r *routerAdapter) HEAD(path string, handler web.Handler, middleware ...web.Middleware) {
+	r.group.HEAD(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
 }
 
-func (r *routerAdapter) Put(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.PUT(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+func (r *routerAdapter) OPTIONS(path string, handler web.Handler, middleware ...web.Middleware) {
+	r.group.OPTIONS(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
 }
 
-func (r *routerAdapter) Patch(path string, handler web.Handler, middleware ...web.Middleware) {
+func (r *routerAdapter) PATCH(path string, handler web.Handler, middleware ...web.Middleware) {
 	r.group.PATCH(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
 }
 
-func (r *routerAdapter) Delete(path string, handler web.Handler, middleware ...web.Middleware) {
-	r.group.DELETE(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+func (r *routerAdapter) POST(path string, handler web.Handler, middleware ...web.Middleware) {
+	r.group.POST(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+}
+
+func (r *routerAdapter) PUT(path string, handler web.Handler, middleware ...web.Middleware) {
+	r.group.PUT(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+}
+
+func (r *routerAdapter) TRACE(path string, handler web.Handler, middleware ...web.Middleware) {
+	r.group.TRACE(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+}
+
+func (r *routerAdapter) Any(path string, handler web.Handler, middleware ...web.Middleware) {
+	r.group.Any(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
+}
+
+func (r *routerAdapter) Match(methods []string, path string, handler web.Handler, middleware ...web.Middleware) {
+	r.group.Match(methods, path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
 }
 
 func (r *routerAdapter) Group(prefix string, middleware ...web.Middleware) web.Router {

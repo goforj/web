@@ -3,11 +3,17 @@ package web
 // Router is the app-facing route registration contract.
 type Router interface {
 	Use(...Middleware)
-	Get(path string, handler Handler, middleware ...Middleware)
-	GetWS(path string, handler WebSocketHandler, middleware ...Middleware)
-	Post(path string, handler Handler, middleware ...Middleware)
-	Put(path string, handler Handler, middleware ...Middleware)
-	Patch(path string, handler Handler, middleware ...Middleware)
-	Delete(path string, handler Handler, middleware ...Middleware)
+	CONNECT(path string, handler Handler, middleware ...Middleware)
+	DELETE(path string, handler Handler, middleware ...Middleware)
+	GET(path string, handler Handler, middleware ...Middleware)
+	GETWS(path string, handler WebSocketHandler, middleware ...Middleware)
+	HEAD(path string, handler Handler, middleware ...Middleware)
+	OPTIONS(path string, handler Handler, middleware ...Middleware)
+	PATCH(path string, handler Handler, middleware ...Middleware)
+	POST(path string, handler Handler, middleware ...Middleware)
+	PUT(path string, handler Handler, middleware ...Middleware)
+	TRACE(path string, handler Handler, middleware ...Middleware)
+	Any(path string, handler Handler, middleware ...Middleware)
+	Match(methods []string, path string, handler Handler, middleware ...Middleware)
 	Group(prefix string, middleware ...Middleware) Router
 }

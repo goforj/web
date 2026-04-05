@@ -14,7 +14,7 @@ import (
 
 func TestRouterRegistersRouteAndContext(t *testing.T) {
 	adapter := New()
-	adapter.Router().Get("/users/:id", func(r web.Context) error {
+	adapter.Router().GET("/users/:id", func(r web.Context) error {
 		if got := r.Param("id"); got != "42" {
 			t.Fatalf("param id = %q", got)
 		}
@@ -51,7 +51,7 @@ func TestRouterGroupAndMiddleware(t *testing.T) {
 		}
 	})
 
-	group.Get("/ping", func(r web.Context) error {
+	group.GET("/ping", func(r web.Context) error {
 		if got := r.Get("trace"); got != "group" {
 			t.Fatalf("trace = %#v", got)
 		}
@@ -80,7 +80,7 @@ func TestWrapMiddlewareBridgesEchoMiddleware(t *testing.T) {
 		}
 	}))
 
-	router.Get("/mw", func(r web.Context) error {
+	router.GET("/mw", func(r web.Context) error {
 		return r.NoContent(http.StatusNoContent)
 	})
 
@@ -98,7 +98,7 @@ func TestWrapMiddlewareBridgesEchoMiddleware(t *testing.T) {
 
 func TestContextSupportsHeadersAndBlobResponses(t *testing.T) {
 	adapter := New()
-	adapter.Router().Get("/blob", func(r web.Context) error {
+	adapter.Router().GET("/blob", func(r web.Context) error {
 		r.SetHeader("Cache-Control", "public, max-age=60")
 		return r.Blob(http.StatusOK, "image/x-icon", []byte{1, 2, 3})
 	})
@@ -134,7 +134,7 @@ func TestContextSupportsFileResponses(t *testing.T) {
 	}
 
 	adapter := New()
-	adapter.Router().Get("/file", func(r web.Context) error {
+	adapter.Router().GET("/file", func(r web.Context) error {
 		return r.File(file.Name())
 	})
 
@@ -152,7 +152,7 @@ func TestContextSupportsFileResponses(t *testing.T) {
 
 func TestContextSupportsCookiesAndRealIP(t *testing.T) {
 	adapter := New()
-	adapter.Router().Get("/cookie", func(r web.Context) error {
+	adapter.Router().GET("/cookie", func(r web.Context) error {
 		r.SetCookie(&http.Cookie{
 			Name:  "session",
 			Value: "abc123",
@@ -187,7 +187,7 @@ func TestContextSupportsCookiesAndRealIP(t *testing.T) {
 
 func TestRouterRegistersWebSocketRoute(t *testing.T) {
 	adapter := New()
-	adapter.Router().GetWS("/ws", func(r web.Context, conn web.WebSocketConn) error {
+	adapter.Router().GETWS("/ws", func(r web.Context, conn web.WebSocketConn) error {
 		var payload map[string]any
 		if err := conn.ReadJSON(&payload); err != nil {
 			t.Fatalf("ReadJSON: %v", err)
@@ -223,5 +223,47 @@ func TestRouterRegistersWebSocketRoute(t *testing.T) {
 	}
 	if got := response["path"]; got != "/ws" {
 		t.Fatalf("path = %#v", got)
+	}
+}
+
+func TestRouterSupportsHeadAndMatch(t *testing.T) {
+	adapter := New()
+	router := adapter.Router()
+	router.HEAD("/head", func(r web.Context) error {
+		r.SetHeader("X-Method", r.Method())
+		return r.NoContent(http.StatusNoContent)
+	})
+	router.Match([]string{http.MethodOptions, http.MethodTrace}, "/match", func(r web.Context) error {
+		return r.Text(http.StatusOK, r.Method())
+	})
+
+	headReq := httptest.NewRequest(http.MethodHead, "/head", nil)
+	headRec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(headRec, headReq)
+	if headRec.Code != http.StatusNoContent {
+		t.Fatalf("head status = %d", headRec.Code)
+	}
+	if got := headRec.Header().Get("X-Method"); got != http.MethodHead {
+		t.Fatalf("X-Method = %q", got)
+	}
+
+	optionsReq := httptest.NewRequest(http.MethodOptions, "/match", nil)
+	optionsRec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(optionsRec, optionsReq)
+	if optionsRec.Code != http.StatusOK {
+		t.Fatalf("options status = %d body=%s", optionsRec.Code, optionsRec.Body.String())
+	}
+	if body := optionsRec.Body.String(); body != http.MethodOptions {
+		t.Fatalf("options body = %q", body)
+	}
+
+	traceReq := httptest.NewRequest(http.MethodTrace, "/match", nil)
+	traceRec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(traceRec, traceReq)
+	if traceRec.Code != http.StatusOK {
+		t.Fatalf("trace status = %d body=%s", traceRec.Code, traceRec.Body.String())
+	}
+	if body := traceRec.Body.String(); body != http.MethodTrace {
+		t.Fatalf("trace body = %q", body)
 	}
 }
