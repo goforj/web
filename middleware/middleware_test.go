@@ -78,6 +78,42 @@ func TestCORSHandlesPreflightAndSimpleRequests(t *testing.T) {
 	}
 }
 
+func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+
+	var captured RequestLoggerValues
+	router.Use(RequestLoggerWithConfig(RequestLoggerConfig{
+		LogValuesFunc: func(r web.Context, values RequestLoggerValues) error {
+			captured = values
+			return nil
+		},
+	}))
+	router.GET("/logger", func(r web.Context) error {
+		return r.Text(http.StatusCreated, "created")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/logger?x=1", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if captured.Status != http.StatusCreated {
+		t.Fatalf("captured status = %d", captured.Status)
+	}
+	if captured.Method != http.MethodGet {
+		t.Fatalf("captured method = %q", captured.Method)
+	}
+	if captured.URI != "/logger?x=1" {
+		t.Fatalf("captured uri = %q", captured.URI)
+	}
+	if captured.Latency < 0 {
+		t.Fatalf("captured latency = %v", captured.Latency)
+	}
+}
+
 func TestRecoverReturnsRecoveredError(t *testing.T) {
 	ctx := newStubContext()
 	handler := Recover()(func(r web.Context) error {
@@ -134,6 +170,7 @@ func newStubContext() *stubContext {
 func (c *stubContext) Context() context.Context                  { return context.Background() }
 func (c *stubContext) Method() string                            { return http.MethodGet }
 func (c *stubContext) Path() string                              { return "/" }
+func (c *stubContext) URI() string                               { return "/" }
 func (c *stubContext) Host() string                              { return "example.com" }
 func (c *stubContext) Param(name string) string                  { return "" }
 func (c *stubContext) Query(name string) string                  { return "" }
@@ -155,4 +192,5 @@ func (c *stubContext) Text(code int, body string) error     { return nil }
 func (c *stubContext) HTML(code int, body string) error     { return nil }
 func (c *stubContext) NoContent(code int) error             { return nil }
 func (c *stubContext) Redirect(code int, url string) error  { return nil }
+func (c *stubContext) StatusCode() int                      { return http.StatusOK }
 func (c *stubContext) Native() any                          { return nil }

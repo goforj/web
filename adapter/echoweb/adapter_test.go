@@ -21,6 +21,9 @@ func TestRouterRegistersRouteAndContext(t *testing.T) {
 		if got := r.Path(); got != "/users/:id" {
 			t.Fatalf("path = %q", got)
 		}
+		if got := r.URI(); got != "/users/42" {
+			t.Fatalf("uri = %q", got)
+		}
 		if got := r.Host(); got != "example.com" {
 			t.Fatalf("host = %q", got)
 		}
@@ -30,7 +33,8 @@ func TestRouterRegistersRouteAndContext(t *testing.T) {
 		})
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "http://example.com/users/42", nil)
+	req := httptest.NewRequest(http.MethodGet, "/users/42", nil)
+	req.Host = "example.com"
 	rec := httptest.NewRecorder()
 	adapter.Echo().ServeHTTP(rec, req)
 

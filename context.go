@@ -10,6 +10,7 @@ type Context interface {
 	Context() context.Context
 	Method() string
 	Path() string
+	URI() string
 	Host() string
 	Param(name string) string
 	Query(name string) string
@@ -29,5 +30,6 @@ type Context interface {
 	HTML(code int, body string) error
 	NoContent(code int) error
 	Redirect(code int, url string) error
+	StatusCode() int
 	Native() any
 }

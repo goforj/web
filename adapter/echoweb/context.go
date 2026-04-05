@@ -30,6 +30,10 @@ func (c *contextAdapter) Path() string {
 	return c.echo.Path()
 }
 
+func (c *contextAdapter) URI() string {
+	return c.echo.Request().RequestURI
+}
+
 func (c *contextAdapter) Host() string {
 	return c.echo.Request().Host
 }
@@ -104,6 +108,10 @@ func (c *contextAdapter) NoContent(code int) error {
 
 func (c *contextAdapter) Redirect(code int, url string) error {
 	return c.echo.Redirect(code, url)
+}
+
+func (c *contextAdapter) StatusCode() int {
+	return c.echo.Response().Status
 }
 
 func (c *contextAdapter) Native() any {
