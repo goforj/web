@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -380,6 +381,52 @@ func TestRemoveTrailingSlashMutatesRequestWhenNotRedirecting(t *testing.T) {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
 	if body := rec.Body.String(); body != "/resource?x=1" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestRewriteChangesMatchingRouteBeforeRouting(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Pre(Rewrite(map[string]string{
+		"/old/*": "/new/$1",
+	}))
+	router.GET("/new/:id", func(r web.Context) error {
+		return r.Text(http.StatusOK, r.Param("id"))
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/old/42", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "42" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestRewriteWithRegexRulesPreservesQuery(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Pre(RewriteWithConfig(RewriteConfig{
+		RegexRules: map[*regexp.Regexp]string{
+			regexp.MustCompile(`^/v1/items/(.*)$`): "/items/$1?source=rewritten",
+		},
+	}))
+	router.GET("/items/:id", func(r web.Context) error {
+		return r.Text(http.StatusOK, r.URI())
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/items/42", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "/items/42?source=rewritten" {
 		t.Fatalf("body = %q", body)
 	}
 }
