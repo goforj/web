@@ -78,6 +78,78 @@ func TestCORSHandlesPreflightAndSimpleRequests(t *testing.T) {
 	}
 }
 
+func TestBasicAuthAllowsValidCredentials(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(BasicAuth(func(username string, password string, r web.Context) (bool, error) {
+		r.Set("username", username)
+		return username == "admin" && password == "secret", nil
+	}))
+	router.GET("/basic", func(r web.Context) error {
+		if got := r.Get("username"); got != "admin" {
+			t.Fatalf("username = %#v", got)
+		}
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/basic", nil)
+	req.SetBasicAuth("admin", "secret")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "ok" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestBasicAuthRejectsMissingCredentials(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(BasicAuth(func(username string, password string, r web.Context) (bool, error) {
+		return true, nil
+	}))
+	router.GET("/basic", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/basic", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("WWW-Authenticate"); got != "basic realm=Restricted" {
+		t.Fatalf("WWW-Authenticate = %q", got)
+	}
+}
+
+func TestBasicAuthRejectsInvalidBase64(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(BasicAuth(func(username string, password string, r web.Context) (bool, error) {
+		return true, nil
+	}))
+	router.GET("/basic", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/basic", nil)
+	req.Header.Set("Authorization", "Basic !!!")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("WWW-Authenticate"); got != "basic realm=Restricted" {
+		t.Fatalf("WWW-Authenticate = %q", got)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
