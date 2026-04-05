@@ -27,6 +27,21 @@ First adapter:
 
 - `github.com/goforj/web/adapter/echoweb`
 
+## Compatibility
+
+The Echo bridge helpers in `adapter/echoweb` are kept for migration, but they are not the preferred long-term API.
+
+Prefer:
+
+- `web.Handler`
+- `web.Middleware`
+- `webmiddleware`
+
+Avoid introducing new uses of:
+
+- `echoweb.WrapHandler`
+- `echoweb.WrapMiddleware`
+
 ## Development
 
 Run the focused adapter benchmark suite with:

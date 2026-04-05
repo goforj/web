@@ -7,7 +7,8 @@ import (
 	echo "github.com/labstack/echo/v4"
 )
 
-// WrapHandler exposes a native Echo handler as a web.Handler bridge.
+// Deprecated: WrapHandler is a legacy migration bridge for Echo handlers.
+// New application code should use web.Handler directly.
 func WrapHandler(handler echo.HandlerFunc) web.Handler {
 	return func(r web.Context) error {
 		native, ok := UnwrapContext(r)
@@ -18,7 +19,8 @@ func WrapHandler(handler echo.HandlerFunc) web.Handler {
 	}
 }
 
-// WrapMiddleware exposes a native Echo middleware as a web.Middleware bridge.
+// Deprecated: WrapMiddleware is a legacy migration bridge for Echo middleware.
+// New application code should use webmiddleware or plain web.Middleware directly.
 func WrapMiddleware(middleware echo.MiddlewareFunc) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {
