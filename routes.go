@@ -121,6 +121,19 @@ func (g RouteGroup) WithMiddlewareNames(names ...string) RouteGroup {
 	return g
 }
 
+// RegisterRoutes registers route groups onto a router.
+func RegisterRoutes(router Router, groups []RouteGroup) error {
+	for _, group := range groups {
+		g := router.Group(group.RoutePrefix(), group.Middlewares()...)
+		for _, route := range group.Routes() {
+			if err := g.Handle(route.Method(), route.Path(), route.Handler(), route.Middlewares()...); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func qualifyHandler(name string) string {
 	safe := filepath.ToSlash(name)
 	safe = strings.TrimSuffix(safe, "-fm")
