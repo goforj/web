@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"io"
@@ -577,6 +579,40 @@ func TestTimeoutReturnsServiceUnavailableWhenHandlerRunsTooLong(t *testing.T) {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
 	if body := strings.TrimSpace(rec.Body.String()); body != "timeout" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestDecompressInflatesGzipRequestBody(t *testing.T) {
+	var compressed bytes.Buffer
+	zw := gzip.NewWriter(&compressed)
+	if _, err := zw.Write([]byte(`{"name":"gopher"}`)); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(Decompress())
+	router.POST("/inflate", func(r web.Context) error {
+		body, err := io.ReadAll(r.Request().Body)
+		if err != nil {
+			t.Fatalf("ReadAll: %v", err)
+		}
+		return r.Text(http.StatusOK, string(body))
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/inflate", bytes.NewReader(compressed.Bytes()))
+	req.Header.Set("Content-Encoding", "gzip")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != `{"name":"gopher"}` {
 		t.Fatalf("body = %q", body)
 	}
 }
