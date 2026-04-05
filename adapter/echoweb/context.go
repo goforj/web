@@ -74,6 +74,10 @@ func (c *contextAdapter) ResponseWriter() http.ResponseWriter {
 	return c.echo.Response().Writer
 }
 
+func (c *contextAdapter) SetResponseWriter(writer http.ResponseWriter) {
+	c.echo.Response().Writer = writer
+}
+
 func (c *contextAdapter) Bind(target any) error {
 	return c.echo.Bind(target)
 }

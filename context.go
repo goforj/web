@@ -21,6 +21,7 @@ type Context interface {
 	Request() *http.Request
 	SetRequest(request *http.Request)
 	ResponseWriter() http.ResponseWriter
+	SetResponseWriter(writer http.ResponseWriter)
 	Bind(target any) error
 	Set(key string, value any)
 	Get(key string) any

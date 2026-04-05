@@ -557,6 +557,30 @@ func TestContextTimeoutReturnsServiceUnavailableOnDeadlineExceeded(t *testing.T)
 	}
 }
 
+func TestTimeoutReturnsServiceUnavailableWhenHandlerRunsTooLong(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(TimeoutWithConfig(TimeoutConfig{
+		Timeout:      5 * time.Millisecond,
+		ErrorMessage: "timeout",
+	}))
+	router.GET("/timeout", func(r web.Context) error {
+		time.Sleep(25 * time.Millisecond)
+		return r.Text(http.StatusOK, "late")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/timeout", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := strings.TrimSpace(rec.Body.String()); body != "timeout" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
@@ -660,6 +684,7 @@ func (c *stubContext) RealIP() string                            { return "127.0
 func (c *stubContext) Request() *http.Request                    { return httptest.NewRequest(http.MethodGet, "/", nil) }
 func (c *stubContext) SetRequest(request *http.Request)          {}
 func (c *stubContext) ResponseWriter() http.ResponseWriter       { return httptest.NewRecorder() }
+func (c *stubContext) SetResponseWriter(writer http.ResponseWriter) {}
 func (c *stubContext) Bind(target any) error                     { return nil }
 func (c *stubContext) Set(key string, value any)                 { c.values[key] = value }
 func (c *stubContext) Get(key string) any                        { return c.values[key] }
