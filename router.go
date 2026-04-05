@@ -4,6 +4,7 @@ package web
 type Router interface {
 	Pre(...Middleware)
 	Use(...Middleware)
+	Handle(method string, path string, handler Handler, middleware ...Middleware) error
 	CONNECT(path string, handler Handler, middleware ...Middleware)
 	DELETE(path string, handler Handler, middleware ...Middleware)
 	GET(path string, handler Handler, middleware ...Middleware)

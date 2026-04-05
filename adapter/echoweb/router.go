@@ -1,6 +1,7 @@
 package echoweb
 
 import (
+	"fmt"
 	"github.com/goforj/web"
 	"github.com/gorilla/websocket"
 	echo "github.com/labstack/echo/v4"
@@ -40,6 +41,32 @@ func (r *routerAdapter) Pre(middleware ...web.Middleware) {
 
 func (r *routerAdapter) Use(middleware ...web.Middleware) {
 	r.middlewares = append(r.middlewares, cleanMiddlewares(middleware)...)
+}
+
+func (r *routerAdapter) Handle(method string, path string, handler web.Handler, middleware ...web.Middleware) error {
+	switch method {
+	case echo.CONNECT:
+		r.CONNECT(path, handler, middleware...)
+	case echo.DELETE:
+		r.DELETE(path, handler, middleware...)
+	case echo.GET:
+		r.GET(path, handler, middleware...)
+	case echo.HEAD:
+		r.HEAD(path, handler, middleware...)
+	case echo.OPTIONS:
+		r.OPTIONS(path, handler, middleware...)
+	case echo.PATCH:
+		r.PATCH(path, handler, middleware...)
+	case echo.POST:
+		r.POST(path, handler, middleware...)
+	case echo.PUT:
+		r.PUT(path, handler, middleware...)
+	case echo.TRACE:
+		r.TRACE(path, handler, middleware...)
+	default:
+		return fmt.Errorf("unsupported route method %q", method)
+	}
+	return nil
 }
 
 func (r *routerAdapter) CONNECT(path string, handler web.Handler, middleware ...web.Middleware) {
