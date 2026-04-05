@@ -58,6 +58,18 @@ func (c *contextAdapter) RealIP() string {
 	return c.echo.RealIP()
 }
 
+func (c *contextAdapter) Request() *http.Request {
+	return c.echo.Request()
+}
+
+func (c *contextAdapter) SetRequest(request *http.Request) {
+	c.echo.SetRequest(request)
+}
+
+func (c *contextAdapter) ResponseWriter() http.ResponseWriter {
+	return c.echo.Response().Writer
+}
+
 func (c *contextAdapter) Bind(target any) error {
 	return c.echo.Bind(target)
 }

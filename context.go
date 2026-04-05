@@ -17,6 +17,9 @@ type Context interface {
 	Header(name string) string
 	Cookie(name string) (*http.Cookie, error)
 	RealIP() string
+	Request() *http.Request
+	SetRequest(request *http.Request)
+	ResponseWriter() http.ResponseWriter
 	Bind(target any) error
 	Set(key string, value any)
 	Get(key string) any

@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -238,6 +239,49 @@ func TestKeyAuthRejectsInvalidKey(t *testing.T) {
 	}
 }
 
+func TestBodyLimitRejectsLargeContentLength(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(BodyLimit("4B"))
+	router.POST("/limit", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/limit", strings.NewReader("12345"))
+	req.ContentLength = 5
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestBodyLimitAllowsSmallBody(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(BodyLimit("8B"))
+	router.POST("/limit", func(r web.Context) error {
+		body, err := io.ReadAll(r.Request().Body)
+		if err != nil {
+			t.Fatalf("ReadAll: %v", err)
+		}
+		return r.Text(http.StatusOK, string(body))
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/limit", strings.NewReader("1234"))
+	req.ContentLength = 4
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "1234" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
@@ -337,6 +381,9 @@ func (c *stubContext) Query(name string) string                  { return "" }
 func (c *stubContext) Header(name string) string                 { return c.headers.Get(name) }
 func (c *stubContext) Cookie(name string) (*http.Cookie, error)  { return nil, http.ErrNoCookie }
 func (c *stubContext) RealIP() string                            { return "127.0.0.1" }
+func (c *stubContext) Request() *http.Request                    { return httptest.NewRequest(http.MethodGet, "/", nil) }
+func (c *stubContext) SetRequest(request *http.Request)          {}
+func (c *stubContext) ResponseWriter() http.ResponseWriter       { return httptest.NewRecorder() }
 func (c *stubContext) Bind(target any) error                     { return nil }
 func (c *stubContext) Set(key string, value any)                 { c.values[key] = value }
 func (c *stubContext) Get(key string) any                        { return c.values[key] }

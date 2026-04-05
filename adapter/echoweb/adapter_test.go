@@ -27,6 +27,12 @@ func TestRouterRegistersRouteAndContext(t *testing.T) {
 		if got := r.Host(); got != "example.com" {
 			t.Fatalf("host = %q", got)
 		}
+		if got := r.Request(); got == nil {
+			t.Fatal("request is nil")
+		}
+		if got := r.ResponseWriter(); got == nil {
+			t.Fatal("response writer is nil")
+		}
 		return r.JSON(http.StatusOK, map[string]any{
 			"id":     r.Param("id"),
 			"method": r.Method(),
