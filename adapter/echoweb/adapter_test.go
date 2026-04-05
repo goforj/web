@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/goforj/web"
+	"github.com/gorilla/websocket"
 	echo "github.com/labstack/echo/v4"
 )
 
@@ -178,5 +179,46 @@ func TestContextSupportsCookiesAndRealIP(t *testing.T) {
 	}
 	if body := rec.Body.String(); body != "{\"incoming\":\"present\",\"real_ip\":\"203.0.113.10\"}\n" {
 		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestRouterRegistersWebSocketRoute(t *testing.T) {
+	adapter := New()
+	adapter.Router().GetWS("/ws", func(r web.Context, conn web.WebSocketConn) error {
+		var payload map[string]any
+		if err := conn.ReadJSON(&payload); err != nil {
+			t.Fatalf("ReadJSON: %v", err)
+		}
+		payload["path"] = r.Path()
+		if err := conn.WriteJSON(payload); err != nil {
+			t.Fatalf("WriteJSON: %v", err)
+		}
+		return conn.Close()
+	})
+
+	server := httptest.NewServer(adapter.Echo())
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer conn.Close()
+
+	if err := conn.WriteJSON(map[string]any{"kind": "ping"}); err != nil {
+		t.Fatalf("WriteJSON: %v", err)
+	}
+
+	var response map[string]any
+	if err := conn.ReadJSON(&response); err != nil {
+		t.Fatalf("ReadJSON: %v", err)
+	}
+
+	if got := response["kind"]; got != "ping" {
+		t.Fatalf("kind = %#v", got)
+	}
+	if got := response["path"]; got != "/ws" {
+		t.Fatalf("path = %#v", got)
 	}
 }

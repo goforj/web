@@ -4,6 +4,7 @@ package web
 type Router interface {
 	Use(...Middleware)
 	Get(path string, handler Handler, middleware ...Middleware)
+	GetWS(path string, handler WebSocketHandler, middleware ...Middleware)
 	Post(path string, handler Handler, middleware ...Middleware)
 	Put(path string, handler Handler, middleware ...Middleware)
 	Patch(path string, handler Handler, middleware ...Middleware)

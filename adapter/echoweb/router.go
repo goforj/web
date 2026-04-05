@@ -2,6 +2,7 @@ package echoweb
 
 import (
 	"github.com/goforj/web"
+	"github.com/gorilla/websocket"
 	echo "github.com/labstack/echo/v4"
 )
 
@@ -29,6 +30,10 @@ func (r *routerAdapter) Get(path string, handler web.Handler, middleware ...web.
 	r.group.GET(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
 }
 
+func (r *routerAdapter) GetWS(path string, handler web.WebSocketHandler, middleware ...web.Middleware) {
+	r.group.GET(path, adaptWebSocketHandler(handler), mustAdaptMiddlewares(middleware)...)
+}
+
 func (r *routerAdapter) Post(path string, handler web.Handler, middleware ...web.Middleware) {
 	r.group.POST(path, adaptHandler(handler), mustAdaptMiddlewares(middleware)...)
 }
@@ -52,6 +57,17 @@ func (r *routerAdapter) Group(prefix string, middleware ...web.Middleware) web.R
 func adaptHandler(handler web.Handler) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		return handler(newContextAdapter(c))
+	}
+}
+
+func adaptWebSocketHandler(handler web.WebSocketHandler) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		upgrader := websocket.Upgrader{}
+		conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
+		if err != nil {
+			return err
+		}
+		return handler(newContextAdapter(c), newWebSocketConn(conn))
 	}
 }
 
