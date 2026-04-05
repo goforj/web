@@ -19,6 +19,7 @@ type Context interface {
 	Bind(target any) error
 	Set(key string, value any)
 	Get(key string) any
+	AddHeader(name string, value string)
 	SetHeader(name string, value string)
 	SetCookie(cookie *http.Cookie)
 	JSON(code int, payload any) error

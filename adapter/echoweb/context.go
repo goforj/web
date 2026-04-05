@@ -66,6 +66,10 @@ func (c *contextAdapter) Get(key string) any {
 	return c.echo.Get(key)
 }
 
+func (c *contextAdapter) AddHeader(name string, value string) {
+	c.echo.Response().Header().Add(name, value)
+}
+
 func (c *contextAdapter) SetHeader(name string, value string) {
 	c.echo.Response().Header().Set(name, value)
 }
