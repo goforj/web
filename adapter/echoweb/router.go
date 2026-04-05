@@ -1,4 +1,4 @@
-package webecho
+package echoweb
 
 import (
 	"github.com/goforj/web"

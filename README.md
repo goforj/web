@@ -10,3 +10,7 @@ Current scope:
 - `Router`
 
 This repo is intentionally starting narrow. Echo will be the first adapter, but app code should depend on `github.com/goforj/web`, not the adapter directly.
+
+First adapter:
+
+- `github.com/goforj/web/adapter/echoweb`
