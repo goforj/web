@@ -134,6 +134,29 @@ func RegisterRoutes(router Router, groups []RouteGroup) error {
 	return nil
 }
 
+// MountRouter applies mount-style router configuration in declaration order.
+func MountRouter(router Router, mounts []RouterMount) error {
+	for _, mount := range mounts {
+		if mount == nil {
+			continue
+		}
+		if err := mount(router); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// qualifyHandler normalizes a runtime function name into a compact,
+// console-friendly identifier like "monitoring.Summary".
+//
+// runtime.FuncForPC names are verbose and inconsistent across:
+// - method values, which end in "-fm"
+// - compiler-generated closures, which end in ".funcN"
+// - pointer receiver methods, which include "(*Type)"
+//
+// The route list only needs a stable, human-readable package-ish prefix plus
+// the method/function name, not the full runtime symbol.
 func qualifyHandler(name string) string {
 	safe := filepath.ToSlash(name)
 	safe = strings.TrimSuffix(safe, "-fm")
@@ -145,12 +168,15 @@ func qualifyHandler(name string) string {
 	}
 	method := safe[lastDot+1:]
 	beforeMethod := safe[:lastDot]
+	// Drop pointer receiver noise so methods and free functions format the same.
 	beforeMethod = regexp.MustCompile(`\(\*[^)]+\)`).ReplaceAllString(beforeMethod, "")
 	beforeMethod = strings.TrimSuffix(beforeMethod, ".")
 
 	parts := strings.Split(beforeMethod, "/")
 	for i := len(parts) - 1; i >= 0; i-- {
 		pkg := strings.Trim(parts[i], ".")
+		// Skip generic path segments so we surface the app/domain package name
+		// instead of broad framework buckets like "internal" or "http".
 		if !isGenericPackage(pkg) && pkg != "" {
 			return fmt.Sprintf("%s.%s", pkg, method)
 		}

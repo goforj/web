@@ -19,3 +19,7 @@ type Router interface {
 	Match(methods []string, path string, handler Handler, middleware ...Middleware)
 	Group(prefix string, middleware ...Middleware) Router
 }
+
+// RouterMount configures a router with mount-style behavior such as SPA/static
+// surfaces, adapter-level middleware, or other non-route-group setup.
+type RouterMount func(Router) error
