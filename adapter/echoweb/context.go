@@ -65,6 +65,10 @@ func (c *contextAdapter) Blob(code int, contentType string, body []byte) error {
 	return c.echo.Blob(code, contentType, body)
 }
 
+func (c *contextAdapter) File(path string) error {
+	return c.echo.File(path)
+}
+
 func (c *contextAdapter) Text(code int, body string) error {
 	return c.echo.String(code, body)
 }

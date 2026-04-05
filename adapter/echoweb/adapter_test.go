@@ -3,6 +3,7 @@ package echoweb
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/goforj/web"
@@ -111,6 +112,35 @@ func TestContextSupportsHeadersAndBlobResponses(t *testing.T) {
 		t.Fatalf("Content-Type = %q", got)
 	}
 	if body := rec.Body.String(); body != string([]byte{1, 2, 3}) {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestContextSupportsFileResponses(t *testing.T) {
+	file, err := os.CreateTemp(t.TempDir(), "web-file-*")
+	if err != nil {
+		t.Fatalf("CreateTemp: %v", err)
+	}
+	if _, err := file.WriteString("file-body"); err != nil {
+		t.Fatalf("WriteString: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	adapter := New()
+	adapter.Router().Get("/file", func(r web.Context) error {
+		return r.File(file.Name())
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/file", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if body := rec.Body.String(); body != "file-body" {
 		t.Fatalf("body = %q", body)
 	}
 }
