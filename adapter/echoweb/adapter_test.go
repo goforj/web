@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/goforj/web"
@@ -141,6 +142,41 @@ func TestContextSupportsFileResponses(t *testing.T) {
 		t.Fatalf("status = %d", rec.Code)
 	}
 	if body := rec.Body.String(); body != "file-body" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestContextSupportsCookiesAndRealIP(t *testing.T) {
+	adapter := New()
+	adapter.Router().Get("/cookie", func(r web.Context) error {
+		r.SetCookie(&http.Cookie{
+			Name:  "session",
+			Value: "abc123",
+			Path:  "/",
+		})
+		cookie, err := r.Cookie("incoming")
+		if err != nil {
+			t.Fatalf("Cookie: %v", err)
+		}
+		return r.JSON(http.StatusOK, map[string]any{
+			"incoming": cookie.Value,
+			"real_ip":  r.RealIP(),
+		})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/cookie", nil)
+	req.AddCookie(&http.Cookie{Name: "incoming", Value: "present"})
+	req.Header.Set("X-Forwarded-For", "203.0.113.10")
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got := rec.Header().Get("Set-Cookie"); !strings.Contains(got, "session=abc123") {
+		t.Fatalf("Set-Cookie = %q", got)
+	}
+	if body := rec.Body.String(); body != "{\"incoming\":\"present\",\"real_ip\":\"203.0.113.10\"}\n" {
 		t.Fatalf("body = %q", body)
 	}
 }

@@ -2,6 +2,7 @@ package echoweb
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/goforj/web"
 	echo "github.com/labstack/echo/v4"
@@ -41,6 +42,14 @@ func (c *contextAdapter) Header(name string) string {
 	return c.echo.Request().Header.Get(name)
 }
 
+func (c *contextAdapter) Cookie(name string) (*http.Cookie, error) {
+	return c.echo.Cookie(name)
+}
+
+func (c *contextAdapter) RealIP() string {
+	return c.echo.RealIP()
+}
+
 func (c *contextAdapter) Bind(target any) error {
 	return c.echo.Bind(target)
 }
@@ -55,6 +64,10 @@ func (c *contextAdapter) Get(key string) any {
 
 func (c *contextAdapter) SetHeader(name string, value string) {
 	c.echo.Response().Header().Set(name, value)
+}
+
+func (c *contextAdapter) SetCookie(cookie *http.Cookie) {
+	http.SetCookie(c.echo.Response(), cookie)
 }
 
 func (c *contextAdapter) JSON(code int, payload any) error {
