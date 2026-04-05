@@ -676,6 +676,39 @@ func TestGzipLeavesShortResponsePlainWhenBelowMinLength(t *testing.T) {
 	}
 }
 
+func TestBodyDumpCapturesRequestAndResponseBodies(t *testing.T) {
+	var capturedRequest []byte
+	var capturedResponse []byte
+
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(BodyDump(func(r web.Context, reqBody []byte, resBody []byte) {
+		capturedRequest = append([]byte(nil), reqBody...)
+		capturedResponse = append([]byte(nil), resBody...)
+	}))
+	router.POST("/dump", func(r web.Context) error {
+		body, err := io.ReadAll(r.Request().Body)
+		if err != nil {
+			t.Fatalf("ReadAll: %v", err)
+		}
+		return r.Text(http.StatusOK, strings.ToUpper(string(body)))
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/dump", strings.NewReader("hello"))
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := string(capturedRequest); got != "hello" {
+		t.Fatalf("captured request = %q", got)
+	}
+	if got := string(capturedResponse); got != "HELLO" {
+		t.Fatalf("captured response = %q", got)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
