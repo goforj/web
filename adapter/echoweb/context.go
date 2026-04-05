@@ -3,6 +3,7 @@ package echoweb
 import (
 	"context"
 	"net/http"
+	"sync"
 
 	"github.com/goforj/web"
 	echo "github.com/labstack/echo/v4"
@@ -14,8 +15,24 @@ type contextAdapter struct {
 
 var _ web.Context = (*contextAdapter)(nil)
 
-func newContextAdapter(c echo.Context) *contextAdapter {
-	return &contextAdapter{echo: c}
+var contextAdapterPool = sync.Pool{
+	New: func() any {
+		return new(contextAdapter)
+	},
+}
+
+func acquireContextAdapter(c echo.Context) *contextAdapter {
+	adapted := contextAdapterPool.Get().(*contextAdapter)
+	adapted.echo = c
+	return adapted
+}
+
+func releaseContextAdapter(adapted *contextAdapter) {
+	if adapted == nil {
+		return
+	}
+	adapted.echo = nil
+	contextAdapterPool.Put(adapted)
 }
 
 func (c *contextAdapter) Context() context.Context {

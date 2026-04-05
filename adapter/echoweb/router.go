@@ -94,7 +94,9 @@ func (r *routerAdapter) Group(prefix string, middleware ...web.Middleware) web.R
 
 func adaptHandler(handler web.Handler) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return handler(newContextAdapter(c))
+		adapted := acquireContextAdapter(c)
+		defer releaseContextAdapter(adapted)
+		return handler(adapted)
 	}
 }
 
@@ -105,7 +107,9 @@ func adaptWebSocketHandler(handler web.WebSocketHandler) echo.HandlerFunc {
 		if err != nil {
 			return err
 		}
-		return handler(newContextAdapter(c), newWebSocketConn(conn))
+		adapted := acquireContextAdapter(c)
+		defer releaseContextAdapter(adapted)
+		return handler(adapted, newWebSocketConn(conn))
 	}
 }
 
@@ -113,27 +117,36 @@ func mustAdaptMiddlewares(middleware []web.Middleware) []echo.MiddlewareFunc {
 	if len(middleware) == 0 {
 		return nil
 	}
-	out := make([]echo.MiddlewareFunc, 0, len(middleware))
+	clean := make([]web.Middleware, 0, len(middleware))
 	for _, item := range middleware {
 		if item == nil {
 			continue
 		}
-		out = append(out, adaptMiddleware(item))
+		clean = append(clean, item)
 	}
-	return out
+	if len(clean) == 0 {
+		return nil
+	}
+	return []echo.MiddlewareFunc{adaptMiddlewares(clean)}
 }
 
-func adaptMiddleware(middleware web.Middleware) echo.MiddlewareFunc {
+func adaptMiddlewares(middlewares []web.Middleware) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		adapted := func(r web.Context) error {
+			native, ok := UnwrapContext(r)
+			if !ok {
+				return echo.ErrInternalServerError
+			}
+			return next(native)
+		}
+		for i := len(middlewares) - 1; i >= 0; i-- {
+			adapted = middlewares[i](adapted)
+		}
+
 		return func(c echo.Context) error {
-			adapted := middleware(func(r web.Context) error {
-				native, ok := UnwrapContext(r)
-				if !ok {
-					return next(c)
-				}
-				return next(native)
-			})
-			return adapted(newContextAdapter(c))
+			adaptedCtx := acquireContextAdapter(c)
+			defer releaseContextAdapter(adaptedCtx)
+			return adapted(adaptedCtx)
 		}
 	}
 }

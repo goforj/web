@@ -27,7 +27,9 @@ func WrapMiddleware(middleware echo.MiddlewareFunc) web.Middleware {
 				return next(r)
 			}
 			handler := middleware(func(c echo.Context) error {
-				return next(newContextAdapter(c))
+				adapted := acquireContextAdapter(c)
+				defer releaseContextAdapter(adapted)
+				return next(adapted)
 			})
 			return handler(native)
 		}
