@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -834,6 +835,75 @@ func TestStaticBrowseListsDirectoryContents(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "a.txt") || !strings.Contains(rec.Body.String(), "nested/") {
 		t.Fatalf("body = %q", rec.Body.String())
+	}
+}
+
+func TestProxyForwardsRequestToBackend(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.URL.Path + "?" + r.URL.RawQuery))
+	}))
+	defer backend.Close()
+
+	targetURL, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Use(Proxy(NewRoundRobinBalancer([]*ProxyTarget{{
+		Name: "backend",
+		URL:  targetURL,
+	}})))
+	router.GET("/*", func(r web.Context) error {
+		return r.NoContent(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/proxy/path?x=1", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "/proxy/path?x=1" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestProxyRewriteAdjustsBackendPath(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(r.URL.Path))
+	}))
+	defer backend.Close()
+
+	targetURL, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.Pre(Rewrite(map[string]string{
+		"/old/*": "/new/$1",
+	}))
+	router.Use(Proxy(NewRoundRobinBalancer([]*ProxyTarget{{
+		Name: "backend",
+		URL:  targetURL,
+	}})))
+	router.GET("/*", func(r web.Context) error {
+		return r.NoContent(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/old/path", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "/new/path" {
+		t.Fatalf("body = %q", body)
 	}
 }
 
