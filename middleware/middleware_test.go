@@ -907,6 +907,42 @@ func TestProxyRewriteAdjustsBackendPath(t *testing.T) {
 	}
 }
 
+func TestCreateExtractorsReadsHeaderQueryCookieAndFormValues(t *testing.T) {
+	extractors, err := CreateExtractors("header:X-Api-Key,query:key,cookie:session,form:key")
+	if err != nil {
+		t.Fatalf("CreateExtractors: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/extract?key=query-value", strings.NewReader("key=form-value"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Api-Key", "header-value")
+	req.AddCookie(&http.Cookie{Name: "session", Value: "cookie-value"})
+
+	adapter := echoweb.New()
+	router := adapter.Router()
+	router.POST("/extract", func(r web.Context) error {
+		var values []string
+		for _, extractor := range extractors {
+			extracted, err := extractor(r)
+			if err != nil {
+				t.Fatalf("extractor error: %v", err)
+			}
+			values = append(values, extracted...)
+		}
+		return r.Text(http.StatusOK, strings.Join(values, ","))
+	})
+
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "header-value,query-value,cookie-value,form-value" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
 func TestRequestLoggerCapturesStatusURIAndMethod(t *testing.T) {
 	adapter := echoweb.New()
 	router := adapter.Router()
