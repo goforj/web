@@ -9,7 +9,6 @@ import (
 
 	"github.com/goforj/web"
 	"github.com/gorilla/websocket"
-	echo "github.com/labstack/echo/v4"
 )
 
 func TestRouterRegistersRouteAndContext(t *testing.T) {
@@ -83,15 +82,15 @@ func TestRouterGroupAndMiddleware(t *testing.T) {
 	}
 }
 
-func TestWrapMiddlewareBridgesEchoMiddleware(t *testing.T) {
+func TestRouterUseAppliesMiddleware(t *testing.T) {
 	adapter := New()
 	router := adapter.Router()
-	router.Use(WrapMiddleware(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			c.Response().Header().Set("X-Echo-MW", "on")
-			return next(c)
+	router.Use(func(next web.Handler) web.Handler {
+		return func(r web.Context) error {
+			r.SetHeader("X-Web-MW", "on")
+			return next(r)
 		}
-	}))
+	})
 
 	router.GET("/mw", func(r web.Context) error {
 		return r.NoContent(http.StatusNoContent)
@@ -104,8 +103,8 @@ func TestWrapMiddlewareBridgesEchoMiddleware(t *testing.T) {
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status = %d", rec.Code)
 	}
-	if got := rec.Header().Get("X-Echo-MW"); got != "on" {
-		t.Fatalf("X-Echo-MW = %q", got)
+	if got := rec.Header().Get("X-Web-MW"); got != "on" {
+		t.Fatalf("X-Web-MW = %q", got)
 	}
 }
 
