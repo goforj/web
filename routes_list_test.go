@@ -43,6 +43,32 @@ func TestBuildRouteEntriesIncludesExtraRoutes(t *testing.T) {
 	}
 }
 
+func TestBuildRouteEntriesSortsByPathThenMethod(t *testing.T) {
+	entries := BuildRouteEntries([]RouteGroup{
+		NewRouteGroup(
+			"/api",
+			[]Route{
+				NewRoute("POST", "/users", testCreateRouteHandler),
+				NewRoute("GET", "/users", testListRouteHandler),
+				NewRoute("GET", "/users/:id", testShowRouteHandler),
+			},
+		),
+	})
+
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(entries))
+	}
+	if entries[0].Path != "/api/users" || strings.Join(entries[0].Methods, ",") != "GET" {
+		t.Fatalf("expected GET /api/users first, got %#v", entries[0])
+	}
+	if entries[1].Path != "/api/users" || strings.Join(entries[1].Methods, ",") != "POST" {
+		t.Fatalf("expected POST /api/users second, got %#v", entries[1])
+	}
+	if entries[2].Path != "/api/users/:id" || strings.Join(entries[2].Methods, ",") != "GET" {
+		t.Fatalf("expected /api/users/:id last, got %#v", entries[2])
+	}
+}
+
 func TestRenderRouteTableIncludesTitleAndLegend(t *testing.T) {
 	table := RenderRouteTable([]RouteEntry{
 		{
@@ -69,3 +95,9 @@ func testGroupMiddleware(next Handler) Handler {
 func testRouteMiddleware(next Handler) Handler {
 	return func(r Context) error { return next(r) }
 }
+
+func testCreateRouteHandler(r Context) error { return nil }
+
+func testListRouteHandler(r Context) error { return nil }
+
+func testShowRouteHandler(r Context) error { return nil }

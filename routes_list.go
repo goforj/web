@@ -230,7 +230,12 @@ func sortRouteEntries(grouped map[string]*RouteEntry) []RouteEntry {
 	}
 	sort.Slice(sorted, func(i, j int) bool {
 		if sorted[i].Path == sorted[j].Path {
-			return sorted[i].Handler < sorted[j].Handler
+			leftMethods := normalizeMethods(sorted[i].Methods)
+			rightMethods := normalizeMethods(sorted[j].Methods)
+			if leftMethods == rightMethods {
+				return sorted[i].Handler < sorted[j].Handler
+			}
+			return leftMethods < rightMethods
 		}
 		return sorted[i].Path < sorted[j].Path
 	})
