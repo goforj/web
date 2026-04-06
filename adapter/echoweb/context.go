@@ -10,7 +10,8 @@ import (
 )
 
 type contextAdapter struct {
-	echo echo.Context
+	echo     echo.Context
+	response responseAdapter
 }
 
 var _ web.Context = (*contextAdapter)(nil)
@@ -24,6 +25,7 @@ var contextAdapterPool = sync.Pool{
 func acquireContextAdapter(c echo.Context) *contextAdapter {
 	adapted := contextAdapterPool.Get().(*contextAdapter)
 	adapted.echo = c
+	adapted.response.context = adapted
 	return adapted
 }
 
@@ -31,6 +33,7 @@ func releaseContextAdapter(adapted *contextAdapter) {
 	if adapted == nil {
 		return
 	}
+	adapted.response.context = nil
 	adapted.echo = nil
 	contextAdapterPool.Put(adapted)
 }
@@ -85,6 +88,10 @@ func (c *contextAdapter) Request() *http.Request {
 
 func (c *contextAdapter) SetRequest(request *http.Request) {
 	c.echo.SetRequest(request)
+}
+
+func (c *contextAdapter) Response() web.Response {
+	return &c.response
 }
 
 func (c *contextAdapter) ResponseWriter() http.ResponseWriter {
@@ -153,6 +160,40 @@ func (c *contextAdapter) StatusCode() int {
 
 func (c *contextAdapter) Native() any {
 	return c.echo
+}
+
+type responseAdapter struct {
+	context *contextAdapter
+}
+
+var _ web.Response = (*responseAdapter)(nil)
+
+func (r *responseAdapter) Header() http.Header {
+	return r.context.echo.Response().Header()
+}
+
+func (r *responseAdapter) Writer() http.ResponseWriter {
+	return r.context.echo.Response().Writer
+}
+
+func (r *responseAdapter) SetWriter(writer http.ResponseWriter) {
+	r.context.echo.Response().Writer = writer
+}
+
+func (r *responseAdapter) StatusCode() int {
+	return r.context.echo.Response().Status
+}
+
+func (r *responseAdapter) Size() int64 {
+	return r.context.echo.Response().Size
+}
+
+func (r *responseAdapter) Committed() bool {
+	return r.context.echo.Response().Committed
+}
+
+func (r *responseAdapter) Native() any {
+	return r.context.echo.Response()
 }
 
 // UnwrapContext returns the underlying Echo context when the web.Context came from this adapter.

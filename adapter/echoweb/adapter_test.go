@@ -35,6 +35,15 @@ func TestRouterRegistersRouteAndContext(t *testing.T) {
 		if got := r.ResponseWriter(); got == nil {
 			t.Fatal("response writer is nil")
 		}
+		if got := r.Response(); got == nil {
+			t.Fatal("response is nil")
+		}
+		if got := r.Response().Writer(); got == nil {
+			t.Fatal("response writer is nil")
+		}
+		if got := r.Response().Committed(); got {
+			t.Fatal("response should not be committed before write")
+		}
 		return r.JSON(http.StatusOK, map[string]any{
 			"id":     r.Param("id"),
 			"method": r.Method(),
@@ -50,6 +59,39 @@ func TestRouterRegistersRouteAndContext(t *testing.T) {
 		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
 	}
 	if body := rec.Body.String(); body != "{\"id\":\"42\",\"method\":\"GET\"}\n" {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestContextResponseExposesStatusSizeAndCommitted(t *testing.T) {
+	adapter := New()
+	adapter.Router().GET("/response", func(r web.Context) error {
+		if err := r.Text(http.StatusAccepted, "ok"); err != nil {
+			t.Fatalf("Text: %v", err)
+		}
+		if got := r.Response().StatusCode(); got != http.StatusAccepted {
+			t.Fatalf("status = %d", got)
+		}
+		if got := r.Response().Size(); got != 2 {
+			t.Fatalf("size = %d", got)
+		}
+		if !r.Response().Committed() {
+			t.Fatal("response should be committed after write")
+		}
+		if got := r.StatusCode(); got != http.StatusAccepted {
+			t.Fatalf("context status = %d", got)
+		}
+		return nil
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/response", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if body := rec.Body.String(); body != "ok" {
 		t.Fatalf("body = %q", body)
 	}
 }

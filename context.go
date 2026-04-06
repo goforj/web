@@ -20,6 +20,7 @@ type Context interface {
 	RealIP() string
 	Request() *http.Request
 	SetRequest(request *http.Request)
+	Response() Response
 	ResponseWriter() http.ResponseWriter
 	SetResponseWriter(writer http.ResponseWriter)
 	Bind(target any) error

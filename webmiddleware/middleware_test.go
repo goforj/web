@@ -1064,6 +1064,11 @@ type stubContext struct {
 	values  map[string]any
 }
 
+type stubResponse struct {
+	headers http.Header
+	writer  http.ResponseWriter
+}
+
 func newStubContext() *stubContext {
 	return &stubContext{
 		headers: http.Header{},
@@ -1071,38 +1076,52 @@ func newStubContext() *stubContext {
 	}
 }
 
-func (c *stubContext) Context() context.Context                  { return context.Background() }
-func (c *stubContext) Method() string                            { return http.MethodGet }
-func (c *stubContext) Path() string                              { return "/" }
-func (c *stubContext) URI() string                               { return "/" }
-func (c *stubContext) Scheme() string                            { return "http" }
-func (c *stubContext) Host() string                              { return "example.com" }
-func (c *stubContext) Param(name string) string                  { return "" }
-func (c *stubContext) Query(name string) string                  { return "" }
-func (c *stubContext) Header(name string) string                 { return c.headers.Get(name) }
-func (c *stubContext) Cookie(name string) (*http.Cookie, error)  { return nil, http.ErrNoCookie }
-func (c *stubContext) RealIP() string                            { return "127.0.0.1" }
-func (c *stubContext) Request() *http.Request                    { return httptest.NewRequest(http.MethodGet, "/", nil) }
-func (c *stubContext) SetRequest(request *http.Request)          {}
-func (c *stubContext) ResponseWriter() http.ResponseWriter       { return httptest.NewRecorder() }
+func (c *stubContext) Context() context.Context                 { return context.Background() }
+func (c *stubContext) Method() string                           { return http.MethodGet }
+func (c *stubContext) Path() string                             { return "/" }
+func (c *stubContext) URI() string                              { return "/" }
+func (c *stubContext) Scheme() string                           { return "http" }
+func (c *stubContext) Host() string                             { return "example.com" }
+func (c *stubContext) Param(name string) string                 { return "" }
+func (c *stubContext) Query(name string) string                 { return "" }
+func (c *stubContext) Header(name string) string                { return c.headers.Get(name) }
+func (c *stubContext) Cookie(name string) (*http.Cookie, error) { return nil, http.ErrNoCookie }
+func (c *stubContext) RealIP() string                           { return "127.0.0.1" }
+func (c *stubContext) Request() *http.Request                   { return httptest.NewRequest(http.MethodGet, "/", nil) }
+func (c *stubContext) SetRequest(request *http.Request)         {}
+func (c *stubContext) Response() web.Response {
+	return &stubResponse{
+		headers: c.headers,
+		writer:  httptest.NewRecorder(),
+	}
+}
+func (c *stubContext) ResponseWriter() http.ResponseWriter          { return httptest.NewRecorder() }
 func (c *stubContext) SetResponseWriter(writer http.ResponseWriter) {}
-func (c *stubContext) Bind(target any) error                     { return nil }
-func (c *stubContext) Set(key string, value any)                 { c.values[key] = value }
-func (c *stubContext) Get(key string) any                        { return c.values[key] }
-func (c *stubContext) AddHeader(name string, value string)       { c.headers.Add(name, value) }
-func (c *stubContext) SetHeader(name string, value string)       { c.headers.Set(name, value) }
-func (c *stubContext) SetCookie(cookie *http.Cookie)             {}
-func (c *stubContext) JSON(code int, payload any) error          { return nil }
+func (c *stubContext) Bind(target any) error                        { return nil }
+func (c *stubContext) Set(key string, value any)                    { c.values[key] = value }
+func (c *stubContext) Get(key string) any                           { return c.values[key] }
+func (c *stubContext) AddHeader(name string, value string)          { c.headers.Add(name, value) }
+func (c *stubContext) SetHeader(name string, value string)          { c.headers.Set(name, value) }
+func (c *stubContext) SetCookie(cookie *http.Cookie)                {}
+func (c *stubContext) JSON(code int, payload any) error             { return nil }
 func (c *stubContext) Blob(code int, contentType string, body []byte) error {
 	return nil
 }
-func (c *stubContext) File(path string) error               { return nil }
-func (c *stubContext) Text(code int, body string) error     { return nil }
-func (c *stubContext) HTML(code int, body string) error     { return nil }
-func (c *stubContext) NoContent(code int) error             { return nil }
-func (c *stubContext) Redirect(code int, url string) error  { return nil }
-func (c *stubContext) StatusCode() int                      { return http.StatusOK }
-func (c *stubContext) Native() any                          { return nil }
+func (c *stubContext) File(path string) error              { return nil }
+func (c *stubContext) Text(code int, body string) error    { return nil }
+func (c *stubContext) HTML(code int, body string) error    { return nil }
+func (c *stubContext) NoContent(code int) error            { return nil }
+func (c *stubContext) Redirect(code int, url string) error { return nil }
+func (c *stubContext) StatusCode() int                     { return http.StatusOK }
+func (c *stubContext) Native() any                         { return nil }
+
+func (r *stubResponse) Header() http.Header                  { return r.headers }
+func (r *stubResponse) Writer() http.ResponseWriter          { return r.writer }
+func (r *stubResponse) SetWriter(writer http.ResponseWriter) { r.writer = writer }
+func (r *stubResponse) StatusCode() int                      { return http.StatusOK }
+func (r *stubResponse) Size() int64                          { return 0 }
+func (r *stubResponse) Committed() bool                      { return false }
+func (r *stubResponse) Native() any                          { return nil }
 
 func pathJoin(parts ...string) string {
 	return strings.Join(parts, string(os.PathSeparator))
