@@ -17,7 +17,7 @@ func TestRunIndexesRoutesAndHandlerMetadata(t *testing.T) {
 
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 
 type Controller struct {}
@@ -31,7 +31,7 @@ func (c *Controller) Routes() []any {
 type requestPayload struct { Name string ` + "`json:\"name\"`" + ` }
 type responsePayload struct { Message string ` + "`json:\"message\"`" + ` }
 
-func (c *Controller) Hello(ctx echo.Context) error {
+func (c *Controller) Hello(ctx *echo.Context) error {
 	name := ctx.Param("name")
 	filter := ctx.QueryParam("filter")
 	var req requestPayload
@@ -283,7 +283,7 @@ func TestRunExtractsStringAndNoContentResponses(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any {
@@ -291,7 +291,7 @@ func (c *Controller) Routes() []any {
 		http.NewRoute(http.MethodGet, "/status", c.Status),
 	}
 }
-func (c *Controller) Status(ctx echo.Context) error {
+func (c *Controller) Status(ctx *echo.Context) error {
 	if ctx.QueryParam("fmt") == "text" {
 		return ctx.String(http.StatusOK, "ok")
 	}
@@ -419,7 +419,7 @@ func TestRunExtractsQueryParamsFromQueryParamsGetPattern(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any {
@@ -427,7 +427,7 @@ func (c *Controller) Routes() []any {
 		http.NewRoute(http.MethodGet, "/search", c.Search),
 	}
 }
-func (c *Controller) Search(ctx echo.Context) error {
+func (c *Controller) Search(ctx *echo.Context) error {
 	_ = ctx.QueryParams().Get("page")
 	return ctx.NoContent(http.StatusNoContent)
 }`,
@@ -462,7 +462,7 @@ func TestRunEmitsDynamicParamDiagnostics(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any {
@@ -470,7 +470,7 @@ func (c *Controller) Routes() []any {
 		http.NewRoute(http.MethodGet, "/search/:id", c.Search),
 	}
 }
-func (c *Controller) Search(ctx echo.Context) error {
+func (c *Controller) Search(ctx *echo.Context) error {
 	key := "q"
 	_ = ctx.QueryParam(key)
 	headerKey := "X-Request-ID"

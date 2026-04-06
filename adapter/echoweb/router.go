@@ -4,22 +4,23 @@ import (
 	"fmt"
 	"github.com/goforj/web"
 	"github.com/gorilla/websocket"
-	echo "github.com/labstack/echo/v4"
+	echo "github.com/labstack/echo/v5"
+	"net/http"
 )
 
 type groupLike interface {
 	Use(middleware ...echo.MiddlewareFunc)
-	CONNECT(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	DELETE(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	GET(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	HEAD(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	OPTIONS(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	POST(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	PUT(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	PATCH(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	TRACE(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) *echo.Route
-	Any(path string, handler echo.HandlerFunc, middleware ...echo.MiddlewareFunc) []*echo.Route
-	Match(methods []string, path string, handler echo.HandlerFunc, middleware ...echo.MiddlewareFunc) []*echo.Route
+	CONNECT(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	DELETE(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	GET(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	HEAD(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	OPTIONS(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	POST(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	PUT(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	PATCH(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	TRACE(path string, h echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	Any(path string, handler echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.RouteInfo
+	Match(methods []string, path string, handler echo.HandlerFunc, middleware ...echo.MiddlewareFunc) echo.Routes
 	Group(prefix string, middleware ...echo.MiddlewareFunc) *echo.Group
 }
 
@@ -45,23 +46,23 @@ func (r *routerAdapter) Use(middleware ...web.Middleware) {
 
 func (r *routerAdapter) Handle(method string, path string, handler web.Handler, middleware ...web.Middleware) error {
 	switch method {
-	case echo.CONNECT:
+	case http.MethodConnect:
 		r.CONNECT(path, handler, middleware...)
-	case echo.DELETE:
+	case http.MethodDelete:
 		r.DELETE(path, handler, middleware...)
-	case echo.GET:
+	case http.MethodGet:
 		r.GET(path, handler, middleware...)
-	case echo.HEAD:
+	case http.MethodHead:
 		r.HEAD(path, handler, middleware...)
-	case echo.OPTIONS:
+	case http.MethodOptions:
 		r.OPTIONS(path, handler, middleware...)
-	case echo.PATCH:
+	case http.MethodPatch:
 		r.PATCH(path, handler, middleware...)
-	case echo.POST:
+	case http.MethodPost:
 		r.POST(path, handler, middleware...)
-	case echo.PUT:
+	case http.MethodPut:
 		r.PUT(path, handler, middleware...)
-	case echo.TRACE:
+	case http.MethodTrace:
 		r.TRACE(path, handler, middleware...)
 	default:
 		return fmt.Errorf("unsupported route method %q", method)
@@ -129,7 +130,7 @@ func (r *routerAdapter) Group(prefix string, middleware ...web.Middleware) web.R
 
 func adaptRouterMiddlewares(r *routerAdapter) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			if len(r.middlewares) == 0 {
 				return next(c)
 			}
@@ -165,7 +166,7 @@ func applyWebSocketMiddlewares(handler web.WebSocketHandler, middleware ...web.M
 }
 
 func adaptHandler(handler web.Handler) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		adapted := acquireContextAdapter(c)
 		defer releaseContextAdapter(adapted)
 		return handler(adapted)
@@ -173,7 +174,7 @@ func adaptHandler(handler web.Handler) echo.HandlerFunc {
 }
 
 func adaptWebSocketHandler(handler web.WebSocketHandler) echo.HandlerFunc {
-	return func(c echo.Context) error {
+	return func(c *echo.Context) error {
 		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 		if err != nil {
@@ -220,7 +221,7 @@ func adaptMiddlewares(middlewares []web.Middleware) echo.MiddlewareFunc {
 			adapted = middlewares[i](adapted)
 		}
 
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			adaptedCtx := acquireContextAdapter(c)
 			defer releaseContextAdapter(adaptedCtx)
 			return adapted(adaptedCtx)

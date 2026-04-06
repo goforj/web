@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/goforj/web"
-	echo "github.com/labstack/echo/v4"
+	echo "github.com/labstack/echo/v5"
 )
 
 // Adapter owns an Echo engine while exposing the app-facing web.Router contract.
@@ -16,6 +16,7 @@ type Adapter struct {
 // New creates a new Echo-backed web adapter.
 func New() *Adapter {
 	engine := echo.New()
+	engine.IPExtractor = echo.LegacyIPExtractor()
 	router := &routerAdapter{engine: engine, group: engine}
 	engine.Use(adaptRouterMiddlewares(router))
 	return &Adapter{
@@ -28,6 +29,9 @@ func New() *Adapter {
 func Wrap(engine *echo.Echo) *Adapter {
 	if engine == nil {
 		engine = echo.New()
+	}
+	if engine.IPExtractor == nil {
+		engine.IPExtractor = echo.LegacyIPExtractor()
 	}
 	router := &routerAdapter{engine: engine, group: engine}
 	engine.Use(adaptRouterMiddlewares(router))

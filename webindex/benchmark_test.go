@@ -50,7 +50,7 @@ func writeSyntheticRepo(root string, controllerCount, routesPerController int) e
 			return err
 		}
 		src := "package " + pkg + "\n\n" +
-			"import (\n\t\"net/http\"\n\t\"github.com/labstack/echo/v4\"\n)\n\n" +
+			"import (\n\t\"net/http\"\n\t\"github.com/labstack/echo/v5\"\n)\n\n" +
 			"type payload struct { Name string `json:\"name\"`; Enabled bool `json:\"enabled,omitempty\"` }\n" +
 			"type Controller struct{}\n\n" +
 			"func (c *Controller) Routes() []any {\n\treturn []any{\n"
@@ -59,7 +59,7 @@ func writeSyntheticRepo(root string, controllerCount, routesPerController int) e
 		}
 		src += "\t}\n}\n\n"
 		for r := 0; r < routesPerController; r++ {
-			src += fmt.Sprintf("func (c *Controller) H%d(ctx echo.Context) error {\n", r) +
+			src += fmt.Sprintf("func (c *Controller) H%d(ctx *echo.Context) error {\n", r) +
 				"\tif ctx.QueryParam(\"full\") == \"1\" {\n" +
 				"\t\treturn ctx.JSON(http.StatusOK, map[string]any{\"ok\": true, \"id\": ctx.Param(\"id\"), \"mode\": \"full\"})\n" +
 				"\t}\n" +

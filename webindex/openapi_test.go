@@ -17,11 +17,11 @@ func TestRunOpenAPIIncludesParameters(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/monitoring/monitors/:id/check-now", c.CheckNow)} }
-func (c *Controller) CheckNow(ctx echo.Context) error {
+func (c *Controller) CheckNow(ctx *echo.Context) error {
 	_ = ctx.Param("id")
 	_ = ctx.QueryParam("sync")
 	_ = ctx.Request().Header.Get("X-Request-ID")
@@ -53,11 +53,11 @@ func TestRunOpenAPIIncludesJSONResponseSchema(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/monitors/:id/check-now", c.CheckNow)} }
-func (c *Controller) CheckNow(ctx echo.Context) error {
+func (c *Controller) CheckNow(ctx *echo.Context) error {
 	id := ctx.Param("id")
 	if id == "" { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false, "error": "missing id"}) }
 	return ctx.JSON(http.StatusAccepted, map[string]any{"ok": true, "mode": "queued", "monitor_id": id})
@@ -103,12 +103,12 @@ func TestRunOpenAPIIncludesRequestBodyFromBind(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type monitorInput struct { Name string }
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/monitors", c.Create)} }
-func (c *Controller) Create(ctx echo.Context) error {
+func (c *Controller) Create(ctx *echo.Context) error {
 	var in monitorInput
 	if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false}) }
 	return ctx.JSON(http.StatusCreated, map[string]any{"ok": true})
@@ -128,13 +128,13 @@ func TestRunOpenAPIRequestBodyIgnoresPostBindReassignmentFunction(t *testing.T) 
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type monitorInput struct { Name string; Type string }
 func normalizeMonitorInput(in monitorInput) monitorInput { return in }
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/monitors", c.Create)} }
-func (c *Controller) Create(ctx echo.Context) error {
+func (c *Controller) Create(ctx *echo.Context) error {
 	var in monitorInput
 	if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false}) }
 	in = normalizeMonitorInput(in)
@@ -155,7 +155,7 @@ func TestRunOpenAPIRequestBodyUsesJSONTagsAndRequired(t *testing.T) {
 		"internal/hello/controller.go": "package hello\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v4\"\n" +
+			"\t\"github.com/labstack/echo/v5\"\n" +
 			")\n" +
 			"type createInput struct {\n" +
 			"\tName string `json:\"name\"`\n" +
@@ -163,7 +163,7 @@ func TestRunOpenAPIRequestBodyUsesJSONTagsAndRequired(t *testing.T) {
 			"}\n" +
 			"type Controller struct{}\n" +
 			"func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, \"/users\", c.Create)} }\n" +
-			"func (c *Controller) Create(ctx echo.Context) error {\n" +
+			"func (c *Controller) Create(ctx *echo.Context) error {\n" +
 			"\tvar in createInput\n" +
 			"\tif err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false}) }\n" +
 			"\treturn ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true})\n" +
@@ -207,7 +207,7 @@ func TestRunOpenAPINonJSONResponseContentTypes(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{
@@ -216,10 +216,10 @@ func (c *Controller) Routes() []any { return []any{
 	http.NewRoute(http.MethodGet, "/x", c.X),
 	http.NewRoute(http.MethodGet, "/b", c.B),
 } }
-func (c *Controller) S(ctx echo.Context) error { return ctx.String(http.StatusOK, "ok") }
-func (c *Controller) H(ctx echo.Context) error { return ctx.HTML(http.StatusOK, "<p>ok</p>") }
-func (c *Controller) X(ctx echo.Context) error { return ctx.XML(http.StatusOK, map[string]any{"ok": true}) }
-func (c *Controller) B(ctx echo.Context) error { return ctx.Blob(http.StatusOK, "application/octet-stream", []byte{1,2,3}) }`,
+func (c *Controller) S(ctx *echo.Context) error { return ctx.String(http.StatusOK, "ok") }
+func (c *Controller) H(ctx *echo.Context) error { return ctx.HTML(http.StatusOK, "<p>ok</p>") }
+func (c *Controller) X(ctx *echo.Context) error { return ctx.XML(http.StatusOK, map[string]any{"ok": true}) }
+func (c *Controller) B(ctx *echo.Context) error { return ctx.Blob(http.StatusOK, "application/octet-stream", []byte{1,2,3}) }`,
 	}
 	writeFixtureFiles(t, root, files)
 
@@ -237,7 +237,7 @@ func TestRunOpenAPIGoldenSnapshot(t *testing.T) {
 		"internal/hello/controller.go": "package hello\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v4\"\n" +
+			"\t\"github.com/labstack/echo/v5\"\n" +
 			")\n" +
 			"type createInput struct {\n" +
 			"\tName string `json:\"name\"`\n" +
@@ -245,7 +245,7 @@ func TestRunOpenAPIGoldenSnapshot(t *testing.T) {
 			"}\n" +
 			"type Controller struct{}\n" +
 			"func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, \"/users\", c.Create)} }\n" +
-			"func (c *Controller) Create(ctx echo.Context) error {\n" +
+			"func (c *Controller) Create(ctx *echo.Context) error {\n" +
 			"\tvar in createInput\n" +
 			"\tif err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false, \"error\": \"bad\"}) }\n" +
 			"\treturn ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true, \"id\": \"u_1\"})\n" +
@@ -277,11 +277,11 @@ func TestRunOpenAPIUsesAppNameAsTitle(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodGet, "/health", c.Health)} }
-func (c *Controller) Health(ctx echo.Context) error { return ctx.NoContent(http.StatusOK) }`,
+func (c *Controller) Health(ctx *echo.Context) error { return ctx.NoContent(http.StatusOK) }`,
 	}
 	writeFixtureFiles(t, root, files)
 
@@ -298,14 +298,14 @@ func TestRunOpenAPIUsesComponentRefs(t *testing.T) {
 		"internal/hello/controller.go": "package hello\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v4\"\n" +
+			"\t\"github.com/labstack/echo/v5\"\n" +
 			")\n" +
 			"type createInput struct {\n" +
 			"\tName string `json:\"name\"`\n" +
 			"}\n" +
 			"type Controller struct{}\n" +
 			"func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, \"/users\", c.Create)} }\n" +
-			"func (c *Controller) Create(ctx echo.Context) error {\n" +
+			"func (c *Controller) Create(ctx *echo.Context) error {\n" +
 			"\tvar in createInput\n" +
 			"\tif err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false}) }\n" +
 			"\treturn ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true, \"id\": \"u_1\"})\n" +
@@ -334,11 +334,11 @@ func TestRunOpenAPIMergesResponseSchemasWithOneOf(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodGet, "/items/:id", c.Get)} }
-func (c *Controller) Get(ctx echo.Context) error {
+func (c *Controller) Get(ctx *echo.Context) error {
 	if ctx.QueryParam("verbose") == "1" {
 		return ctx.JSON(http.StatusOK, map[string]any{"ok": true, "id": "x", "details": "full"})
 	}
@@ -371,11 +371,11 @@ func TestRunOpenAPICrossPackageAliasBindSchema(t *testing.T) {
 import (
 	"net/http"
 	mdt "example.com/test/internal/dto"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/users", c.Create)} }
-func (c *Controller) Create(ctx echo.Context) error {
+func (c *Controller) Create(ctx *echo.Context) error {
 	var in mdt.CreateInput
 	if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false}) }
 	return ctx.JSON(http.StatusCreated, map[string]any{"ok": true})
@@ -410,7 +410,7 @@ func TestRunOpenAPIStructuralValidation(t *testing.T) {
 		"internal/users/controller.go": "package users\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v4\"\n" +
+			"\t\"github.com/labstack/echo/v5\"\n" +
 			")\n" +
 			"type createUser struct { Name string `json:\"name\"` }\n" +
 			"type Controller struct{}\n" +
@@ -418,8 +418,8 @@ func TestRunOpenAPIStructuralValidation(t *testing.T) {
 			"\thttp.NewRoute(http.MethodGet, \"/users/:id\", c.Get),\n" +
 			"\thttp.NewRoute(http.MethodPost, \"/users\", c.Create),\n" +
 			"} }\n" +
-			"func (c *Controller) Get(ctx echo.Context) error { return ctx.JSON(http.StatusOK, map[string]any{\"ok\": true, \"id\": ctx.Param(\"id\")}) }\n" +
-			"func (c *Controller) Create(ctx echo.Context) error { var in createUser; if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false}) }; return ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true}) }\n",
+			"func (c *Controller) Get(ctx *echo.Context) error { return ctx.JSON(http.StatusOK, map[string]any{\"ok\": true, \"id\": ctx.Param(\"id\")}) }\n" +
+			"func (c *Controller) Create(ctx *echo.Context) error { var in createUser; if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false}) }; return ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true}) }\n",
 	}
 	writeFixtureFiles(t, root, files)
 	doc := buildOpenAPI(t, root)
@@ -436,7 +436,7 @@ func TestRunOpenAPIMultiControllerGoldenSnapshot(t *testing.T) {
 		"internal/users/controller.go": "package users\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v4\"\n" +
+			"\t\"github.com/labstack/echo/v5\"\n" +
 			")\n" +
 			"type createUser struct { Name string `json:\"name\"`; Email *string `json:\"email,omitempty\"` }\n" +
 			"type Controller struct{}\n" +
@@ -444,16 +444,16 @@ func TestRunOpenAPIMultiControllerGoldenSnapshot(t *testing.T) {
 			"\thttp.NewRoute(http.MethodGet, \"/users/:id\", c.Get),\n" +
 			"\thttp.NewRoute(http.MethodPost, \"/users\", c.Create),\n" +
 			"} }\n" +
-			"func (c *Controller) Get(ctx echo.Context) error { return ctx.JSON(http.StatusOK, map[string]any{\"ok\": true, \"id\": ctx.Param(\"id\")}) }\n" +
-			"func (c *Controller) Create(ctx echo.Context) error { var in createUser; if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false, \"error\": \"bad\"}) }; return ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true, \"id\": \"u_1\"}) }\n",
+			"func (c *Controller) Get(ctx *echo.Context) error { return ctx.JSON(http.StatusOK, map[string]any{\"ok\": true, \"id\": ctx.Param(\"id\")}) }\n" +
+			"func (c *Controller) Create(ctx *echo.Context) error { var in createUser; if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false, \"error\": \"bad\"}) }; return ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true, \"id\": \"u_1\"}) }\n",
 		"internal/files/controller.go": `package files
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodGet, "/files/:id/download", c.Download)} }
-func (c *Controller) Download(ctx echo.Context) error {
+func (c *Controller) Download(ctx *echo.Context) error {
 	if ctx.QueryParam("raw") == "1" { return ctx.Blob(http.StatusOK, "application/octet-stream", []byte{1,2}) }
 	return ctx.String(http.StatusOK, "ok")
 }`,
@@ -483,7 +483,7 @@ func TestRunOpenAPIDeterministicAcrossRuns(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 )
 type in struct { Name string ` + "`json:\"name\"`" + ` }
 type Controller struct{}
@@ -491,11 +491,11 @@ func (c *Controller) Routes() []any { return []any{
 	http.NewRoute(http.MethodGet, "/items/:id", c.Get),
 	http.NewRoute(http.MethodPost, "/items", c.Create),
 } }
-func (c *Controller) Get(ctx echo.Context) error {
+func (c *Controller) Get(ctx *echo.Context) error {
 	if ctx.QueryParam("full") == "1" { return ctx.JSON(http.StatusOK, map[string]any{"id": ctx.Param("id"), "ok": true, "mode": "full"}) }
 	return ctx.JSON(http.StatusOK, map[string]any{"id": ctx.Param("id"), "ok": true})
 }
-func (c *Controller) Create(ctx echo.Context) error {
+func (c *Controller) Create(ctx *echo.Context) error {
 	var payload in
 	if err := ctx.Bind(&payload); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false}) }
 	return ctx.JSON(http.StatusCreated, map[string]any{"ok": true})

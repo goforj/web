@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/goforj/web"
-	echo "github.com/labstack/echo/v4"
+	echo "github.com/labstack/echo/v5"
 )
 
 type contextAdapter struct {
-	echo     echo.Context
+	echo     *echo.Context
 	response responseAdapter
 }
 
@@ -22,7 +22,7 @@ var contextAdapterPool = sync.Pool{
 	},
 }
 
-func acquireContextAdapter(c echo.Context) *contextAdapter {
+func acquireContextAdapter(c *echo.Context) *contextAdapter {
 	adapted := contextAdapterPool.Get().(*contextAdapter)
 	adapted.echo = c
 	adapted.response.context = adapted
@@ -95,11 +95,11 @@ func (c *contextAdapter) Response() web.Response {
 }
 
 func (c *contextAdapter) ResponseWriter() http.ResponseWriter {
-	return c.echo.Response().Writer
+	return c.echo.Response()
 }
 
 func (c *contextAdapter) SetResponseWriter(writer http.ResponseWriter) {
-	c.echo.Response().Writer = writer
+	c.echo.SetResponse(writer)
 }
 
 func (c *contextAdapter) Bind(target any) error {
@@ -135,7 +135,8 @@ func (c *contextAdapter) Blob(code int, contentType string, body []byte) error {
 }
 
 func (c *contextAdapter) File(path string) error {
-	return c.echo.File(path)
+	http.ServeFile(c.echo.Response(), c.echo.Request(), path)
+	return nil
 }
 
 func (c *contextAdapter) Text(code int, body string) error {
@@ -155,7 +156,7 @@ func (c *contextAdapter) Redirect(code int, url string) error {
 }
 
 func (c *contextAdapter) StatusCode() int {
-	return c.echo.Response().Status
+	return c.response.StatusCode()
 }
 
 func (c *contextAdapter) Native() any {
@@ -173,23 +174,35 @@ func (r *responseAdapter) Header() http.Header {
 }
 
 func (r *responseAdapter) Writer() http.ResponseWriter {
-	return r.context.echo.Response().Writer
+	return r.context.echo.Response()
 }
 
 func (r *responseAdapter) SetWriter(writer http.ResponseWriter) {
-	r.context.echo.Response().Writer = writer
+	r.context.echo.SetResponse(writer)
 }
 
 func (r *responseAdapter) StatusCode() int {
-	return r.context.echo.Response().Status
+	response, err := echo.UnwrapResponse(r.context.echo.Response())
+	if err != nil || response == nil {
+		return 0
+	}
+	return response.Status
 }
 
 func (r *responseAdapter) Size() int64 {
-	return r.context.echo.Response().Size
+	response, err := echo.UnwrapResponse(r.context.echo.Response())
+	if err != nil || response == nil {
+		return 0
+	}
+	return response.Size
 }
 
 func (r *responseAdapter) Committed() bool {
-	return r.context.echo.Response().Committed
+	response, err := echo.UnwrapResponse(r.context.echo.Response())
+	if err != nil || response == nil {
+		return false
+	}
+	return response.Committed
 }
 
 func (r *responseAdapter) Native() any {
@@ -197,7 +210,7 @@ func (r *responseAdapter) Native() any {
 }
 
 // UnwrapContext returns the underlying Echo context when the web.Context came from this adapter.
-func UnwrapContext(ctx web.Context) (echo.Context, bool) {
+func UnwrapContext(ctx web.Context) (*echo.Context, bool) {
 	adapted, ok := ctx.(*contextAdapter)
 	if !ok || adapted == nil || adapted.echo == nil {
 		return nil, false

@@ -12,13 +12,13 @@ import (
 	"github.com/goforj/web"
 	"github.com/goforj/web/webmiddleware"
 	"github.com/gorilla/websocket"
-	echo "github.com/labstack/echo/v4"
-	echomiddleware "github.com/labstack/echo/v4/middleware"
+	echo "github.com/labstack/echo/v5"
+	echomiddleware "github.com/labstack/echo/v5/middleware"
 )
 
 func BenchmarkEchoPlainText(b *testing.B) {
 	engine := echo.New()
-	engine.GET("/plain", func(c echo.Context) error {
+	engine.GET("/plain", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 
@@ -54,7 +54,7 @@ func BenchmarkWebPlainText(b *testing.B) {
 
 func BenchmarkEchoParamsJSON(b *testing.B) {
 	engine := echo.New()
-	engine.GET("/users/:id", func(c echo.Context) error {
+	engine.GET("/users/:id", func(c *echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]any{
 			"id":     c.Param("id"),
 			"method": c.Request().Method,
@@ -97,26 +97,26 @@ func BenchmarkWebParamsJSON(b *testing.B) {
 func BenchmarkEchoMiddlewareChain(b *testing.B) {
 	engine := echo.New()
 	engine.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			c.Set("a", "1")
 			return next(c)
 		}
 	})
 	engine.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			c.Response().Header().Set("X-B", "1")
 			return next(c)
 		}
 	})
 	engine.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			if c.Get("a") == nil {
 				b.Fatal("missing context value")
 			}
 			return next(c)
 		}
 	})
-	engine.GET("/chain", func(c echo.Context) error {
+	engine.GET("/chain", func(c *echo.Context) error {
 		return c.String(http.StatusOK, "ok")
 	})
 
@@ -214,19 +214,19 @@ func BenchmarkEchoGroupAndRouteMiddleware(b *testing.B) {
 	engine := echo.New()
 	group := engine.Group("/api",
 		func(next echo.HandlerFunc) echo.HandlerFunc {
-			return func(c echo.Context) error {
+			return func(c *echo.Context) error {
 				c.Set("group", "1")
 				return next(c)
 			}
 		},
 		func(next echo.HandlerFunc) echo.HandlerFunc {
-			return func(c echo.Context) error {
+			return func(c *echo.Context) error {
 				c.Response().Header().Set("X-Group", "1")
 				return next(c)
 			}
 		},
 	)
-	group.GET("/users/:id", func(c echo.Context) error {
+	group.GET("/users/:id", func(c *echo.Context) error {
 		if c.Get("group") == nil {
 			b.Fatal("missing group middleware state")
 		}
@@ -238,12 +238,12 @@ func BenchmarkEchoGroupAndRouteMiddleware(b *testing.B) {
 			"method": c.Request().Method,
 		})
 	}, func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			c.Set("route", "1")
 			return next(c)
 		}
 	}, func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			return next(c)
 		}
 	})
@@ -313,7 +313,7 @@ func BenchmarkWebGroupAndRouteMiddleware(b *testing.B) {
 func BenchmarkEchoCompress(b *testing.B) {
 	engine := echo.New()
 	engine.Use(echomiddleware.Gzip())
-	engine.GET("/gzip", func(c echo.Context) error {
+	engine.GET("/gzip", func(c *echo.Context) error {
 		return c.String(http.StatusOK, strings.Repeat("x", 1024))
 	})
 
@@ -376,8 +376,8 @@ func BenchmarkWebCompress(b *testing.B) {
 
 func BenchmarkEchoBodyDump(b *testing.B) {
 	engine := echo.New()
-	engine.Use(echomiddleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {}))
-	engine.POST("/dump", func(c echo.Context) error {
+	engine.Use(echomiddleware.BodyDump(func(c *echo.Context, reqBody, resBody []byte, err error) {}))
+	engine.POST("/dump", func(c *echo.Context) error {
 		payload, err := io.ReadAll(c.Request().Body)
 		if err != nil {
 			return err
@@ -422,7 +422,7 @@ func BenchmarkWebBodyDump(b *testing.B) {
 
 func BenchmarkEchoWebSocketJSON(b *testing.B) {
 	engine := echo.New()
-	engine.GET("/ws", func(c echo.Context) error {
+	engine.GET("/ws", func(c *echo.Context) error {
 		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 		if err != nil {
@@ -495,7 +495,7 @@ func BenchmarkWebWebSocketJSON(b *testing.B) {
 
 func BenchmarkEchoWebSocketJSONPersistent(b *testing.B) {
 	engine := echo.New()
-	engine.GET("/ws", func(c echo.Context) error {
+	engine.GET("/ws", func(c *echo.Context) error {
 		upgrader := websocket.Upgrader{}
 		conn, err := upgrader.Upgrade(c.Response(), c.Request(), nil)
 		if err != nil {
