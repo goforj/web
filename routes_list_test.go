@@ -69,6 +69,27 @@ func TestBuildRouteEntriesSortsByPathThenMethod(t *testing.T) {
 	}
 }
 
+func TestBuildRouteEntriesIncludesWebSocketRoutes(t *testing.T) {
+	entries := BuildRouteEntries([]RouteGroup{
+		NewRouteGroup(
+			"/api",
+			[]Route{
+				NewWebSocketRoute("/stream", testWebSocketRouteHandler),
+			},
+		),
+	})
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if got := strings.Join(entries[0].Methods, ","); got != "GETWS" {
+		t.Fatalf("expected GETWS method, got %q", got)
+	}
+	if entries[0].Path != "/api/stream" {
+		t.Fatalf("expected websocket route path, got %q", entries[0].Path)
+	}
+}
+
 func TestRenderRouteTableIncludesTitleAndLegend(t *testing.T) {
 	table := RenderRouteTable([]RouteEntry{
 		{
@@ -101,3 +122,5 @@ func testCreateRouteHandler(r Context) error { return nil }
 func testListRouteHandler(r Context) error { return nil }
 
 func testShowRouteHandler(r Context) error { return nil }
+
+func testWebSocketRouteHandler(r Context, conn WebSocketConn) error { return nil }

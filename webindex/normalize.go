@@ -24,6 +24,9 @@ func normalize(routes []discoveredRoute, handlers []discoveredHandler, prefixes 
 	ops := make([]Operation, 0, len(routes))
 	for _, r := range routes {
 		method := normalizeMethodExpr(r.MethodExpr)
+		if method == "getws" {
+			continue
+		}
 		path := r.Path
 		prefix := routePrefix(r, mapping, effectivePrefix)
 		path = joinPath(prefix, r.Path)

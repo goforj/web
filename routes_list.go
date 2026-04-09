@@ -298,6 +298,8 @@ func colorizeMethod(method string) string {
 	switch method {
 	case "GET":
 		return colorize(ansiGet, method)
+	case "GETWS":
+		return colorize(ansiGet, method)
 	case "POST":
 		return colorize(ansiPost, method)
 	case "DELETE":

@@ -103,6 +103,29 @@ func discoverRoutesAndHandlers(fset *token.FileSet, parsed []*parsedFile) ([]dis
 						File:                filepath.ToSlash(pos.Filename),
 						Line:                pos.Line,
 					})
+				case "NewWebSocketRoute":
+					if len(call.Args) < 2 {
+						return true
+					}
+					path := extractStringLiteral(call.Args[0])
+					if path == "" {
+						return true
+					}
+					handlerExpr := exprString(call.Args[1])
+					handlerFn := methodNameFromHandlerExpr(handlerExpr)
+					hintPkg, hintRecv := inferHandlerHints(call.Args[1], fn, localTypes, pf.PackageName)
+					pos := fset.Position(call.Pos())
+					routes = append(routes, discoveredRoute{
+						MethodExpr:          `"GETWS"`,
+						Path:                path,
+						HandlerExpr:         handlerExpr,
+						HandlerFunction:     handlerFn,
+						HandlerPackageHint:  hintPkg,
+						HandlerReceiverHint: hintRecv,
+						MiddlewareExprs:     middlewareExprs(call.Args[2:]),
+						File:                filepath.ToSlash(pos.Filename),
+						Line:                pos.Line,
+					})
 				case "NewRouteGroup":
 					if len(call.Args) > 0 {
 						if prefix := extractStringLiteral(call.Args[0]); prefix != "" {

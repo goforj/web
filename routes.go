@@ -25,11 +25,27 @@ func NewRoute(
 	}
 }
 
+// NewWebSocketRoute creates a websocket route using the app-facing websocket handler contract.
+func NewWebSocketRoute(
+	route string,
+	handler WebSocketHandler,
+	middlewares ...Middleware,
+) Route {
+	return Route{
+		method:      "GETWS",
+		route:       route,
+		wsHandler:   handler,
+		handlerName: qualifyHandler(runtime.FuncForPC(reflect.ValueOf(handler).Pointer()).Name()),
+		middlewares: middlewares,
+	}
+}
+
 // Route represents a single route in the application.
 type Route struct {
 	method          string
 	route           string
 	handler         Handler
+	wsHandler       WebSocketHandler
 	handlerName     string
 	middlewares     []Middleware
 	middlewareNames []string
@@ -48,6 +64,11 @@ func (r *Route) Path() string {
 // Handler returns the route handler.
 func (r *Route) Handler() Handler {
 	return r.handler
+}
+
+// WebSocketHandler returns the websocket route handler.
+func (r *Route) WebSocketHandler() WebSocketHandler {
+	return r.wsHandler
 }
 
 // HandlerName returns the original handler name for route reporting.
@@ -72,6 +93,11 @@ func (r *Route) MiddlewareNames() []string {
 func (r Route) WithMiddlewareNames(names ...string) Route {
 	r.middlewareNames = append([]string(nil), names...)
 	return r
+}
+
+// IsWebSocket reports whether this route upgrades to a websocket connection.
+func (r *Route) IsWebSocket() bool {
+	return r != nil && r.wsHandler != nil
 }
 
 // NewRouteGroup wraps routes and their accompanied web middleware.
@@ -126,6 +152,10 @@ func RegisterRoutes(router Router, groups []RouteGroup) error {
 	for _, group := range groups {
 		g := router.Group(group.RoutePrefix(), group.Middlewares()...)
 		for _, route := range group.Routes() {
+			if route.IsWebSocket() {
+				g.GETWS(route.Path(), route.WebSocketHandler(), route.Middlewares()...)
+				continue
+			}
 			if err := g.Handle(route.Method(), route.Path(), route.Handler(), route.Middlewares()...); err != nil {
 				return err
 			}
