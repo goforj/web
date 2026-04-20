@@ -15,7 +15,7 @@ type TrailingSlashConfig struct {
 var DefaultTrailingSlashConfig = TrailingSlashConfig{}
 
 // AddTrailingSlash adds a trailing slash to the request path.
-// @group Middleware - Routing
+// @group Middleware - Path Rewriting
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -30,7 +30,7 @@ func AddTrailingSlash() web.Middleware {
 }
 
 // AddTrailingSlashWithConfig returns trailing-slash middleware with config.
-// @group Middleware - Routing
+// @group Middleware - Path Rewriting
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -67,7 +67,7 @@ func AddTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 }
 
 // RemoveTrailingSlash removes the trailing slash from the request path.
-// @group Middleware - Routing
+// @group Middleware - Path Rewriting
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
 // ctx := webtest.NewContext(req, nil, "/docs/", nil)
@@ -82,7 +82,7 @@ func RemoveTrailingSlash() web.Middleware {
 }
 
 // RemoveTrailingSlashWithConfig returns remove-trailing-slash middleware with config.
-// @group Middleware - Routing
+// @group Middleware - Path Rewriting
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
 // ctx := webtest.NewContext(req, nil, "/docs/", nil)

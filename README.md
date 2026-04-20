@@ -61,13 +61,16 @@ func main() {
 | **Indexing** | [Run](#webindex-run) |
 | **Middleware<br>Auth** | [BasicAuth](#webmiddleware-basicauth) [BasicAuthWithConfig](#webmiddleware-basicauthwithconfig) [CSRF](#webmiddleware-csrf) [CSRFWithConfig](#webmiddleware-csrfwithconfig) [CreateExtractors](#webmiddleware-createextractors) [KeyAuth](#webmiddleware-keyauth) [KeyAuthWithConfig](#webmiddleware-keyauthwithconfig) |
 | **Middleware<br>Compression** | [Compress](#webmiddleware-compress) [Decompress](#webmiddleware-decompress) [DecompressWithConfig](#webmiddleware-decompresswithconfig) [Gzip](#webmiddleware-gzip) [GzipWithConfig](#webmiddleware-gzipwithconfig) |
+| **Middleware<br>Method Override** | [MethodFromForm](#webmiddleware-methodfromform) [MethodFromHeader](#webmiddleware-methodfromheader) [MethodFromQuery](#webmiddleware-methodfromquery) [MethodOverride](#webmiddleware-methodoverride) [MethodOverrideWithConfig](#webmiddleware-methodoverridewithconfig) |
+| **Middleware<br>Path Rewriting** | [AddTrailingSlash](#webmiddleware-addtrailingslash) [AddTrailingSlashWithConfig](#webmiddleware-addtrailingslashwithconfig) [RemoveTrailingSlash](#webmiddleware-removetrailingslash) [RemoveTrailingSlashWithConfig](#webmiddleware-removetrailingslashwithconfig) [Rewrite](#webmiddleware-rewrite) [RewriteWithConfig](#webmiddleware-rewritewithconfig) |
 | **Middleware<br>Payloads** | [BodyDump](#webmiddleware-bodydump) [BodyDumpWithConfig](#webmiddleware-bodydumpwithconfig) [BodyLimit](#webmiddleware-bodylimit) [BodyLimitWithConfig](#webmiddleware-bodylimitwithconfig) [ErrorBodyDump](#webmiddleware-errorbodydump) [ErrorBodyDumpWithConfig](#webmiddleware-errorbodydumpwithconfig) |
 | **Middleware<br>Proxying** | [NewRandomBalancer](#webmiddleware-newrandombalancer) [NewRoundRobinBalancer](#webmiddleware-newroundrobinbalancer) [Proxy](#webmiddleware-proxy) [ProxyWithConfig](#webmiddleware-proxywithconfig) |
 | **Middleware<br>Rate Limiting** | [NewRateLimiterMemoryStore](#webmiddleware-newratelimitermemorystore) [NewRateLimiterMemoryStoreWithConfig](#webmiddleware-newratelimitermemorystorewithconfig) [RateLimiter](#webmiddleware-ratelimiter) [RateLimiterMemoryStore.Allow](#webmiddleware-ratelimitermemorystore-allow) [RateLimiterWithConfig](#webmiddleware-ratelimiterwithconfig) |
+| **Middleware<br>Redirects** | [HTTPSNonWWWRedirect](#webmiddleware-httpsnonwwwredirect) [HTTPSNonWWWRedirectWithConfig](#webmiddleware-httpsnonwwwredirectwithconfig) [HTTPSRedirect](#webmiddleware-httpsredirect) [HTTPSRedirectWithConfig](#webmiddleware-httpsredirectwithconfig) [HTTPSWWWRedirect](#webmiddleware-httpswwwredirect) [HTTPSWWWRedirectWithConfig](#webmiddleware-httpswwwredirectwithconfig) [NonWWWRedirect](#webmiddleware-nonwwwredirect) [NonWWWRedirectWithConfig](#webmiddleware-nonwwwredirectwithconfig) [WWWRedirect](#webmiddleware-wwwredirect) [WWWRedirectWithConfig](#webmiddleware-wwwredirectwithconfig) |
 | **Middleware<br>Reliability** | [Recover](#webmiddleware-recover) [RecoverWithConfig](#webmiddleware-recoverwithconfig) |
 | **Middleware<br>Request Lifecycle** | [ContextTimeout](#webmiddleware-contexttimeout) [ContextTimeoutWithConfig](#webmiddleware-contexttimeoutwithconfig) [DefaultSkipper](#webmiddleware-defaultskipper) [RequestID](#webmiddleware-requestid) [RequestIDWithConfig](#webmiddleware-requestidwithconfig) [RequestLoggerWithConfig](#webmiddleware-requestloggerwithconfig) [Timeout](#webmiddleware-timeout) [TimeoutWithConfig](#webmiddleware-timeoutwithconfig) |
-| **Middleware<br>Routing** | [AddTrailingSlash](#webmiddleware-addtrailingslash) [AddTrailingSlashWithConfig](#webmiddleware-addtrailingslashwithconfig) [HTTPSNonWWWRedirect](#webmiddleware-httpsnonwwwredirect) [HTTPSNonWWWRedirectWithConfig](#webmiddleware-httpsnonwwwredirectwithconfig) [HTTPSRedirect](#webmiddleware-httpsredirect) [HTTPSRedirectWithConfig](#webmiddleware-httpsredirectwithconfig) [HTTPSWWWRedirect](#webmiddleware-httpswwwredirect) [HTTPSWWWRedirectWithConfig](#webmiddleware-httpswwwredirectwithconfig) [MethodFromForm](#webmiddleware-methodfromform) [MethodFromHeader](#webmiddleware-methodfromheader) [MethodFromQuery](#webmiddleware-methodfromquery) [MethodOverride](#webmiddleware-methodoverride) [MethodOverrideWithConfig](#webmiddleware-methodoverridewithconfig) [NonWWWRedirect](#webmiddleware-nonwwwredirect) [NonWWWRedirectWithConfig](#webmiddleware-nonwwwredirectwithconfig) [RemoveTrailingSlash](#webmiddleware-removetrailingslash) [RemoveTrailingSlashWithConfig](#webmiddleware-removetrailingslashwithconfig) [Rewrite](#webmiddleware-rewrite) [RewriteWithConfig](#webmiddleware-rewritewithconfig) [Static](#webmiddleware-static) [StaticWithConfig](#webmiddleware-staticwithconfig) [WWWRedirect](#webmiddleware-wwwredirect) [WWWRedirectWithConfig](#webmiddleware-wwwredirectwithconfig) |
 | **Middleware<br>Security** | [CORS](#webmiddleware-cors) [CORSWithConfig](#webmiddleware-corswithconfig) [Secure](#webmiddleware-secure) [SecureWithConfig](#webmiddleware-securewithconfig) |
+| **Middleware<br>Static Files** | [Static](#webmiddleware-static) [StaticWithConfig](#webmiddleware-staticwithconfig) |
 | **Prometheus** | [Default](#webprometheus-default) [Handler](#webprometheus-handler) [Metrics.Handler](#webprometheus-metrics-handler) [Metrics.Middleware](#webprometheus-metrics-middleware) [Middleware](#webprometheus-middleware) [MustNew](#webprometheus-mustnew) [New](#webprometheus-new) [RunPushGatewayGatherer](#webprometheus-runpushgatewaygatherer) [WriteGatheredMetrics](#webprometheus-writegatheredmetrics) |
 | **Route Reporting** | [BuildRouteEntries](#buildrouteentries) [RenderRouteTable](#renderroutetable) |
 | **Routing** | [MountRouter](#mountrouter) [NewRoute](#newroute) [NewRouteGroup](#newroutegroup) [NewWebSocketRoute](#newwebsocketroute) [RegisterRoutes](#registerroutes) [Route.Handler](#route-handler) [Route.HandlerName](#route-handlername) [Route.IsWebSocket](#route-iswebsocket) [Route.Method](#route-method) [Route.MiddlewareNames](#route-middlewarenames) [Route.Middlewares](#route-middlewares) [Route.Path](#route-path) [Route.WebSocketHandler](#route-websockethandler) [Route.WithMiddlewareNames](#route-withmiddlewarenames) [RouteGroup.MiddlewareNames](#routegroup-middlewarenames) [RouteGroup.Middlewares](#routegroup-middlewares) [RouteGroup.RoutePrefix](#routegroup-routeprefix) [RouteGroup.Routes](#routegroup-routes) [RouteGroup.WithMiddlewareNames](#routegroup-withmiddlewarenames) |
@@ -424,6 +427,172 @@ fmt.Println(ctx.Response().Header().Get("Content-Encoding") == "")
 // true
 ```
 
+### Middleware - Method Override
+
+#### <a id="webmiddleware-methodfromform"></a>webmiddleware.MethodFromForm
+
+MethodFromForm gets an override method from a form field.
+
+```go
+getter := webmiddleware.MethodFromForm("_method")
+req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("_method=DELETE"))
+req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+ctx := webtest.NewContext(req, nil, "/", nil)
+fmt.Println(getter(ctx))
+// DELETE
+```
+
+#### <a id="webmiddleware-methodfromheader"></a>webmiddleware.MethodFromHeader
+
+MethodFromHeader gets an override method from a request header.
+
+```go
+getter := webmiddleware.MethodFromHeader("X-HTTP-Method-Override")
+ctx := webtest.NewContext(nil, nil, "/", nil)
+ctx.Request().Header.Set("X-HTTP-Method-Override", "PATCH")
+fmt.Println(getter(ctx))
+// PATCH
+```
+
+#### <a id="webmiddleware-methodfromquery"></a>webmiddleware.MethodFromQuery
+
+MethodFromQuery gets an override method from a query parameter.
+
+```go
+getter := webmiddleware.MethodFromQuery("_method")
+req := httptest.NewRequest(http.MethodPost, "/?_method=PUT", nil)
+ctx := webtest.NewContext(req, nil, "/", nil)
+fmt.Println(getter(ctx))
+// PUT
+```
+
+#### <a id="webmiddleware-methodoverride"></a>webmiddleware.MethodOverride
+
+MethodOverride returns method override middleware.
+
+```go
+req := httptest.NewRequest(http.MethodPost, "/", nil)
+req.Header.Set("X-HTTP-Method-Override", http.MethodPatch)
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := webmiddleware.MethodOverride()(func(c web.Context) error {
+	fmt.Println(c.Method())
+	return nil
+})
+_ = handler(ctx)
+// PATCH
+```
+
+#### <a id="webmiddleware-methodoverridewithconfig"></a>webmiddleware.MethodOverrideWithConfig
+
+MethodOverrideWithConfig returns method override middleware with config.
+
+```go
+req := httptest.NewRequest(http.MethodPost, "/?_method=DELETE", nil)
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+	Getter: webmiddleware.MethodFromQuery("_method"),
+})(func(c web.Context) error {
+	fmt.Println(c.Method())
+	return nil
+})
+_ = handler(ctx)
+// DELETE
+```
+
+### Middleware - Path Rewriting
+
+#### <a id="webmiddleware-addtrailingslash"></a>webmiddleware.AddTrailingSlash
+
+AddTrailingSlash adds a trailing slash to the request path.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+handler := webmiddleware.AddTrailingSlash()(func(c web.Context) error {
+	fmt.Println(c.Request().URL.Path)
+	return nil
+})
+_ = handler(ctx)
+// /docs/
+```
+
+#### <a id="webmiddleware-addtrailingslashwithconfig"></a>webmiddleware.AddTrailingSlashWithConfig
+
+AddTrailingSlashWithConfig returns trailing-slash middleware with config.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+handler := webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})(func(c web.Context) error {
+	return c.NoContent(204)
+})
+_ = handler(ctx)
+fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
+// 308 /docs/
+```
+
+#### <a id="webmiddleware-removetrailingslash"></a>webmiddleware.RemoveTrailingSlash
+
+RemoveTrailingSlash removes the trailing slash from the request path.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
+ctx := webtest.NewContext(req, nil, "/docs/", nil)
+handler := webmiddleware.RemoveTrailingSlash()(func(c web.Context) error {
+	fmt.Println(c.Request().URL.Path)
+	return nil
+})
+_ = handler(ctx)
+// /docs
+```
+
+#### <a id="webmiddleware-removetrailingslashwithconfig"></a>webmiddleware.RemoveTrailingSlashWithConfig
+
+RemoveTrailingSlashWithConfig returns remove-trailing-slash middleware with config.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
+ctx := webtest.NewContext(req, nil, "/docs/", nil)
+handler := webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})(func(c web.Context) error {
+	return c.NoContent(204)
+})
+_ = handler(ctx)
+fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
+// 308 /docs
+```
+
+#### <a id="webmiddleware-rewrite"></a>webmiddleware.Rewrite
+
+Rewrite rewrites the request path using wildcard rules.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
+ctx := webtest.NewContext(req, nil, "/old/*", nil)
+handler := webmiddleware.Rewrite(map[string]string{"/old/*": "/new/$1"})(func(c web.Context) error {
+	fmt.Println(c.Request().URL.Path)
+	return nil
+})
+_ = handler(ctx)
+// /new/users
+```
+
+#### <a id="webmiddleware-rewritewithconfig"></a>webmiddleware.RewriteWithConfig
+
+RewriteWithConfig rewrites the request path using wildcard and regex rules.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
+ctx := webtest.NewContext(req, nil, "/old/*", nil)
+handler := webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
+	Rules: map[string]string{"/old/*": "/v2/$1"},
+})(func(c web.Context) error {
+	fmt.Println(c.Request().URL.Path)
+	return nil
+})
+_ = handler(ctx)
+// /v2/users
+```
+
 ### Middleware - Payloads
 
 #### <a id="webmiddleware-bodydump"></a>webmiddleware.BodyDump
@@ -640,6 +809,128 @@ fmt.Println(ctx.StatusCode())
 // 202
 ```
 
+### Middleware - Redirects
+
+#### <a id="webmiddleware-httpsnonwwwredirect"></a>webmiddleware.HTTPSNonWWWRedirect
+
+HTTPSNonWWWRedirect redirects to https without www.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSNonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Response().Header().Get("Location"))
+// https://example.com/docs
+```
+
+#### <a id="webmiddleware-httpsnonwwwredirectwithconfig"></a>webmiddleware.HTTPSNonWWWRedirectWithConfig
+
+HTTPSNonWWWRedirectWithConfig returns HTTPS non-WWW redirect middleware with config.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
+```
+
+#### <a id="webmiddleware-httpsredirect"></a>webmiddleware.HTTPSRedirect
+
+HTTPSRedirect redirects http requests to https.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
+// 301 https://example.com/docs
+```
+
+#### <a id="webmiddleware-httpsredirectwithconfig"></a>webmiddleware.HTTPSRedirectWithConfig
+
+HTTPSRedirectWithConfig returns HTTPS redirect middleware with config.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
+```
+
+#### <a id="webmiddleware-httpswwwredirect"></a>webmiddleware.HTTPSWWWRedirect
+
+HTTPSWWWRedirect redirects to https + www.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSWWWRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Response().Header().Get("Location"))
+// https://www.example.com/docs
+```
+
+#### <a id="webmiddleware-httpswwwredirectwithconfig"></a>webmiddleware.HTTPSWWWRedirectWithConfig
+
+HTTPSWWWRedirectWithConfig returns HTTPS+WWW redirect middleware with config.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
+```
+
+#### <a id="webmiddleware-nonwwwredirect"></a>webmiddleware.NonWWWRedirect
+
+NonWWWRedirect redirects to the non-www host.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.NonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Response().Header().Get("Location"))
+// http://example.com/docs
+```
+
+#### <a id="webmiddleware-nonwwwredirectwithconfig"></a>webmiddleware.NonWWWRedirectWithConfig
+
+NonWWWRedirectWithConfig returns non-WWW redirect middleware with config.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
+```
+
+#### <a id="webmiddleware-wwwredirect"></a>webmiddleware.WWWRedirect
+
+WWWRedirect redirects to the www host.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.WWWRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Response().Header().Get("Location"))
+// http://www.example.com/docs
+```
+
+#### <a id="webmiddleware-wwwredirectwithconfig"></a>webmiddleware.WWWRedirectWithConfig
+
+WWWRedirectWithConfig returns WWW redirect middleware with config.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
+```
+
 ### Middleware - Reliability
 
 #### <a id="webmiddleware-recover"></a>webmiddleware.Recover
@@ -785,320 +1076,6 @@ fmt.Println(ctx.StatusCode())
 // 202
 ```
 
-### Middleware - Routing
-
-#### <a id="webmiddleware-addtrailingslash"></a>webmiddleware.AddTrailingSlash
-
-AddTrailingSlash adds a trailing slash to the request path.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-handler := webmiddleware.AddTrailingSlash()(func(c web.Context) error {
-	fmt.Println(c.Request().URL.Path)
-	return nil
-})
-_ = handler(ctx)
-// /docs/
-```
-
-#### <a id="webmiddleware-addtrailingslashwithconfig"></a>webmiddleware.AddTrailingSlashWithConfig
-
-AddTrailingSlashWithConfig returns trailing-slash middleware with config.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-handler := webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})(func(c web.Context) error {
-	return c.NoContent(204)
-})
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
-// 308 /docs/
-```
-
-#### <a id="webmiddleware-httpsnonwwwredirect"></a>webmiddleware.HTTPSNonWWWRedirect
-
-HTTPSNonWWWRedirect redirects to https without www.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSNonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Response().Header().Get("Location"))
-// https://example.com/docs
-```
-
-#### <a id="webmiddleware-httpsnonwwwredirectwithconfig"></a>webmiddleware.HTTPSNonWWWRedirectWithConfig
-
-HTTPSNonWWWRedirectWithConfig returns HTTPS non-WWW redirect middleware with config.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
-```
-
-#### <a id="webmiddleware-httpsredirect"></a>webmiddleware.HTTPSRedirect
-
-HTTPSRedirect redirects http requests to https.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
-// 301 https://example.com/docs
-```
-
-#### <a id="webmiddleware-httpsredirectwithconfig"></a>webmiddleware.HTTPSRedirectWithConfig
-
-HTTPSRedirectWithConfig returns HTTPS redirect middleware with config.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
-```
-
-#### <a id="webmiddleware-httpswwwredirect"></a>webmiddleware.HTTPSWWWRedirect
-
-HTTPSWWWRedirect redirects to https + www.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSWWWRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Response().Header().Get("Location"))
-// https://www.example.com/docs
-```
-
-#### <a id="webmiddleware-httpswwwredirectwithconfig"></a>webmiddleware.HTTPSWWWRedirectWithConfig
-
-HTTPSWWWRedirectWithConfig returns HTTPS+WWW redirect middleware with config.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
-```
-
-#### <a id="webmiddleware-methodfromform"></a>webmiddleware.MethodFromForm
-
-MethodFromForm gets an override method from a form field.
-
-```go
-getter := webmiddleware.MethodFromForm("_method")
-req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("_method=DELETE"))
-req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-ctx := webtest.NewContext(req, nil, "/", nil)
-fmt.Println(getter(ctx))
-// DELETE
-```
-
-#### <a id="webmiddleware-methodfromheader"></a>webmiddleware.MethodFromHeader
-
-MethodFromHeader gets an override method from a request header.
-
-```go
-getter := webmiddleware.MethodFromHeader("X-HTTP-Method-Override")
-ctx := webtest.NewContext(nil, nil, "/", nil)
-ctx.Request().Header.Set("X-HTTP-Method-Override", "PATCH")
-fmt.Println(getter(ctx))
-// PATCH
-```
-
-#### <a id="webmiddleware-methodfromquery"></a>webmiddleware.MethodFromQuery
-
-MethodFromQuery gets an override method from a query parameter.
-
-```go
-getter := webmiddleware.MethodFromQuery("_method")
-req := httptest.NewRequest(http.MethodPost, "/?_method=PUT", nil)
-ctx := webtest.NewContext(req, nil, "/", nil)
-fmt.Println(getter(ctx))
-// PUT
-```
-
-#### <a id="webmiddleware-methodoverride"></a>webmiddleware.MethodOverride
-
-MethodOverride returns method override middleware.
-
-```go
-req := httptest.NewRequest(http.MethodPost, "/", nil)
-req.Header.Set("X-HTTP-Method-Override", http.MethodPatch)
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.MethodOverride()(func(c web.Context) error {
-	fmt.Println(c.Method())
-	return nil
-})
-_ = handler(ctx)
-// PATCH
-```
-
-#### <a id="webmiddleware-methodoverridewithconfig"></a>webmiddleware.MethodOverrideWithConfig
-
-MethodOverrideWithConfig returns method override middleware with config.
-
-```go
-req := httptest.NewRequest(http.MethodPost, "/?_method=DELETE", nil)
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
-	Getter: webmiddleware.MethodFromQuery("_method"),
-})(func(c web.Context) error {
-	fmt.Println(c.Method())
-	return nil
-})
-_ = handler(ctx)
-// DELETE
-```
-
-#### <a id="webmiddleware-nonwwwredirect"></a>webmiddleware.NonWWWRedirect
-
-NonWWWRedirect redirects to the non-www host.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.NonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Response().Header().Get("Location"))
-// http://example.com/docs
-```
-
-#### <a id="webmiddleware-nonwwwredirectwithconfig"></a>webmiddleware.NonWWWRedirectWithConfig
-
-NonWWWRedirectWithConfig returns non-WWW redirect middleware with config.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
-```
-
-#### <a id="webmiddleware-removetrailingslash"></a>webmiddleware.RemoveTrailingSlash
-
-RemoveTrailingSlash removes the trailing slash from the request path.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
-ctx := webtest.NewContext(req, nil, "/docs/", nil)
-handler := webmiddleware.RemoveTrailingSlash()(func(c web.Context) error {
-	fmt.Println(c.Request().URL.Path)
-	return nil
-})
-_ = handler(ctx)
-// /docs
-```
-
-#### <a id="webmiddleware-removetrailingslashwithconfig"></a>webmiddleware.RemoveTrailingSlashWithConfig
-
-RemoveTrailingSlashWithConfig returns remove-trailing-slash middleware with config.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
-ctx := webtest.NewContext(req, nil, "/docs/", nil)
-handler := webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})(func(c web.Context) error {
-	return c.NoContent(204)
-})
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
-// 308 /docs
-```
-
-#### <a id="webmiddleware-rewrite"></a>webmiddleware.Rewrite
-
-Rewrite rewrites the request path using wildcard rules.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
-ctx := webtest.NewContext(req, nil, "/old/*", nil)
-handler := webmiddleware.Rewrite(map[string]string{"/old/*": "/new/$1"})(func(c web.Context) error {
-	fmt.Println(c.Request().URL.Path)
-	return nil
-})
-_ = handler(ctx)
-// /new/users
-```
-
-#### <a id="webmiddleware-rewritewithconfig"></a>webmiddleware.RewriteWithConfig
-
-RewriteWithConfig rewrites the request path using wildcard and regex rules.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
-ctx := webtest.NewContext(req, nil, "/old/*", nil)
-handler := webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
-	Rules: map[string]string{"/old/*": "/v2/$1"},
-})(func(c web.Context) error {
-	fmt.Println(c.Request().URL.Path)
-	return nil
-})
-_ = handler(ctx)
-// /v2/users
-```
-
-#### <a id="webmiddleware-static"></a>webmiddleware.Static
-
-Static serves static content from the provided root.
-
-```go
-dir, _ := os.MkdirTemp("", "web-static-*")
-defer os.RemoveAll(dir)
-_ = os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hello"), 0o644)
-req := httptest.NewRequest(http.MethodGet, "/hello.txt", nil)
-ctx := webtest.NewContext(req, nil, "/hello.txt", nil)
-_ = webmiddleware.Static(dir)(func(c web.Context) error { return c.NoContent(http.StatusNotFound) })(ctx)
-fmt.Println(strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String()))
-// hello
-```
-
-#### <a id="webmiddleware-staticwithconfig"></a>webmiddleware.StaticWithConfig
-
-StaticWithConfig serves static content using config.
-
-```go
-dir, _ := os.MkdirTemp("", "web-static-*")
-defer os.RemoveAll(dir)
-_ = os.WriteFile(filepath.Join(dir, "index.html"), []byte("<h1>home</h1>"), 0o644)
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-ctx := webtest.NewContext(req, nil, "/", nil)
-_ = webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{Root: dir})(func(c web.Context) error { return c.NoContent(http.StatusNotFound) })(ctx)
-fmt.Println(strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String()))
-// <h1>home</h1>
-```
-
-#### <a id="webmiddleware-wwwredirect"></a>webmiddleware.WWWRedirect
-
-WWWRedirect redirects to the www host.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.WWWRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Response().Header().Get("Location"))
-// http://www.example.com/docs
-```
-
-#### <a id="webmiddleware-wwwredirectwithconfig"></a>webmiddleware.WWWRedirectWithConfig
-
-WWWRedirectWithConfig returns WWW redirect middleware with config.
-
-```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
-```
-
 ### Middleware - Security
 
 #### <a id="webmiddleware-cors"></a>webmiddleware.CORS
@@ -1154,6 +1131,38 @@ handler := webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{ReferrerPol
 _ = handler(ctx)
 fmt.Println(ctx.Response().Header().Get("Referrer-Policy"))
 // same-origin
+```
+
+### Middleware - Static Files
+
+#### <a id="webmiddleware-static"></a>webmiddleware.Static
+
+Static serves static content from the provided root.
+
+```go
+dir, _ := os.MkdirTemp("", "web-static-*")
+defer os.RemoveAll(dir)
+_ = os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hello"), 0o644)
+req := httptest.NewRequest(http.MethodGet, "/hello.txt", nil)
+ctx := webtest.NewContext(req, nil, "/hello.txt", nil)
+_ = webmiddleware.Static(dir)(func(c web.Context) error { return c.NoContent(http.StatusNotFound) })(ctx)
+fmt.Println(strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String()))
+// hello
+```
+
+#### <a id="webmiddleware-staticwithconfig"></a>webmiddleware.StaticWithConfig
+
+StaticWithConfig serves static content using config.
+
+```go
+dir, _ := os.MkdirTemp("", "web-static-*")
+defer os.RemoveAll(dir)
+_ = os.WriteFile(filepath.Join(dir, "index.html"), []byte("<h1>home</h1>"), 0o644)
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+ctx := webtest.NewContext(req, nil, "/", nil)
+_ = webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{Root: dir})(func(c web.Context) error { return c.NoContent(http.StatusNotFound) })(ctx)
+fmt.Println(strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String()))
+// <h1>home</h1>
 ```
 
 ### Prometheus
