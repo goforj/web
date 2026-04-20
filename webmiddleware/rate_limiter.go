@@ -56,7 +56,17 @@ var DefaultRateLimiterConfig = RateLimiterConfig{
 // @group Middleware
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
-// _ = webmiddleware.RateLimiter(store)
+// handler := webmiddleware.RateLimiter(store)(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// req1 := httptest.NewRequest(http.MethodGet, "/", nil)
+// req1.RemoteAddr = "192.0.2.10:1234"
+// ctx1 := webtest.NewContext(req1, nil, "/", nil)
+// _ = handler(ctx1)
+// req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+// req2.RemoteAddr = "192.0.2.10:1234"
+// ctx2 := webtest.NewContext(req2, nil, "/", nil)
+// _ = handler(ctx2)
+// fmt.Println(ctx1.StatusCode(), ctx2.StatusCode())
+//	// 204 429
 func RateLimiter(store RateLimiterStore) web.Middleware {
 	config := DefaultRateLimiterConfig
 	config.Store = store
@@ -68,7 +78,11 @@ func RateLimiter(store RateLimiterStore) web.Middleware {
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 // mw := webmiddleware.RateLimiterWithConfig(webmiddleware.RateLimiterConfig{Store: store})
-// _ = mw
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusAccepted) })
+// _ = handler(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 202
 func RateLimiterWithConfig(config RateLimiterConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultRateLimiterConfig.Skipper

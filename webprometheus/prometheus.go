@@ -90,7 +90,8 @@ var (
 // Default returns the package-level Prometheus metrics instance.
 // @group Prometheus
 // Example:
-// _ = webprometheus.Default()
+// fmt.Println(webprometheus.Default() == webprometheus.Default())
+//	// true
 func Default() *Metrics {
 	defaultOnce.Do(func() {
 		defaultMetrics = MustNew(Config{})
@@ -101,7 +102,15 @@ func Default() *Metrics {
 // Middleware returns the package-level Prometheus middleware.
 // @group Prometheus
 // Example:
-// _ = webprometheus.Middleware()
+// registry := prometheus.NewRegistry()
+// metrics, _ := webprometheus.New(webprometheus.Config{Registerer: registry, Gatherer: registry, Namespace: "example"})
+// handler := metrics.Middleware()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/healthz", nil), nil, "/healthz", nil)
+// _ = handler(ctx)
+// out := &bytes.Buffer{}
+// _ = webprometheus.WriteGatheredMetrics(out, registry)
+// fmt.Println(strings.Contains(out.String(), "example_requests_total"))
+//	// true
 func Middleware() web.Middleware {
 	return Default().Middleware()
 }
@@ -109,7 +118,16 @@ func Middleware() web.Middleware {
 // Handler returns the package-level Prometheus scrape handler.
 // @group Prometheus
 // Example:
-// _ = webprometheus.Handler()
+// registry := prometheus.NewRegistry()
+// counter := prometheus.NewCounter(prometheus.CounterOpts{Name: "demo_total", Help: "demo counter"})
+// registry.MustRegister(counter)
+// counter.Inc()
+// metrics, _ := webprometheus.New(webprometheus.Config{Registerer: prometheus.NewRegistry(), Gatherer: registry})
+// recorder := httptest.NewRecorder()
+// ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/metrics", nil), recorder, "/metrics", nil)
+// _ = metrics.Handler()(ctx)
+// fmt.Println(strings.Contains(recorder.Body.String(), "demo_total"))
+//	// true
 func Handler() web.Handler {
 	return Default().Handler()
 }
@@ -117,7 +135,9 @@ func Handler() web.Handler {
 // MustNew creates a Metrics instance and panics on registration errors.
 // @group Prometheus
 // Example:
-// _ = webprometheus.MustNew(webprometheus.Config{})
+// metrics := webprometheus.MustNew(webprometheus.Config{Registerer: prometheus.NewRegistry(), Gatherer: prometheus.NewRegistry()})
+// fmt.Println(metrics != nil)
+//	// true
 func MustNew(config Config) *Metrics {
 	metrics, err := New(config)
 	if err != nil {
@@ -222,8 +242,15 @@ func New(config Config) (*Metrics, error) {
 // Middleware records Prometheus metrics for each request.
 // @group Prometheus
 // Example:
-// metrics, _ := webprometheus.New(webprometheus.Config{})
-// _ = metrics.Middleware()
+// registry := prometheus.NewRegistry()
+// metrics, _ := webprometheus.New(webprometheus.Config{Registerer: registry, Gatherer: registry, Namespace: "example"})
+// handler := metrics.Middleware()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/healthz", nil), nil, "/healthz", nil)
+// _ = handler(ctx)
+// out := &bytes.Buffer{}
+// _ = webprometheus.WriteGatheredMetrics(out, registry)
+// fmt.Println(strings.Contains(out.String(), "example_requests_total"))
+//	// true
 func (m *Metrics) Middleware() web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {
@@ -271,8 +298,16 @@ func (m *Metrics) Middleware() web.Middleware {
 // Handler exposes the configured Prometheus metrics as a web.Handler.
 // @group Prometheus
 // Example:
-// metrics, _ := webprometheus.New(webprometheus.Config{})
-// _ = metrics.Handler()
+// registry := prometheus.NewRegistry()
+// counter := prometheus.NewCounter(prometheus.CounterOpts{Name: "demo_total", Help: "demo counter"})
+// registry.MustRegister(counter)
+// counter.Inc()
+// metrics, _ := webprometheus.New(webprometheus.Config{Registerer: prometheus.NewRegistry(), Gatherer: registry})
+// recorder := httptest.NewRecorder()
+// ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/metrics", nil), recorder, "/metrics", nil)
+// _ = metrics.Handler()(ctx)
+// fmt.Println(strings.Contains(recorder.Body.String(), "demo_total"))
+//	// true
 func (m *Metrics) Handler() web.Handler {
 	inner := promhttp.HandlerFor(m.gatherer, promhttp.HandlerOpts{
 		DisableCompression: m.config.DisableCompression,

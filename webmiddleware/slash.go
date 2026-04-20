@@ -17,7 +17,14 @@ var DefaultTrailingSlashConfig = TrailingSlashConfig{}
 // AddTrailingSlash adds a trailing slash to the request path.
 // @group Middleware
 // Example:
-// _ = webmiddleware.AddTrailingSlash()
+// req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// handler := webmiddleware.AddTrailingSlash()(func(c web.Context) error {
+// 	fmt.Println(c.Request().URL.Path)
+// 	return nil
+// })
+// _ = handler(ctx)
+//	// /docs/
 func AddTrailingSlash() web.Middleware {
 	return AddTrailingSlashWithConfig(DefaultTrailingSlashConfig)
 }
@@ -25,7 +32,14 @@ func AddTrailingSlash() web.Middleware {
 // AddTrailingSlashWithConfig returns trailing-slash middleware with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})
+// req := httptest.NewRequest(http.MethodGet, "/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// handler := webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})(func(c web.Context) error {
+// 	return c.NoContent(204)
+// })
+// _ = handler(ctx)
+// fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
+//	// 308 /docs/
 func AddTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {
@@ -55,7 +69,14 @@ func AddTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 // RemoveTrailingSlash removes the trailing slash from the request path.
 // @group Middleware
 // Example:
-// _ = webmiddleware.RemoveTrailingSlash()
+// req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
+// ctx := webtest.NewContext(req, nil, "/docs/", nil)
+// handler := webmiddleware.RemoveTrailingSlash()(func(c web.Context) error {
+// 	fmt.Println(c.Request().URL.Path)
+// 	return nil
+// })
+// _ = handler(ctx)
+//	// /docs
 func RemoveTrailingSlash() web.Middleware {
 	return RemoveTrailingSlashWithConfig(DefaultTrailingSlashConfig)
 }
@@ -63,7 +84,14 @@ func RemoveTrailingSlash() web.Middleware {
 // RemoveTrailingSlashWithConfig returns remove-trailing-slash middleware with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})
+// req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
+// ctx := webtest.NewContext(req, nil, "/docs/", nil)
+// handler := webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})(func(c web.Context) error {
+// 	return c.NoContent(204)
+// })
+// _ = handler(ctx)
+// fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
+//	// 308 /docs
 func RemoveTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {

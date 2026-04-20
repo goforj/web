@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"github.com/goforj/web/webprometheus"
 )
 
 func main() {
-	_ = webprometheus.Default()
+	fmt.Println(webprometheus.Default() == webprometheus.Default())
+	// true
 }

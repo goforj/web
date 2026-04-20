@@ -22,7 +22,15 @@ var DefaultMethodOverrideConfig = MethodOverrideConfig{
 // MethodOverride returns method override middleware.
 // @group Middleware
 // Example:
-// _ = webmiddleware.MethodOverride()
+// req := httptest.NewRequest(http.MethodPost, "/", nil)
+// req.Header.Set("X-HTTP-Method-Override", http.MethodPatch)
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := webmiddleware.MethodOverride()(func(c web.Context) error {
+// 	fmt.Println(c.Method())
+// 	return nil
+// })
+// _ = handler(ctx)
+//	// PATCH
 func MethodOverride() web.Middleware {
 	return MethodOverrideWithConfig(DefaultMethodOverrideConfig)
 }
@@ -30,7 +38,16 @@ func MethodOverride() web.Middleware {
 // MethodOverrideWithConfig returns method override middleware with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{})
+// req := httptest.NewRequest(http.MethodPost, "/?_method=DELETE", nil)
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+// 	Getter: webmiddleware.MethodFromQuery("_method"),
+// })(func(c web.Context) error {
+// 	fmt.Println(c.Method())
+// 	return nil
+// })
+// _ = handler(ctx)
+//	// DELETE
 func MethodOverrideWithConfig(config MethodOverrideConfig) web.Middleware {
 	if config.Getter == nil {
 		config.Getter = DefaultMethodOverrideConfig.Getter

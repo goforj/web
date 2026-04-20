@@ -88,8 +88,13 @@ func (r *Route) Path() string {
 // Handler returns the route handler.
 // @group Routing
 // Example:
-// route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil })
-// _ = route.Handler()
+// route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error {
+// 	return c.NoContent(http.StatusCreated)
+// })
+// ctx := webtest.NewContext(nil, nil, "/healthz", nil)
+// _ = route.Handler()(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 201
 func (r *Route) Handler() Handler {
 	return r.handler
 }
@@ -97,8 +102,14 @@ func (r *Route) Handler() Handler {
 // WebSocketHandler returns the websocket route handler.
 // @group Routing
 // Example:
-// route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error { return nil })
-// _ = route.WebSocketHandler()
+// route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error {
+// 	c.Set("ready", true)
+// 	return nil
+// })
+// ctx := webtest.NewContext(nil, nil, "/ws", nil)
+// err := route.WebSocketHandler()(ctx, nil)
+// fmt.Println(err == nil, ctx.Get("ready"))
+//	// true true
 func (r *Route) WebSocketHandler() WebSocketHandler {
 	return r.wsHandler
 }
