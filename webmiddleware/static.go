@@ -49,7 +49,6 @@ const staticIndexHTML = `
 // @group Middleware
 // Example:
 // _ = webmiddleware.Static(".")
-//	// true
 func Static(root string) web.Middleware {
 	config := DefaultStaticConfig
 	config.Root = root
@@ -60,7 +59,6 @@ func Static(root string) web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{Root: "."})
-//	// true
 func StaticWithConfig(config StaticConfig) web.Middleware {
 	if config.Root == "" {
 		config.Root = "."

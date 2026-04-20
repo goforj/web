@@ -15,6 +15,7 @@ func main() {
 			}),
 		},
 	})
+	_ = server
 	fmt.Println(err == nil)
-	// true true
+	// true
 }

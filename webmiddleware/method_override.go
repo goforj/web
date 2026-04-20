@@ -23,7 +23,6 @@ var DefaultMethodOverrideConfig = MethodOverrideConfig{
 // @group Middleware
 // Example:
 // _ = webmiddleware.MethodOverride()
-//	// true
 func MethodOverride() web.Middleware {
 	return MethodOverrideWithConfig(DefaultMethodOverrideConfig)
 }
@@ -32,7 +31,6 @@ func MethodOverride() web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{})
-//	// true
 func MethodOverrideWithConfig(config MethodOverrideConfig) web.Middleware {
 	if config.Getter == nil {
 		config.Getter = DefaultMethodOverrideConfig.Getter

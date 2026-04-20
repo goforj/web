@@ -57,7 +57,6 @@ var DefaultRateLimiterConfig = RateLimiterConfig{
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 // _ = webmiddleware.RateLimiter(store)
-//	// true
 func RateLimiter(store RateLimiterStore) web.Middleware {
 	config := DefaultRateLimiterConfig
 	config.Store = store
@@ -70,7 +69,6 @@ func RateLimiter(store RateLimiterStore) web.Middleware {
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 // mw := webmiddleware.RateLimiterWithConfig(webmiddleware.RateLimiterConfig{Store: store})
 // _ = mw
-//	// true
 func RateLimiterWithConfig(config RateLimiterConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultRateLimiterConfig.Skipper
@@ -142,7 +140,6 @@ type visitor struct {
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 // _ = store
-//	// true
 func NewRateLimiterMemoryStore(limit rate.Limit) *RateLimiterMemoryStore {
 	return NewRateLimiterMemoryStoreWithConfig(RateLimiterMemoryStoreConfig{Rate: limit})
 }
@@ -152,7 +149,6 @@ func NewRateLimiterMemoryStore(limit rate.Limit) *RateLimiterMemoryStore {
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStoreWithConfig(webmiddleware.RateLimiterMemoryStoreConfig{Rate: rate.Every(time.Second)})
 // _ = store
-//	// true
 func NewRateLimiterMemoryStoreWithConfig(config RateLimiterMemoryStoreConfig) *RateLimiterMemoryStore {
 	store := &RateLimiterMemoryStore{
 		rate:      config.Rate,

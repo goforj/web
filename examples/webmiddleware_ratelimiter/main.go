@@ -9,5 +9,4 @@ import (
 func main() {
 	store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 	_ = webmiddleware.RateLimiter(store)
-	// true
 }

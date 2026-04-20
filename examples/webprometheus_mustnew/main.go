@@ -6,5 +6,4 @@ import (
 
 func main() {
 	_ = webprometheus.MustNew(webprometheus.Config{})
-	// true
 }

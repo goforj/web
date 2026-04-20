@@ -7,5 +7,4 @@ import (
 func main() {
 	metrics, _ := webprometheus.New(webprometheus.Config{})
 	_ = metrics.Middleware()
-	// true
 }

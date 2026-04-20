@@ -30,7 +30,6 @@ var DefaultBodyDumpConfig = BodyDumpConfig{
 // Example:
 // mw := webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {})
 // _ = mw
-//	// true
 func BodyDump(handler BodyDumpHandler) web.Middleware {
 	config := DefaultBodyDumpConfig
 	config.Handler = handler
@@ -44,7 +43,6 @@ func BodyDump(handler BodyDumpHandler) web.Middleware {
 // 	Handler: func(c web.Context, reqBody, resBody []byte) {},
 // })
 // _ = mw
-//	// true
 func BodyDumpWithConfig(config BodyDumpConfig) web.Middleware {
 	if config.Handler == nil {
 		panic("web: body dump middleware requires a handler")

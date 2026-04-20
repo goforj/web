@@ -10,5 +10,4 @@ func main() {
 		LogValuesFunc: func(c web.Context, values webmiddleware.RequestLoggerValues) error { return nil },
 	})
 	_ = mw
-	// true
 }

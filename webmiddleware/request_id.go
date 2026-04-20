@@ -27,7 +27,7 @@ var DefaultRequestIDConfig = RequestIDConfig{
 // Example:
 // mw := webmiddleware.RequestID()
 // handler := mw(func(c web.Context) error {
-// 	fmt.Println(c.Get("request_id") != nil)
+// 	_ = c.Get("request_id")
 // 	return c.NoContent(http.StatusOK)
 // })
 // ctx := webtest.NewContext(nil, nil, "/", nil)

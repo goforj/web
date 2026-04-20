@@ -8,5 +8,4 @@ import (
 func main() {
 	mw := webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {})
 	_ = mw
-	// true
 }

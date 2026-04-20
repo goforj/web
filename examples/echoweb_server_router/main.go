@@ -7,5 +7,4 @@ import (
 func main() {
 	server, _ := echoweb.NewServer(echoweb.ServerConfig{})
 	_ = server.Router()
-	// true
 }

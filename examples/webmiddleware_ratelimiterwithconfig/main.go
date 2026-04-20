@@ -10,5 +10,4 @@ func main() {
 	store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 	mw := webmiddleware.RateLimiterWithConfig(webmiddleware.RateLimiterConfig{Store: store})
 	_ = mw
-	// true
 }

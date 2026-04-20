@@ -33,7 +33,6 @@ var DefaultGzipConfig = GzipConfig{
 // @group Middleware
 // Example:
 // _ = webmiddleware.Gzip()
-//	// true
 func Gzip() web.Middleware {
 	return GzipWithConfig(DefaultGzipConfig)
 }
@@ -42,7 +41,6 @@ func Gzip() web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.Compress()
-//	// true
 func Compress() web.Middleware {
 	return Gzip()
 }
@@ -51,7 +49,6 @@ func Compress() web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{MinLength: 256})
-//	// true
 func GzipWithConfig(config GzipConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultGzipConfig.Skipper

@@ -42,7 +42,6 @@ var DefaultDecompressConfig = DecompressConfig{
 // @group Middleware
 // Example:
 // _ = webmiddleware.Decompress()
-//	// true
 func Decompress() web.Middleware {
 	return DecompressWithConfig(DefaultDecompressConfig)
 }
@@ -51,7 +50,6 @@ func Decompress() web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{})
-//	// true
 func DecompressWithConfig(config DecompressConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultSkipper

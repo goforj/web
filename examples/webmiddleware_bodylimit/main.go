@@ -6,5 +6,4 @@ import (
 
 func main() {
 	_ = webmiddleware.BodyLimit("2KB")
-	// true
 }

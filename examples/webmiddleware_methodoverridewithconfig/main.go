@@ -6,5 +6,4 @@ import (
 
 func main() {
 	_ = webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{})
-	// true
 }

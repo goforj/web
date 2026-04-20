@@ -90,7 +90,6 @@ func (r *Route) Path() string {
 // Example:
 // route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil })
 // _ = route.Handler()
-//	// true
 func (r *Route) Handler() Handler {
 	return r.handler
 }
@@ -100,7 +99,6 @@ func (r *Route) Handler() Handler {
 // Example:
 // route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error { return nil })
 // _ = route.WebSocketHandler()
-//	// true
 func (r *Route) WebSocketHandler() WebSocketHandler {
 	return r.wsHandler
 }

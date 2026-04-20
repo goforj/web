@@ -9,5 +9,4 @@ func main() {
 	target, _ := url.Parse("http://localhost:8080")
 	balancer := webmiddleware.NewRoundRobinBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
 	_ = balancer
-	// true
 }

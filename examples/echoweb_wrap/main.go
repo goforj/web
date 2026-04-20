@@ -7,5 +7,4 @@ import (
 func main() {
 	adapter := echoweb.Wrap(nil)
 	_ = adapter.Echo()
-	// true
 }

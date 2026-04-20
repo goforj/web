@@ -10,5 +10,4 @@ func main() {
 		return key == "demo-key", nil
 	})
 	_ = mw
-	// true
 }

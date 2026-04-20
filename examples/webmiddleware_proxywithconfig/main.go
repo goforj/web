@@ -11,5 +11,4 @@ func main() {
 		Balancer: webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}}),
 	})
 	_ = mw
-	// true
 }

@@ -11,5 +11,4 @@ func main() {
 		Validator: func(user, pass string, c web.Context) (bool, error) { return true, nil },
 	})
 	_ = mw
-	// true
 }

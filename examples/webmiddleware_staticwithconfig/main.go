@@ -6,5 +6,4 @@ import (
 
 func main() {
 	_ = webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{Root: "."})
-	// true
 }

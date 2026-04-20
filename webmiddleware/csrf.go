@@ -46,7 +46,6 @@ var DefaultCSRFConfig = CSRFConfig{
 // @group Middleware
 // Example:
 // _ = webmiddleware.CSRF()
-//	// true
 func CSRF() web.Middleware {
 	return CSRFWithConfig(DefaultCSRFConfig)
 }
@@ -56,7 +55,6 @@ func CSRF() web.Middleware {
 // Example:
 // mw := webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{CookieName: "_csrf"})
 // _ = mw
-//	// true
 func CSRFWithConfig(config CSRFConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultCSRFConfig.Skipper

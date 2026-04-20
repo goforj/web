@@ -18,7 +18,6 @@ type Adapter struct {
 // Example:
 // adapter := echoweb.New()
 // _ = adapter.Router()
-//	// true
 func New() *Adapter {
 	engine := echo.New()
 	engine.IPExtractor = echo.LegacyIPExtractor()
@@ -35,7 +34,6 @@ func New() *Adapter {
 // Example:
 // adapter := echoweb.Wrap(nil)
 // _ = adapter.Echo()
-//	// true
 func Wrap(engine *echo.Echo) *Adapter {
 	if engine == nil {
 		engine = echo.New()
@@ -56,7 +54,6 @@ func Wrap(engine *echo.Echo) *Adapter {
 // Example:
 // adapter := echoweb.New()
 // _ = adapter.Echo()
-//	// true
 func (a *Adapter) Echo() *echo.Echo {
 	if a == nil {
 		return nil
@@ -69,7 +66,6 @@ func (a *Adapter) Echo() *echo.Echo {
 // Example:
 // adapter := echoweb.New()
 // _ = adapter.Router()
-//	// true
 func (a *Adapter) Router() web.Router {
 	if a == nil {
 		return nil

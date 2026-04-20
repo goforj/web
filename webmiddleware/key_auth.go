@@ -48,7 +48,6 @@ func (e *ErrKeyAuthMissing) Unwrap() error {
 // 	return key == "demo-key", nil
 // })
 // _ = mw
-//	// true
 func KeyAuth(fn KeyAuthValidator) web.Middleware {
 	config := DefaultKeyAuthConfig
 	config.Validator = fn
@@ -62,7 +61,6 @@ func KeyAuth(fn KeyAuthValidator) web.Middleware {
 // 	Validator: func(key string, c web.Context) (bool, error) { return true, nil },
 // })
 // _ = mw
-//	// true
 func KeyAuthWithConfig(config KeyAuthConfig) web.Middleware {
 	if config.AuthScheme == "" {
 		config.AuthScheme = DefaultKeyAuthConfig.AuthScheme

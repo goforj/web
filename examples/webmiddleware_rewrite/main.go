@@ -6,5 +6,4 @@ import (
 
 func main() {
 	_ = webmiddleware.Rewrite(map[string]string{"/old/*": "/new/$1"})
-	// true
 }

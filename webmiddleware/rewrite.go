@@ -22,7 +22,6 @@ var DefaultRewriteConfig = RewriteConfig{}
 // @group Middleware
 // Example:
 // _ = webmiddleware.Rewrite(map[string]string{"/old/*": "/new/$1"})
-//	// true
 func Rewrite(rules map[string]string) web.Middleware {
 	config := DefaultRewriteConfig
 	config.Rules = rules

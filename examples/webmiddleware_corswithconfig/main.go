@@ -7,5 +7,4 @@ import (
 func main() {
 	mw := webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{AllowOrigins: []string{"https://example.com"}})
 	_ = mw
-	// true
 }

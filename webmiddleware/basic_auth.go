@@ -36,7 +36,6 @@ var DefaultBasicAuthConfig = BasicAuthConfig{
 // 	return user == "demo" && pass == "secret", nil
 // })
 // _ = mw
-//	// true
 func BasicAuth(fn BasicAuthValidator) web.Middleware {
 	config := DefaultBasicAuthConfig
 	config.Validator = fn
@@ -51,7 +50,6 @@ func BasicAuth(fn BasicAuthValidator) web.Middleware {
 // 	Validator: func(user, pass string, c web.Context) (bool, error) { return true, nil },
 // })
 // _ = mw
-//	// true
 func BasicAuthWithConfig(config BasicAuthConfig) web.Middleware {
 	if config.Validator == nil {
 		panic("web: basic-auth middleware requires a validator function")

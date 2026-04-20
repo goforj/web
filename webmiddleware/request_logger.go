@@ -27,7 +27,6 @@ type RequestLoggerConfig struct {
 // 	LogValuesFunc: func(c web.Context, values webmiddleware.RequestLoggerValues) error { return nil },
 // })
 // _ = mw
-//	// true
 func RequestLoggerWithConfig(config RequestLoggerConfig) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {

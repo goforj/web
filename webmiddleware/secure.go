@@ -33,7 +33,6 @@ var DefaultSecureConfig = SecureConfig{
 // @group Middleware
 // Example:
 // _ = webmiddleware.Secure()
-//	// true
 func Secure() web.Middleware {
 	return SecureWithConfig(DefaultSecureConfig)
 }
@@ -42,7 +41,6 @@ func Secure() web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{ReferrerPolicy: "same-origin"})
-//	// true
 func SecureWithConfig(config SecureConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultSecureConfig.Skipper

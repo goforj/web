@@ -18,7 +18,6 @@ var DefaultTrailingSlashConfig = TrailingSlashConfig{}
 // @group Middleware
 // Example:
 // _ = webmiddleware.AddTrailingSlash()
-//	// true
 func AddTrailingSlash() web.Middleware {
 	return AddTrailingSlashWithConfig(DefaultTrailingSlashConfig)
 }
@@ -27,7 +26,6 @@ func AddTrailingSlash() web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})
-//	// true
 func AddTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {
@@ -58,7 +56,6 @@ func AddTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.RemoveTrailingSlash()
-//	// true
 func RemoveTrailingSlash() web.Middleware {
 	return RemoveTrailingSlashWithConfig(DefaultTrailingSlashConfig)
 }
@@ -67,7 +64,6 @@ func RemoveTrailingSlash() web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})
-//	// true
 func RemoveTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {

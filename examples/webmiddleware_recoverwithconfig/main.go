@@ -6,5 +6,4 @@ import (
 
 func main() {
 	_ = webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{})
-	// true
 }

@@ -10,5 +10,4 @@ func main() {
 		Handler: func(c web.Context, status int, body []byte) {},
 	})
 	_ = mw
-	// true
 }

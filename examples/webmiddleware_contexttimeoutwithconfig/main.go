@@ -7,5 +7,4 @@ import (
 
 func main() {
 	_ = webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{Timeout: time.Second})
-	// true
 }

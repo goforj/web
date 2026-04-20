@@ -6,5 +6,4 @@ import (
 
 func main() {
 	_ = webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})
-	// true
 }

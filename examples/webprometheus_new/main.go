@@ -7,6 +7,7 @@ import (
 
 func main() {
 	metrics, err := webprometheus.New(webprometheus.Config{Namespace: "app"})
+	_ = metrics
 	fmt.Println(err == nil)
-	// true true
+	// true
 }

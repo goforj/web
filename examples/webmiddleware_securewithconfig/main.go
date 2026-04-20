@@ -6,5 +6,4 @@ import (
 
 func main() {
 	_ = webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{ReferrerPolicy: "same-origin"})
-	// true
 }

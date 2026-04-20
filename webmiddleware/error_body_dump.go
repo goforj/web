@@ -27,7 +27,6 @@ var DefaultErrorBodyDumpConfig = ErrorBodyDumpConfig{
 // Example:
 // mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {})
 // _ = mw
-//	// true
 func ErrorBodyDump(handler ErrorBodyDumpHandler) web.Middleware {
 	config := DefaultErrorBodyDumpConfig
 	config.Handler = handler
@@ -41,7 +40,6 @@ func ErrorBodyDump(handler ErrorBodyDumpHandler) web.Middleware {
 // 	Handler: func(c web.Context, status int, body []byte) {},
 // })
 // _ = mw
-//	// true
 func ErrorBodyDumpWithConfig(config ErrorBodyDumpConfig) web.Middleware {
 	if config.Handler == nil {
 		panic("web: error body dump middleware requires a handler")

@@ -7,5 +7,4 @@ import (
 
 func main() {
 	_ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
-	// true
 }

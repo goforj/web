@@ -7,5 +7,4 @@ import (
 func main() {
 	mw := webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{CookieName: "_csrf"})
 	_ = mw
-	// true
 }

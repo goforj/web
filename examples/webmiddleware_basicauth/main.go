@@ -10,5 +10,4 @@ func main() {
 		return user == "demo" && pass == "secret", nil
 	})
 	_ = mw
-	// true
 }

@@ -19,7 +19,6 @@ type ContextTimeoutConfig struct {
 // @group Middleware
 // Example:
 // _ = webmiddleware.ContextTimeout(2 * time.Second)
-//	// true
 func ContextTimeout(timeout time.Duration) web.Middleware {
 	return ContextTimeoutWithConfig(ContextTimeoutConfig{Timeout: timeout})
 }
@@ -28,7 +27,6 @@ func ContextTimeout(timeout time.Duration) web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{Timeout: time.Second})
-//	// true
 func ContextTimeoutWithConfig(config ContextTimeoutConfig) web.Middleware {
 	if config.Timeout == 0 {
 		panic("web: context timeout requires a timeout")

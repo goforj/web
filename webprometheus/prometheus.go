@@ -91,7 +91,6 @@ var (
 // @group Prometheus
 // Example:
 // _ = webprometheus.Default()
-//	// true
 func Default() *Metrics {
 	defaultOnce.Do(func() {
 		defaultMetrics = MustNew(Config{})
@@ -103,7 +102,6 @@ func Default() *Metrics {
 // @group Prometheus
 // Example:
 // _ = webprometheus.Middleware()
-//	// true
 func Middleware() web.Middleware {
 	return Default().Middleware()
 }
@@ -112,7 +110,6 @@ func Middleware() web.Middleware {
 // @group Prometheus
 // Example:
 // _ = webprometheus.Handler()
-//	// true
 func Handler() web.Handler {
 	return Default().Handler()
 }
@@ -121,7 +118,6 @@ func Handler() web.Handler {
 // @group Prometheus
 // Example:
 // _ = webprometheus.MustNew(webprometheus.Config{})
-//	// true
 func MustNew(config Config) *Metrics {
 	metrics, err := New(config)
 	if err != nil {
@@ -134,8 +130,9 @@ func MustNew(config Config) *Metrics {
 // @group Prometheus
 // Example:
 // metrics, err := webprometheus.New(webprometheus.Config{Namespace: "app"})
+// _ = metrics
 // fmt.Println(err == nil)
-//	// true true
+//	// true
 func New(config Config) (*Metrics, error) {
 	config = withDefaults(config)
 
@@ -227,7 +224,6 @@ func New(config Config) (*Metrics, error) {
 // Example:
 // metrics, _ := webprometheus.New(webprometheus.Config{})
 // _ = metrics.Middleware()
-//	// true
 func (m *Metrics) Middleware() web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {
@@ -277,7 +273,6 @@ func (m *Metrics) Middleware() web.Middleware {
 // Example:
 // metrics, _ := webprometheus.New(webprometheus.Config{})
 // _ = metrics.Handler()
-//	// true
 func (m *Metrics) Handler() web.Handler {
 	inner := promhttp.HandlerFor(m.gatherer, promhttp.HandlerOpts{
 		DisableCompression: m.config.DisableCompression,

@@ -27,7 +27,6 @@ var DefaultTimeoutConfig = TimeoutConfig{
 // @group Middleware
 // Example:
 // _ = webmiddleware.Timeout()
-//	// true
 func Timeout() web.Middleware {
 	return TimeoutWithConfig(DefaultTimeoutConfig)
 }
@@ -36,7 +35,6 @@ func Timeout() web.Middleware {
 // @group Middleware
 // Example:
 // _ = webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{Timeout: time.Second})
-//	// true
 func TimeoutWithConfig(config TimeoutConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultTimeoutConfig.Skipper
