@@ -1,6 +1,9 @@
 package echoweb
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -9,6 +12,7 @@ import (
 
 	"github.com/goforj/web"
 	"github.com/gorilla/websocket"
+	echo "github.com/labstack/echo/v5"
 )
 
 func TestRouterRegistersRouteAndContext(t *testing.T) {
@@ -348,4 +352,218 @@ func TestRouterSupportsHeadAndMatch(t *testing.T) {
 	if body := traceRec.Body.String(); body != http.MethodTrace {
 		t.Fatalf("trace body = %q", body)
 	}
+}
+
+func TestWrapAndNilAccessors(t *testing.T) {
+	adapter := Wrap(nil)
+	if adapter.Echo() == nil {
+		t.Fatal("Wrap(nil) should create an echo engine")
+	}
+	if adapter.Router() == nil {
+		t.Fatal("Wrap(nil) should create a router")
+	}
+
+	engine := echo.New()
+	wrapped := Wrap(engine)
+	if got := wrapped.Echo(); got != engine {
+		t.Fatal("Wrap(existing) should keep the provided engine")
+	}
+
+	var nilAdapter *Adapter
+	if nilAdapter.Echo() != nil {
+		t.Fatal("nil adapter Echo() should return nil")
+	}
+	if nilAdapter.Router() != nil {
+		t.Fatal("nil adapter Router() should return nil")
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/missing", nil)
+	nilAdapter.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("nil adapter status = %d", rec.Code)
+	}
+}
+
+func TestContextAdapterHelpers(t *testing.T) {
+	adapter := New()
+	adapter.Router().POST("/helpers/:id", func(r web.Context) error {
+		if got, want := r.Context().Value("trace"), "trace-1"; got != want {
+			t.Fatalf("Context().Value(trace) = %#v, want %q", got, want)
+		}
+		if got, want := r.Query("expand"), "roles"; got != want {
+			t.Fatalf("Query(expand) = %q, want %q", got, want)
+		}
+		if got, want := r.Header("X-Mode"), "fast"; got != want {
+			t.Fatalf("Header(X-Mode) = %q, want %q", got, want)
+		}
+
+		type payload struct {
+			Name string `json:"name"`
+		}
+		var body payload
+		if err := r.Bind(&body); err != nil {
+			t.Fatalf("Bind(): %v", err)
+		}
+		if got, want := body.Name, "demo"; got != want {
+			t.Fatalf("bound.Name = %q, want %q", got, want)
+		}
+
+		r.AddHeader("X-Added", "one")
+		r.AddHeader("X-Added", "two")
+		r.SetHeader("X-Set", "ok")
+
+		if native, ok := UnwrapContext(r); !ok || native == nil {
+			t.Fatal("UnwrapContext() failed")
+		}
+		if _, ok := r.Native().(*echo.Context); !ok {
+			t.Fatalf("Native() type = %T", r.Native())
+		}
+		return r.HTML(http.StatusCreated, "<strong>"+body.Name+"</strong>")
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/helpers/42?expand=roles", bytes.NewBufferString(`{"name":"demo"}`))
+	req = req.WithContext(context.WithValue(req.Context(), "trace", "trace-1"))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Mode", "fast")
+	rec := httptest.NewRecorder()
+	adapter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Values("X-Added"); len(got) != 2 {
+		t.Fatalf("X-Added values = %#v", got)
+	}
+	if got, want := rec.Header().Get("X-Set"), "ok"; got != want {
+		t.Fatalf("X-Set = %q, want %q", got, want)
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "text/html") {
+		t.Fatalf("Content-Type = %q", got)
+	}
+}
+
+func TestContextAdapterDisableReuse(t *testing.T) {
+	adapted := &contextAdapter{reusable: true}
+	adapted.DisableReuse()
+	if adapted.reusable {
+		t.Fatal("DisableReuse() should disable pooling")
+	}
+}
+
+func TestContextAdapterRedirectAndResponseWriters(t *testing.T) {
+	adapter := New()
+	adapter.Router().GET("/redirect", func(r web.Context) error {
+		current := r.ResponseWriter()
+		r.SetResponseWriter(current)
+		if got := r.Response().Header(); got == nil {
+			t.Fatal("Response().Header() returned nil")
+		}
+		if got := r.Response().Native(); got == nil {
+			t.Fatal("Response().Native() returned nil")
+		}
+		r.Response().SetWriter(current)
+		return r.Redirect(http.StatusTemporaryRedirect, "/target")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/redirect", nil)
+	rec := httptest.NewRecorder()
+	adapter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if got, want := rec.Header().Get("Location"), "/target"; got != want {
+		t.Fatalf("Location = %q, want %q", got, want)
+	}
+}
+
+func TestRouterCoversHandleVariantsAndAny(t *testing.T) {
+	adapter := New()
+	router := adapter.Router()
+
+	handler := func(r web.Context) error {
+		return r.JSON(http.StatusOK, map[string]string{"method": r.Method()})
+	}
+	register := func(method, path string) {
+		t.Helper()
+		if err := router.Handle(method, path, handler); err != nil {
+			t.Fatalf("Handle(%s): %v", method, err)
+		}
+	}
+
+	register(http.MethodConnect, "/connect")
+	register(http.MethodDelete, "/delete")
+	register(http.MethodGet, "/get")
+	register(http.MethodHead, "/head")
+	register(http.MethodOptions, "/options")
+	register(http.MethodPatch, "/patch")
+	register(http.MethodPost, "/post")
+	register(http.MethodPut, "/put")
+	register(http.MethodTrace, "/trace")
+	router.Any("/any", handler)
+
+	for _, tc := range []struct {
+		method string
+		path   string
+	}{
+		{http.MethodConnect, "/connect"},
+		{http.MethodDelete, "/delete"},
+		{http.MethodGet, "/get"},
+		{http.MethodHead, "/head"},
+		{http.MethodOptions, "/options"},
+		{http.MethodPatch, "/patch"},
+		{http.MethodPost, "/post"},
+		{http.MethodPut, "/put"},
+		{http.MethodTrace, "/trace"},
+		{http.MethodPost, "/any"},
+	} {
+		req := httptest.NewRequest(tc.method, tc.path, nil)
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s %s status = %d body=%s", tc.method, tc.path, rec.Code, rec.Body.String())
+		}
+		if tc.method != http.MethodHead {
+			var payload map[string]string
+			if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("%s %s json: %v", tc.method, tc.path, err)
+			}
+			if got, want := payload["method"], tc.method; got != want {
+				t.Fatalf("%s %s method = %q, want %q", tc.method, tc.path, got, want)
+			}
+		}
+	}
+
+	if err := router.Handle("BREW", "/coffee", handler); err == nil {
+		t.Fatal("Handle() should reject unsupported methods")
+	}
+}
+
+func TestWebSocketUnwrapHelpers(t *testing.T) {
+	if conn, ok := UnwrapWebSocketConn(nil); ok || conn != nil {
+		t.Fatalf("UnwrapWebSocketConn(nil) = (%v, %v)", conn, ok)
+	}
+
+	adapter := New()
+	adapter.Router().GETWS("/ws-native", func(r web.Context, conn web.WebSocketConn) error {
+		if _, ok := conn.Native().(*websocket.Conn); !ok {
+			t.Fatalf("Native() type = %T", conn.Native())
+		}
+		native, ok := UnwrapWebSocketConn(conn)
+		if !ok || native == nil {
+			t.Fatal("UnwrapWebSocketConn() failed")
+		}
+		return conn.Close()
+	})
+
+	server := httptest.NewServer(adapter.Echo())
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws-native"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer conn.Close()
 }

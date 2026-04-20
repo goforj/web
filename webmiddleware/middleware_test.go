@@ -1,11 +1,13 @@
 package webmiddleware
 
 import (
+	"bufio"
 	"bytes"
 	"compress/gzip"
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/goforj/web"
 	"github.com/goforj/web/adapter/echoweb"
+	"github.com/goforj/web/webtest"
 	"golang.org/x/time/rate"
 )
 
@@ -837,6 +840,456 @@ func TestStaticBrowseListsDirectoryContents(t *testing.T) {
 		t.Fatalf("body = %q", rec.Body.String())
 	}
 }
+
+func TestConvenienceMiddlewareWrappersAndHelpers(t *testing.T) {
+	t.Run("cors wrapper", func(t *testing.T) {
+		adapter := echoweb.New()
+		adapter.Router().Use(CORS())
+		adapter.Router().GET("/cors", func(r web.Context) error { return r.NoContent(http.StatusNoContent) })
+
+		req := httptest.NewRequest(http.MethodOptions, "/cors", nil)
+		req.Header.Set("Origin", "https://example.com")
+		req.Header.Set("Access-Control-Request-Method", http.MethodGet)
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, req)
+
+		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
+			t.Fatalf("Access-Control-Allow-Origin = %q", got)
+		}
+	})
+
+	t.Run("redirect wrappers", func(t *testing.T) {
+		testCases := []struct {
+			name     string
+			mw       web.Middleware
+			url      string
+			wantCode int
+			wantLoc  string
+		}{
+			{"https_www", HTTPSWWWRedirect(), "http://example.com/docs", http.StatusMovedPermanently, "https://www.example.com/docs"},
+			{"https_www_config", HTTPSWWWRedirectWithConfig(RedirectConfig{Code: http.StatusTemporaryRedirect}), "http://example.com/docs", http.StatusTemporaryRedirect, "https://www.example.com/docs"},
+			{"https_non_www", HTTPSNonWWWRedirect(), "http://www.example.com/docs", http.StatusMovedPermanently, "https://example.com/docs"},
+			{"https_non_www_config", HTTPSNonWWWRedirectWithConfig(RedirectConfig{Code: http.StatusTemporaryRedirect}), "http://www.example.com/docs", http.StatusTemporaryRedirect, "https://example.com/docs"},
+			{"www", WWWRedirect(), "http://example.com/docs", http.StatusMovedPermanently, "http://www.example.com/docs"},
+			{"www_config", WWWRedirectWithConfig(RedirectConfig{Code: http.StatusTemporaryRedirect}), "http://example.com/docs", http.StatusTemporaryRedirect, "http://www.example.com/docs"},
+			{"non_www", NonWWWRedirect(), "http://www.example.com/docs", http.StatusMovedPermanently, "http://example.com/docs"},
+			{"non_www_config", NonWWWRedirectWithConfig(RedirectConfig{Code: http.StatusTemporaryRedirect}), "http://www.example.com/docs", http.StatusTemporaryRedirect, "http://example.com/docs"},
+		}
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, tc.url, nil), nil, "/docs", nil)
+				if err := tc.mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })(ctx); err != nil {
+					t.Fatalf("middleware error = %v", err)
+				}
+				if got := ctx.StatusCode(); got != tc.wantCode {
+					t.Fatalf("status = %d, want %d", got, tc.wantCode)
+				}
+				if got := ctx.Response().Header().Get("Location"); got != tc.wantLoc {
+					t.Fatalf("Location = %q, want %q", got, tc.wantLoc)
+				}
+			})
+		}
+	})
+
+	t.Run("method override getters", func(t *testing.T) {
+		ctx := webtest.NewContext(httptest.NewRequest(http.MethodPost, "/?_method=PATCH", strings.NewReader("_method=DELETE")), nil, "/", nil)
+		ctx.Request().Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		ctx.Request().Header.Set("X-HTTP-Method-Override", http.MethodPut)
+
+		if got, want := MethodFromForm("_method")(ctx), http.MethodDelete; got != want {
+			t.Fatalf("MethodFromForm() = %q, want %q", got, want)
+		}
+		if got, want := MethodFromQuery("_method")(ctx), http.MethodPatch; got != want {
+			t.Fatalf("MethodFromQuery() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("secure wrapper", func(t *testing.T) {
+		ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "https://example.com", nil), nil, "/", nil)
+		if err := Secure()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })(ctx); err != nil {
+			t.Fatalf("Secure() error = %v", err)
+		}
+		if got, want := ctx.Response().Header().Get("X-Frame-Options"), "SAMEORIGIN"; got != want {
+			t.Fatalf("X-Frame-Options = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("add trailing slash wrapper", func(t *testing.T) {
+		ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil), nil, "/docs", nil)
+		if err := AddTrailingSlash()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })(ctx); err != nil {
+			t.Fatalf("AddTrailingSlash() error = %v", err)
+		}
+		if got, want := ctx.Request().URL.Path, "/docs/"; got != want {
+			t.Fatalf("Path = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("static wrapper", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(dir+"/hello.txt", []byte("hello"), 0o644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/hello.txt", nil), nil, "/hello.txt", nil)
+		if err := Static(dir)(func(c web.Context) error { return c.NoContent(http.StatusNotFound) })(ctx); err != nil {
+			t.Fatalf("Static() error = %v", err)
+		}
+		if got, want := strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String()), "hello"; got != want {
+			t.Fatalf("body = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("timeout wrapper", func(t *testing.T) {
+		ctx := webtest.NewContext(nil, nil, "/", nil)
+		if err := Timeout()(func(c web.Context) error { return c.NoContent(http.StatusAccepted) })(ctx); err != nil {
+			t.Fatalf("Timeout() error = %v", err)
+		}
+		if got, want := ctx.StatusCode(), http.StatusAccepted; got != want {
+			t.Fatalf("status = %d, want %d", got, want)
+		}
+	})
+
+	t.Run("compress wrapper", func(t *testing.T) {
+		adapter := echoweb.New()
+		adapter.Router().Use(Compress())
+		adapter.Router().GET("/", func(r web.Context) error { return r.Text(http.StatusOK, "hello") })
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Accept-Encoding", "gzip")
+		rec := httptest.NewRecorder()
+		adapter.ServeHTTP(rec, req)
+
+		if got, want := rec.Header().Get("Content-Encoding"), "gzip"; got != want {
+			t.Fatalf("Content-Encoding = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("balancer helpers", func(t *testing.T) {
+		targetA := &ProxyTarget{Name: "a", URL: mustParseURL(t, "http://a.example.com")}
+		targetB := &ProxyTarget{Name: "b", URL: mustParseURL(t, "http://b.example.com")}
+
+		random := NewRandomBalancer([]*ProxyTarget{targetA})
+		if got := random.Next(nil); got != targetA {
+			t.Fatalf("random.Next() = %#v, want %#v", got, targetA)
+		}
+		if ok := random.AddTarget(targetA); ok {
+			t.Fatal("AddTarget should reject duplicate names")
+		}
+		if ok := random.AddTarget(targetB); !ok {
+			t.Fatal("AddTarget should accept a new target")
+		}
+		if ok := random.RemoveTarget("b"); !ok {
+			t.Fatal("RemoveTarget should remove existing target")
+		}
+		if ok := random.RemoveTarget("missing"); ok {
+			t.Fatal("RemoveTarget should reject missing target")
+		}
+	})
+
+	t.Run("invalid config error", func(t *testing.T) {
+		if got, want := invalidConfigError("bad config").Error(), "web: bad config"; got != want {
+			t.Fatalf("invalidConfigError() = %q, want %q", got, want)
+		}
+	})
+}
+
+func TestMiddlewareInternalHelpers(t *testing.T) {
+	t.Run("parse body limit", func(t *testing.T) {
+		if got, err := parseBodyLimit("2KB"); err != nil || got != 2<<10 {
+			t.Fatalf("parseBodyLimit(2KB) = (%d, %v)", got, err)
+		}
+		if _, err := parseBodyLimit("bogus"); err == nil {
+			t.Fatal("parseBodyLimit() should reject invalid input")
+		}
+	})
+
+	t.Run("request id generator", func(t *testing.T) {
+		if got := defaultRequestIDGenerator(); len(got) != 32 {
+			t.Fatalf("defaultRequestIDGenerator() len = %d", len(got))
+		}
+	})
+
+	t.Run("request is https", func(t *testing.T) {
+		ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "https://example.com", nil), nil, "/", nil)
+		if !requestIsHTTPS(ctx) {
+			t.Fatal("requestIsHTTPS() should detect https scheme")
+		}
+		ctx = webtest.NewContext(httptest.NewRequest(http.MethodGet, "http://example.com", nil), nil, "/", nil)
+		ctx.Request().Header.Set("X-Forwarded-Proto", "https")
+		if !requestIsHTTPS(ctx) {
+			t.Fatal("requestIsHTTPS() should detect forwarded https")
+		}
+		if requestIsHTTPS(requestIsHTTPOnlyContext{}) {
+			t.Fatal("requestIsHTTPS() should be false without a request")
+		}
+	})
+
+	t.Run("csrf random string", func(t *testing.T) {
+		if got := randomString(8); len(got) != 8 {
+			t.Fatalf("randomString(8) len = %d", len(got))
+		}
+		if got := randomString(0); got != "" {
+			t.Fatalf("randomString(0) = %q", got)
+		}
+	})
+
+	t.Run("param extractor", func(t *testing.T) {
+		extractor := paramExtractor("id")
+		ctx := webtest.NewContext(nil, nil, "/users/:id", webtest.PathParams{"id": "42"})
+		values, err := extractor(ctx)
+		if err != nil {
+			t.Fatalf("paramExtractor(): %v", err)
+		}
+		if len(values) != 1 || values[0] != "42" {
+			t.Fatalf("values = %#v", values)
+		}
+	})
+
+	t.Run("normalize extractor error", func(t *testing.T) {
+		testCases := []struct {
+			err  error
+			want string
+		}{
+			{nil, "missing key"},
+			{errQueryExtractorValueMissing, "missing key in the query string"},
+			{errCookieExtractorValueMissing, "missing key in cookies"},
+			{errFormExtractorValueMissing, "missing key in the form"},
+			{errHeaderExtractorValueMissing, "missing key in request header"},
+			{errHeaderExtractorValueInvalid, "invalid key in the request header"},
+		}
+		for _, tc := range testCases {
+			if got := normalizeExtractorError(tc.err).Error(); got != tc.want {
+				t.Fatalf("normalizeExtractorError(%v) = %q, want %q", tc.err, got, tc.want)
+			}
+		}
+	})
+
+	t.Run("key auth missing unwrap", func(t *testing.T) {
+		err := &ErrKeyAuthMissing{Err: errors.New("missing")}
+		if !errors.Is(err, err.Err) {
+			t.Fatal("ErrKeyAuthMissing should unwrap its inner error")
+		}
+	})
+
+	t.Run("cors origin helpers", func(t *testing.T) {
+		allowed, err := corsAllowedOrigin("https://api.example.com", CORSConfig{
+			AllowOrigins: []string{"https://*.example.com"},
+		}, nil)
+		if err != nil {
+			t.Fatalf("corsAllowedOrigin(): %v", err)
+		}
+		if got, want := allowed, "https://api.example.com"; got != want {
+			t.Fatalf("corsAllowedOrigin() = %q, want %q", got, want)
+		}
+		if !corsMatchSubdomain("https://api.example.com", "https://*.example.com") {
+			t.Fatal("corsMatchSubdomain() should match subdomains")
+		}
+		allowed, err = corsAllowedOrigin("https://api.example.com", CORSConfig{
+			AllowOriginFunc: func(origin string) (bool, error) { return false, nil },
+		}, nil)
+		if err != nil || allowed != "" {
+			t.Fatalf("AllowOriginFunc false = (%q, %v)", allowed, err)
+		}
+		wantErr := errors.New("origin failed")
+		_, err = corsAllowedOrigin("https://api.example.com", CORSConfig{
+			AllowOriginFunc: func(origin string) (bool, error) { return false, wantErr },
+		}, nil)
+		if !errors.Is(err, wantErr) {
+			t.Fatalf("corsAllowedOrigin() error = %v", err)
+		}
+	})
+
+	t.Run("body dump writer helpers", func(t *testing.T) {
+		rec := newFancyRecorder()
+		writer := &bodyDumpResponseWriter{
+			Writer:         io.Discard,
+			ResponseWriter: rec,
+		}
+		writer.Flush()
+		if _, _, err := writer.Hijack(); err != nil {
+			t.Fatalf("Hijack(): %v", err)
+		}
+	})
+
+	t.Run("gzip writer helpers", func(t *testing.T) {
+		rec := newFancyRecorder()
+		buffer := &bytes.Buffer{}
+		gz := gzip.NewWriter(buffer)
+		writer := &gzipResponseWriter{
+			Writer:         gz,
+			ResponseWriter: rec,
+			buffer:         &bytes.Buffer{},
+			minLength:      1,
+		}
+		if _, err := writer.Write([]byte("hello")); err != nil {
+			t.Fatalf("Write(): %v", err)
+		}
+		writer.Flush()
+		if _, _, err := writer.Hijack(); err != nil {
+			t.Fatalf("Hijack(): %v", err)
+		}
+		if err := writer.Push("/assets/app.js", nil); err != nil {
+			t.Fatalf("Push(): %v", err)
+		}
+		_ = gz.Close()
+	})
+
+	t.Run("ignorable writer", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		writer := &ignorableWriter{ResponseWriter: rec}
+		writer.Ignore(true)
+		writer.WriteHeader(http.StatusCreated)
+		if _, err := writer.Write([]byte("ignored")); err != nil {
+			t.Fatalf("Write(): %v", err)
+		}
+		if rec.Code == http.StatusCreated || rec.Body.Len() != 0 {
+			t.Fatalf("ignore should suppress writes: code=%d body=%q", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("request id handler and defaults", func(t *testing.T) {
+		var handled string
+		ctx := webtest.NewContext(nil, nil, "/", nil)
+		err := RequestIDWithConfig(RequestIDConfig{
+			RequestIDHandler: func(c web.Context, id string) { handled = id },
+		})(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })(ctx)
+		if err != nil {
+			t.Fatalf("RequestIDWithConfig() error = %v", err)
+		}
+		if handled == "" {
+			t.Fatal("RequestIDHandler should receive the generated id")
+		}
+		if got := ctx.Response().Header().Get("X-Request-ID"); got == "" {
+			t.Fatal("expected generated X-Request-ID header")
+		}
+	})
+
+	t.Run("rate limiter cleanup", func(t *testing.T) {
+		now := time.Now()
+		store := &RateLimiterMemoryStore{
+			visitors: map[string]*visitor{
+				"stale":  {Limiter: rate.NewLimiter(rate.Every(time.Second), 1), lastSeen: now.Add(-10 * time.Minute)},
+				"fresh":  {Limiter: rate.NewLimiter(rate.Every(time.Second), 1), lastSeen: now},
+			},
+			expiresIn:   time.Minute,
+			lastCleanup: now.Add(-2 * time.Minute),
+			timeNow:     func() time.Time { return now },
+		}
+		store.cleanupStaleVisitors()
+		if _, ok := store.visitors["stale"]; ok {
+			t.Fatal("cleanupStaleVisitors() should remove stale entries")
+		}
+		if _, ok := store.visitors["fresh"]; !ok {
+			t.Fatal("cleanupStaleVisitors() should keep fresh entries")
+		}
+	})
+
+	t.Run("proxy balancer edge cases", func(t *testing.T) {
+		random := NewRandomBalancer(nil)
+		if got := random.Next(nil); got != nil {
+			t.Fatalf("random.Next(nil) = %#v", got)
+		}
+
+		rr := NewRoundRobinBalancer([]*ProxyTarget{
+			{Name: "a", URL: mustParseURL(t, "http://a.example.com")},
+			{Name: "b", URL: mustParseURL(t, "http://b.example.com")},
+		})
+		if got := rr.Next(nil).Name; got != "a" {
+			t.Fatalf("round robin first = %q", got)
+		}
+		if got := rr.Next(nil).Name; got != "b" {
+			t.Fatalf("round robin second = %q", got)
+		}
+		if got := rr.Next(nil).Name; got != "a" {
+			t.Fatalf("round robin reset = %q", got)
+		}
+	})
+
+	t.Run("timeout handler panic restores writer", func(t *testing.T) {
+		ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
+		original := ctx.ResponseWriter()
+		handler := timeoutHandler{
+			writer:  &ignorableWriter{ResponseWriter: original},
+			ctx:     ctx,
+			handler: func(c web.Context) error { panic("boom") },
+			errCh:   make(chan error, 1),
+		}
+		defer func() {
+			if recover() == nil {
+				t.Fatal("expected panic from timeoutHandler")
+			}
+			if ctx.ResponseWriter() != original {
+				t.Fatal("timeoutHandler should restore original writer after panic")
+			}
+		}()
+		handler.ServeHTTP(handler.writer, ctx.Request())
+	})
+}
+
+func mustParseURL(t *testing.T, raw string) *url.URL {
+	t.Helper()
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		t.Fatalf("url.Parse(%q): %v", raw, err)
+	}
+	return parsed
+}
+
+type fancyRecorder struct {
+	*httptest.ResponseRecorder
+	pushes []string
+}
+
+func newFancyRecorder() *fancyRecorder {
+	return &fancyRecorder{ResponseRecorder: httptest.NewRecorder()}
+}
+
+func (r *fancyRecorder) Flush() {}
+
+func (r *fancyRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	server, client := net.Pipe()
+	reader := bufio.NewReader(client)
+	writer := bufio.NewWriter(client)
+	return server, bufio.NewReadWriter(reader, writer), nil
+}
+
+func (r *fancyRecorder) Push(target string, _ *http.PushOptions) error {
+	r.pushes = append(r.pushes, target)
+	return nil
+}
+
+type requestIsHTTPOnlyContext struct{}
+
+func (requestIsHTTPOnlyContext) Context() context.Context                    { return context.Background() }
+func (requestIsHTTPOnlyContext) Method() string                              { return http.MethodGet }
+func (requestIsHTTPOnlyContext) Path() string                                { return "/" }
+func (requestIsHTTPOnlyContext) URI() string                                 { return "/" }
+func (requestIsHTTPOnlyContext) Scheme() string                              { return "http" }
+func (requestIsHTTPOnlyContext) Host() string                                { return "example.com" }
+func (requestIsHTTPOnlyContext) Param(string) string                         { return "" }
+func (requestIsHTTPOnlyContext) Query(string) string                         { return "" }
+func (requestIsHTTPOnlyContext) Header(string) string                        { return "" }
+func (requestIsHTTPOnlyContext) Cookie(string) (*http.Cookie, error)         { return nil, http.ErrNoCookie }
+func (requestIsHTTPOnlyContext) RealIP() string                              { return "127.0.0.1" }
+func (requestIsHTTPOnlyContext) Request() *http.Request                      { return nil }
+func (requestIsHTTPOnlyContext) SetRequest(*http.Request)                    {}
+func (requestIsHTTPOnlyContext) Response() web.Response                      { return nil }
+func (requestIsHTTPOnlyContext) ResponseWriter() http.ResponseWriter         { return httptest.NewRecorder() }
+func (requestIsHTTPOnlyContext) SetResponseWriter(http.ResponseWriter)       {}
+func (requestIsHTTPOnlyContext) Bind(any) error                              { return nil }
+func (requestIsHTTPOnlyContext) Set(string, any)                             {}
+func (requestIsHTTPOnlyContext) Get(string) any                              { return nil }
+func (requestIsHTTPOnlyContext) AddHeader(string, string)                    {}
+func (requestIsHTTPOnlyContext) SetHeader(string, string)                    {}
+func (requestIsHTTPOnlyContext) SetCookie(*http.Cookie)                      {}
+func (requestIsHTTPOnlyContext) JSON(int, any) error                         { return nil }
+func (requestIsHTTPOnlyContext) Blob(int, string, []byte) error              { return nil }
+func (requestIsHTTPOnlyContext) File(string) error                           { return nil }
+func (requestIsHTTPOnlyContext) Text(int, string) error                      { return nil }
+func (requestIsHTTPOnlyContext) HTML(int, string) error                      { return nil }
+func (requestIsHTTPOnlyContext) NoContent(int) error                         { return nil }
+func (requestIsHTTPOnlyContext) Redirect(int, string) error                  { return nil }
+func (requestIsHTTPOnlyContext) StatusCode() int                             { return 0 }
+func (requestIsHTTPOnlyContext) Native() any                                 { return nil }
 
 func TestProxyForwardsRequestToBackend(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
