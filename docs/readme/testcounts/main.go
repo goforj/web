@@ -222,18 +222,23 @@ func renderBadges(unitCount int) string {
 }
 
 func renderPackageCoverageTable(items []packageCoverage) string {
-	lines := []string{
-		"| Package | Coverage |",
-		"|------|---------:|",
-	}
+	lines := make([]string, 0, len(items))
 	for _, item := range items {
 		percent := 0.0
 		if item.Total > 0 {
 			percent = (float64(item.Covered) / float64(item.Total)) * 100
 		}
-		lines = append(lines, fmt.Sprintf("| `%s` | %.1f%% |", item.Name, percent))
+		lines = append(lines, fmt.Sprintf(`<img src="https://img.shields.io/badge/%s-%.1f%%25-4c9a2a" alt="%s coverage">`, badgeLabel(item.Name), percent, item.Name))
 	}
 	return strings.Join(lines, "\n")
+}
+
+func badgeLabel(name string) string {
+	replacer := strings.NewReplacer(
+		"/", "--",
+		" ", "_",
+	)
+	return replacer.Replace(name)
 }
 
 func replaceSection(input, start, end, replacement string) (string, error) {
