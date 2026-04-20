@@ -36,7 +36,13 @@ var DefaultCORSConfig = CORSConfig{
 // CORS returns Cross-Origin Resource Sharing middleware.
 // @group Middleware
 // Example:
-// _ = webmiddleware.CORS()
+// req := httptest.NewRequest(http.MethodGet, "/", nil)
+// req.Header.Set("Origin", "https://example.com")
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := webmiddleware.CORS()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// _ = handler(ctx)
+// fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
+//	// *
 func CORS() web.Middleware {
 	return CORSWithConfig(DefaultCORSConfig)
 }
@@ -45,7 +51,13 @@ func CORS() web.Middleware {
 // @group Middleware
 // Example:
 // mw := webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{AllowOrigins: []string{"https://example.com"}})
-// _ = mw
+// req := httptest.NewRequest(http.MethodGet, "/", nil)
+// req.Header.Set("Origin", "https://example.com")
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// _ = handler(ctx)
+// fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
+//	// https://example.com
 func CORSWithConfig(config CORSConfig) web.Middleware {
 	if len(config.AllowOrigins) == 0 {
 		config.AllowOrigins = DefaultCORSConfig.AllowOrigins

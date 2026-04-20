@@ -24,7 +24,12 @@ var DefaultRecoverConfig = RecoverConfig{
 // Recover returns middleware that recovers panics from the handler chain.
 // @group Middleware
 // Example:
-// _ = webmiddleware.Recover()
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// handler := webmiddleware.Recover()(func(c web.Context) error {
+// 	panic("boom")
+// })
+// fmt.Println(handler(ctx) != nil)
+//	// true
 func Recover() web.Middleware {
 	return RecoverWithConfig(DefaultRecoverConfig)
 }
@@ -32,7 +37,12 @@ func Recover() web.Middleware {
 // RecoverWithConfig returns recover middleware with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{})
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// handler := webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{DisableErrorHandler: true})(func(c web.Context) error {
+// 	panic("boom")
+// })
+// fmt.Println(handler(ctx) != nil)
+//	// true
 func RecoverWithConfig(config RecoverConfig) web.Middleware {
 	if config.StackSize == 0 {
 		config.StackSize = DefaultRecoverConfig.StackSize

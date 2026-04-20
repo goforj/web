@@ -45,7 +45,11 @@ var DefaultCSRFConfig = CSRFConfig{
 // CSRF enables token-based CSRF protection.
 // @group Middleware
 // Example:
-// _ = webmiddleware.CSRF()
+// ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
+// handler := webmiddleware.CSRF()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// _ = handler(ctx)
+// fmt.Println(ctx.Response().Header().Get("Set-Cookie") != "")
+//	// true
 func CSRF() web.Middleware {
 	return CSRFWithConfig(DefaultCSRFConfig)
 }
@@ -54,7 +58,11 @@ func CSRF() web.Middleware {
 // @group Middleware
 // Example:
 // mw := webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{CookieName: "_csrf"})
-// _ = mw
+// ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// _ = handler(ctx)
+// fmt.Println(strings.Contains(ctx.Response().Header().Get("Set-Cookie"), "_csrf="))
+//	// true
 func CSRFWithConfig(config CSRFConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultCSRFConfig.Skipper

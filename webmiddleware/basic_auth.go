@@ -35,7 +35,13 @@ var DefaultBasicAuthConfig = BasicAuthConfig{
 // mw := webmiddleware.BasicAuth(func(user, pass string, c web.Context) (bool, error) {
 // 	return user == "demo" && pass == "secret", nil
 // })
-// _ = mw
+// req := httptest.NewRequest(http.MethodGet, "/", nil)
+// req.Header.Set("Authorization", "basic ZGVtbzpzZWNyZXQ=")
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// _ = handler(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 204
 func BasicAuth(fn BasicAuthValidator) web.Middleware {
 	config := DefaultBasicAuthConfig
 	config.Validator = fn
@@ -49,7 +55,11 @@ func BasicAuth(fn BasicAuthValidator) web.Middleware {
 // 	Realm: "Example",
 // 	Validator: func(user, pass string, c web.Context) (bool, error) { return true, nil },
 // })
-// _ = mw
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// _ = handler(ctx)
+// fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("WWW-Authenticate"))
+//	// 401 basic realm=\"Example\"
 func BasicAuthWithConfig(config BasicAuthConfig) web.Middleware {
 	if config.Validator == nil {
 		panic("web: basic-auth middleware requires a validator function")

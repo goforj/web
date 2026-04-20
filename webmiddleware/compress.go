@@ -32,7 +32,15 @@ var DefaultGzipConfig = GzipConfig{
 // Gzip compresses responses with gzip.
 // @group Middleware
 // Example:
-// _ = webmiddleware.Gzip()
+// req := httptest.NewRequest(http.MethodGet, "/", nil)
+// req.Header.Set("Accept-Encoding", "gzip")
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := webmiddleware.Gzip()(func(c web.Context) error {
+// 	return c.Text(http.StatusOK, "hello")
+// })
+// _ = handler(ctx)
+// fmt.Println(ctx.Response().Header().Get("Content-Encoding"))
+//	// gzip
 func Gzip() web.Middleware {
 	return GzipWithConfig(DefaultGzipConfig)
 }
@@ -40,7 +48,15 @@ func Gzip() web.Middleware {
 // Compress is an alias for Gzip to match the checklist naming.
 // @group Middleware
 // Example:
-// _ = webmiddleware.Compress()
+// req := httptest.NewRequest(http.MethodGet, "/", nil)
+// req.Header.Set("Accept-Encoding", "gzip")
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := webmiddleware.Compress()(func(c web.Context) error {
+// 	return c.Text(http.StatusOK, "hello")
+// })
+// _ = handler(ctx)
+// fmt.Println(ctx.Response().Header().Get("Content-Encoding"))
+//	// gzip
 func Compress() web.Middleware {
 	return Gzip()
 }
@@ -48,7 +64,15 @@ func Compress() web.Middleware {
 // GzipWithConfig compresses responses with gzip and config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{MinLength: 256})
+// req := httptest.NewRequest(http.MethodGet, "/", nil)
+// req.Header.Set("Accept-Encoding", "gzip")
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{MinLength: 256})(func(c web.Context) error {
+// 	return c.Text(http.StatusOK, "short")
+// })
+// _ = handler(ctx)
+// fmt.Println(ctx.Response().Header().Get("Content-Encoding") == "")
+//	// true
 func GzipWithConfig(config GzipConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultGzipConfig.Skipper

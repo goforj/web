@@ -262,7 +262,13 @@ BasicAuth returns basic auth middleware.
 mw := webmiddleware.BasicAuth(func(user, pass string, c web.Context) (bool, error) {
 	return user == "demo" && pass == "secret", nil
 })
-_ = mw
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+req.Header.Set("Authorization", "basic ZGVtbzpzZWNyZXQ=")
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+_ = handler(ctx)
+fmt.Println(ctx.StatusCode())
+// 204
 ```
 
 #### <a id="webmiddleware-basicauthwithconfig"></a>webmiddleware.BasicAuthWithConfig
@@ -274,7 +280,11 @@ mw := webmiddleware.BasicAuthWithConfig(webmiddleware.BasicAuthConfig{
 	Realm: "Example",
 	Validator: func(user, pass string, c web.Context) (bool, error) { return true, nil },
 })
-_ = mw
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+_ = handler(ctx)
+fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("WWW-Authenticate"))
+// 401 basic realm=\"Example\"
 ```
 
 #### <a id="webmiddleware-bodydump"></a>webmiddleware.BodyDump
@@ -332,7 +342,13 @@ fmt.Println(ctx.StatusCode())
 CORS returns Cross-Origin Resource Sharing middleware.
 
 ```go
-_ = webmiddleware.CORS()
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+req.Header.Set("Origin", "https://example.com")
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := webmiddleware.CORS()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+_ = handler(ctx)
+fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
+// *
 ```
 
 #### <a id="webmiddleware-corswithconfig"></a>webmiddleware.CORSWithConfig
@@ -341,7 +357,13 @@ CORSWithConfig returns CORS middleware with config.
 
 ```go
 mw := webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{AllowOrigins: []string{"https://example.com"}})
-_ = mw
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+req.Header.Set("Origin", "https://example.com")
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+_ = handler(ctx)
+fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
+// https://example.com
 ```
 
 #### <a id="webmiddleware-csrf"></a>webmiddleware.CSRF
@@ -349,7 +371,11 @@ _ = mw
 CSRF enables token-based CSRF protection.
 
 ```go
-_ = webmiddleware.CSRF()
+ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
+handler := webmiddleware.CSRF()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+_ = handler(ctx)
+fmt.Println(ctx.Response().Header().Get("Set-Cookie") != "")
+// true
 ```
 
 #### <a id="webmiddleware-csrfwithconfig"></a>webmiddleware.CSRFWithConfig
@@ -358,7 +384,11 @@ CSRFWithConfig enables token-based CSRF protection with config.
 
 ```go
 mw := webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{CookieName: "_csrf"})
-_ = mw
+ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+_ = handler(ctx)
+fmt.Println(strings.Contains(ctx.Response().Header().Get("Set-Cookie"), "_csrf="))
+// true
 ```
 
 #### <a id="webmiddleware-compress"></a>webmiddleware.Compress
@@ -366,7 +396,15 @@ _ = mw
 Compress is an alias for Gzip to match the checklist naming.
 
 ```go
-_ = webmiddleware.Compress()
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+req.Header.Set("Accept-Encoding", "gzip")
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := webmiddleware.Compress()(func(c web.Context) error {
+	return c.Text(http.StatusOK, "hello")
+})
+_ = handler(ctx)
+fmt.Println(ctx.Response().Header().Get("Content-Encoding"))
+// gzip
 ```
 
 #### <a id="webmiddleware-contexttimeout"></a>webmiddleware.ContextTimeout
@@ -445,7 +483,15 @@ _ = mw
 Gzip compresses responses with gzip.
 
 ```go
-_ = webmiddleware.Gzip()
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+req.Header.Set("Accept-Encoding", "gzip")
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := webmiddleware.Gzip()(func(c web.Context) error {
+	return c.Text(http.StatusOK, "hello")
+})
+_ = handler(ctx)
+fmt.Println(ctx.Response().Header().Get("Content-Encoding"))
+// gzip
 ```
 
 #### <a id="webmiddleware-gzipwithconfig"></a>webmiddleware.GzipWithConfig
@@ -453,7 +499,15 @@ _ = webmiddleware.Gzip()
 GzipWithConfig compresses responses with gzip and config.
 
 ```go
-_ = webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{MinLength: 256})
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+req.Header.Set("Accept-Encoding", "gzip")
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{MinLength: 256})(func(c web.Context) error {
+	return c.Text(http.StatusOK, "short")
+})
+_ = handler(ctx)
+fmt.Println(ctx.Response().Header().Get("Content-Encoding") == "")
+// true
 ```
 
 #### <a id="webmiddleware-httpsnonwwwredirect"></a>webmiddleware.HTTPSNonWWWRedirect
@@ -512,7 +566,13 @@ KeyAuth returns key auth middleware.
 mw := webmiddleware.KeyAuth(func(key string, c web.Context) (bool, error) {
 	return key == "demo-key", nil
 })
-_ = mw
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+req.Header.Set("Authorization", "Bearer demo-key")
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+_ = handler(ctx)
+fmt.Println(ctx.StatusCode())
+// 204
 ```
 
 #### <a id="webmiddleware-keyauthwithconfig"></a>webmiddleware.KeyAuthWithConfig
@@ -523,7 +583,11 @@ KeyAuthWithConfig returns key auth middleware with config.
 mw := webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
 	Validator: func(key string, c web.Context) (bool, error) { return true, nil },
 })
-_ = mw
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+_ = handler(ctx)
+fmt.Println(ctx.StatusCode())
+// 400
 ```
 
 #### <a id="webmiddleware-methodfromform"></a>webmiddleware.MethodFromForm
@@ -721,7 +785,12 @@ fmt.Println(ctx.StatusCode())
 Recover returns middleware that recovers panics from the handler chain.
 
 ```go
-_ = webmiddleware.Recover()
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := webmiddleware.Recover()(func(c web.Context) error {
+	panic("boom")
+})
+fmt.Println(handler(ctx) != nil)
+// true
 ```
 
 #### <a id="webmiddleware-recoverwithconfig"></a>webmiddleware.RecoverWithConfig
@@ -729,7 +798,12 @@ _ = webmiddleware.Recover()
 RecoverWithConfig returns recover middleware with config.
 
 ```go
-_ = webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{})
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{DisableErrorHandler: true})(func(c web.Context) error {
+	panic("boom")
+})
+fmt.Println(handler(ctx) != nil)
+// true
 ```
 
 #### <a id="webmiddleware-removetrailingslash"></a>webmiddleware.RemoveTrailingSlash
@@ -893,7 +967,11 @@ _ = webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{Root: "."})
 Timeout returns a response-timeout middleware.
 
 ```go
-_ = webmiddleware.Timeout()
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := webmiddleware.Timeout()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+_ = handler(ctx)
+fmt.Println(ctx.StatusCode())
+// 204
 ```
 
 #### <a id="webmiddleware-timeoutwithconfig"></a>webmiddleware.TimeoutWithConfig
@@ -901,7 +979,13 @@ _ = webmiddleware.Timeout()
 TimeoutWithConfig returns a response-timeout middleware with config.
 
 ```go
-_ = webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{Timeout: time.Second})
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{Timeout: time.Second})(func(c web.Context) error {
+	return c.NoContent(http.StatusAccepted)
+})
+_ = handler(ctx)
+fmt.Println(ctx.StatusCode())
+// 202
 ```
 
 #### <a id="webmiddleware-wwwredirect"></a>webmiddleware.WWWRedirect

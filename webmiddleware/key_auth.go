@@ -47,7 +47,13 @@ func (e *ErrKeyAuthMissing) Unwrap() error {
 // mw := webmiddleware.KeyAuth(func(key string, c web.Context) (bool, error) {
 // 	return key == "demo-key", nil
 // })
-// _ = mw
+// req := httptest.NewRequest(http.MethodGet, "/", nil)
+// req.Header.Set("Authorization", "Bearer demo-key")
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// _ = handler(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 204
 func KeyAuth(fn KeyAuthValidator) web.Middleware {
 	config := DefaultKeyAuthConfig
 	config.Validator = fn
@@ -60,7 +66,11 @@ func KeyAuth(fn KeyAuthValidator) web.Middleware {
 // mw := webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
 // 	Validator: func(key string, c web.Context) (bool, error) { return true, nil },
 // })
-// _ = mw
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
+// _ = handler(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 400
 func KeyAuthWithConfig(config KeyAuthConfig) web.Middleware {
 	if config.AuthScheme == "" {
 		config.AuthScheme = DefaultKeyAuthConfig.AuthScheme
