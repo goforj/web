@@ -153,7 +153,10 @@ type visitor struct {
 // @group Middleware
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
-// _ = store
+// allowed1, _ := store.Allow("192.0.2.1")
+// allowed2, _ := store.Allow("192.0.2.1")
+// fmt.Println(allowed1, allowed2)
+//	// true false
 func NewRateLimiterMemoryStore(limit rate.Limit) *RateLimiterMemoryStore {
 	return NewRateLimiterMemoryStoreWithConfig(RateLimiterMemoryStoreConfig{Rate: limit})
 }
@@ -162,7 +165,9 @@ func NewRateLimiterMemoryStore(limit rate.Limit) *RateLimiterMemoryStore {
 // @group Middleware
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStoreWithConfig(webmiddleware.RateLimiterMemoryStoreConfig{Rate: rate.Every(time.Second)})
-// _ = store
+// allowed, _ := store.Allow("192.0.2.1")
+// fmt.Println(allowed)
+//	// true
 func NewRateLimiterMemoryStoreWithConfig(config RateLimiterMemoryStoreConfig) *RateLimiterMemoryStore {
 	store := &RateLimiterMemoryStore{
 		rate:      config.Rate,

@@ -341,11 +341,20 @@ func inferImports(code, importPath string) []string {
 	if strings.Contains(code, "os.") {
 		add("os")
 	}
+	if strings.Contains(code, "filepath.") {
+		add("path/filepath")
+	}
 	if strings.Contains(code, "time.") {
 		add("time")
 	}
 	if strings.Contains(code, "bytes.") {
 		add("bytes")
+	}
+	if strings.Contains(code, "gzip.") {
+		add("compress/gzip")
+	}
+	if strings.Contains(code, "io.") {
+		add("io")
 	}
 	if strings.Contains(code, "strings.") {
 		add("strings")

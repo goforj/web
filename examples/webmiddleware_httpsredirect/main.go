@@ -1,9 +1,18 @@
 package main
 
 import (
+	"fmt"
+	"github.com/goforj/web"
 	"github.com/goforj/web/webmiddleware"
+	"github.com/goforj/web/webtest"
+	"net/http"
+	"net/http/httptest"
 )
 
 func main() {
-	_ = webmiddleware.HTTPSRedirect()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+	ctx := webtest.NewContext(req, nil, "/docs", nil)
+	_ = webmiddleware.HTTPSRedirect()(func(c web.Context) error { return nil })(ctx)
+	fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
+	// 301 https://example.com/docs
 }

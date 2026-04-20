@@ -28,8 +28,16 @@ var DefaultBodyDumpConfig = BodyDumpConfig{
 // BodyDump captures request and response payloads.
 // @group Middleware
 // Example:
-// mw := webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {})
-// _ = mw
+// var captured string
+// mw := webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {
+// 	captured = fmt.Sprintf("%s -> %s", string(reqBody), string(resBody))
+// })
+// req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ping"))
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.Text(http.StatusOK, "pong") })
+// _ = handler(ctx)
+// fmt.Println(captured)
+//	// ping -> pong
 func BodyDump(handler BodyDumpHandler) web.Middleware {
 	config := DefaultBodyDumpConfig
 	config.Handler = handler
@@ -40,9 +48,12 @@ func BodyDump(handler BodyDumpHandler) web.Middleware {
 // @group Middleware
 // Example:
 // mw := webmiddleware.BodyDumpWithConfig(webmiddleware.BodyDumpConfig{
-// 	Handler: func(c web.Context, reqBody, resBody []byte) {},
+// 	Handler: func(c web.Context, reqBody, resBody []byte) { fmt.Println(string(resBody)) },
 // })
-// _ = mw
+// ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.Text(http.StatusOK, "ok") })
+// _ = handler(ctx)
+//	// ok
 func BodyDumpWithConfig(config BodyDumpConfig) web.Middleware {
 	if config.Handler == nil {
 		panic("web: body dump middleware requires a handler")

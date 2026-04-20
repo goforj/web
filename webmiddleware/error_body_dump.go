@@ -25,8 +25,15 @@ var DefaultErrorBodyDumpConfig = ErrorBodyDumpConfig{
 // ErrorBodyDump captures response bodies for non-2xx and non-3xx responses.
 // @group Middleware
 // Example:
-// mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {})
-// _ = mw
+// var captured string
+// mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
+// 	captured = fmt.Sprintf("%d:%s", status, string(body))
+// })
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.Text(http.StatusBadRequest, "nope") })
+// _ = handler(ctx)
+// fmt.Println(captured)
+//	// 400:nope
 func ErrorBodyDump(handler ErrorBodyDumpHandler) web.Middleware {
 	config := DefaultErrorBodyDumpConfig
 	config.Handler = handler
@@ -37,9 +44,12 @@ func ErrorBodyDump(handler ErrorBodyDumpHandler) web.Middleware {
 // @group Middleware
 // Example:
 // mw := webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
-// 	Handler: func(c web.Context, status int, body []byte) {},
+// 	Handler: func(c web.Context, status int, body []byte) { fmt.Println(status) },
 // })
-// _ = mw
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// handler := mw(func(c web.Context) error { return c.Text(http.StatusInternalServerError, "boom") })
+// _ = handler(ctx)
+//	// 500
 func ErrorBodyDumpWithConfig(config ErrorBodyDumpConfig) web.Middleware {
 	if config.Handler == nil {
 		panic("web: error body dump middleware requires a handler")

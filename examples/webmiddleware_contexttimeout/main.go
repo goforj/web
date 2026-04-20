@@ -1,10 +1,19 @@
 package main
 
 import (
+	"fmt"
+	"github.com/goforj/web"
 	"github.com/goforj/web/webmiddleware"
+	"github.com/goforj/web/webtest"
 	"time"
 )
 
 func main() {
-	_ = webmiddleware.ContextTimeout(2 * time.Second)
+	ctx := webtest.NewContext(nil, nil, "/", nil)
+	handler := webmiddleware.ContextTimeout(2 * time.Second)(func(c web.Context) error {
+		fmt.Println(c.Request().Context().Err() == nil)
+		return nil
+	})
+	_ = handler(ctx)
+	// true
 }

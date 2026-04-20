@@ -37,9 +37,8 @@ type parsedFile struct {
 // 	Root:    ".",
 // 	OutPath: "webindex.json",
 // })
-// _ = manifest
-// fmt.Println(err == nil)
-//	// true
+// fmt.Println(err == nil, manifest.Version != "")
+//	// true true
 func Run(_ context.Context, opts IndexOptions) (Manifest, error) {
 	root := opts.Root
 	if root == "" {

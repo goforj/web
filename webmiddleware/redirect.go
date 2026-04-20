@@ -24,7 +24,11 @@ type redirectLogic func(scheme string, host string, uri string) (bool, string)
 // HTTPSRedirect redirects http requests to https.
 // @group Middleware
 // Example:
-// _ = webmiddleware.HTTPSRedirect()
+// req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.HTTPSRedirect()(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
+//	// 301 https://example.com/docs
 func HTTPSRedirect() web.Middleware {
 	return HTTPSRedirectWithConfig(DefaultRedirectConfig)
 }
@@ -32,7 +36,11 @@ func HTTPSRedirect() web.Middleware {
 // HTTPSRedirectWithConfig returns HTTPS redirect middleware with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 307
 func HTTPSRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if scheme != "https" {
@@ -45,7 +53,11 @@ func HTTPSRedirectWithConfig(config RedirectConfig) web.Middleware {
 // HTTPSWWWRedirect redirects to https + www.
 // @group Middleware
 // Example:
-// _ = webmiddleware.HTTPSWWWRedirect()
+// req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.HTTPSWWWRedirect()(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.Response().Header().Get("Location"))
+//	// https://www.example.com/docs
 func HTTPSWWWRedirect() web.Middleware {
 	return HTTPSWWWRedirectWithConfig(DefaultRedirectConfig)
 }
@@ -53,7 +65,11 @@ func HTTPSWWWRedirect() web.Middleware {
 // HTTPSWWWRedirectWithConfig returns HTTPS+WWW redirect middleware with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 307
 func HTTPSWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if scheme != "https" || !strings.HasPrefix(host, wwwPrefix) {
@@ -67,7 +83,11 @@ func HTTPSWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 // HTTPSNonWWWRedirect redirects to https without www.
 // @group Middleware
 // Example:
-// _ = webmiddleware.HTTPSNonWWWRedirect()
+// req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.HTTPSNonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.Response().Header().Get("Location"))
+//	// https://example.com/docs
 func HTTPSNonWWWRedirect() web.Middleware {
 	return HTTPSNonWWWRedirectWithConfig(DefaultRedirectConfig)
 }
@@ -75,7 +95,11 @@ func HTTPSNonWWWRedirect() web.Middleware {
 // HTTPSNonWWWRedirectWithConfig returns HTTPS non-WWW redirect middleware with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 307
 func HTTPSNonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if scheme != "https" || strings.HasPrefix(host, wwwPrefix) {
@@ -88,7 +112,11 @@ func HTTPSNonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 // WWWRedirect redirects to the www host.
 // @group Middleware
 // Example:
-// _ = webmiddleware.WWWRedirect()
+// req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.WWWRedirect()(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.Response().Header().Get("Location"))
+//	// http://www.example.com/docs
 func WWWRedirect() web.Middleware {
 	return WWWRedirectWithConfig(DefaultRedirectConfig)
 }
@@ -96,7 +124,11 @@ func WWWRedirect() web.Middleware {
 // WWWRedirectWithConfig returns WWW redirect middleware with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 307
 func WWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if !strings.HasPrefix(host, wwwPrefix) {
@@ -109,7 +141,11 @@ func WWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 // NonWWWRedirect redirects to the non-www host.
 // @group Middleware
 // Example:
-// _ = webmiddleware.NonWWWRedirect()
+// req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.NonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.Response().Header().Get("Location"))
+//	// http://example.com/docs
 func NonWWWRedirect() web.Middleware {
 	return NonWWWRedirectWithConfig(DefaultRedirectConfig)
 }
@@ -117,7 +153,11 @@ func NonWWWRedirect() web.Middleware {
 // NonWWWRedirectWithConfig returns non-WWW redirect middleware with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+// ctx := webtest.NewContext(req, nil, "/docs", nil)
+// _ = webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.StatusCode())
+//	// 307
 func NonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if strings.HasPrefix(host, wwwPrefix) {

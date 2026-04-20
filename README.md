@@ -78,7 +78,8 @@ Echo returns the underlying Echo engine.
 
 ```go
 adapter := echoweb.New()
-_ = adapter.Echo()
+fmt.Println(adapter.Echo() != nil)
+// true
 ```
 
 #### <a id="echoweb-adapter-router"></a>echoweb.Adapter.Router
@@ -87,7 +88,8 @@ Router returns the app-facing router contract.
 
 ```go
 adapter := echoweb.New()
-_ = adapter.Router()
+fmt.Println(adapter.Router() != nil)
+// true
 ```
 
 #### <a id="echoweb-adapter-servehttp"></a>echoweb.Adapter.ServeHTTP
@@ -110,7 +112,8 @@ New creates a new Echo-backed web adapter.
 
 ```go
 adapter := echoweb.New()
-_ = adapter.Router()
+fmt.Println(adapter.Router() != nil, adapter.Echo() != nil)
+// true true
 ```
 
 #### <a id="echoweb-newserver"></a>echoweb.NewServer
@@ -125,9 +128,8 @@ server, err := echoweb.NewServer(echoweb.ServerConfig{
 		}),
 	},
 })
-_ = server
-fmt.Println(err == nil)
-// true
+fmt.Println(err == nil, server.Router() != nil)
+// true true
 ```
 
 #### <a id="echoweb-server-router"></a>echoweb.Server.Router
@@ -136,7 +138,8 @@ Router exposes the app-facing router contract.
 
 ```go
 server, _ := echoweb.NewServer(echoweb.ServerConfig{})
-_ = server.Router()
+fmt.Println(server.Router() != nil)
+// true
 ```
 
 #### <a id="echoweb-server-serve"></a>echoweb.Server.Serve
@@ -203,7 +206,8 @@ Wrap exposes an existing Echo engine through the web.Router contract.
 
 ```go
 adapter := echoweb.Wrap(nil)
-_ = adapter.Echo()
+fmt.Println(adapter.Echo() != nil)
+// true
 ```
 
 ### Indexing
@@ -217,9 +221,8 @@ manifest, err := webindex.Run(context.Background(), webindex.IndexOptions{
 	Root:    ".",
 	OutPath: "webindex.json",
 })
-_ = manifest
-fmt.Println(err == nil)
-// true
+fmt.Println(err == nil, manifest.Version != "")
+// true true
 ```
 
 ### Middleware
@@ -292,8 +295,16 @@ fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("WWW-Authenticate"))
 BodyDump captures request and response payloads.
 
 ```go
-mw := webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {})
-_ = mw
+var captured string
+mw := webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {
+	captured = fmt.Sprintf("%s -> %s", string(reqBody), string(resBody))
+})
+req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ping"))
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.Text(http.StatusOK, "pong") })
+_ = handler(ctx)
+fmt.Println(captured)
+// ping -> pong
 ```
 
 #### <a id="webmiddleware-bodydumpwithconfig"></a>webmiddleware.BodyDumpWithConfig
@@ -302,9 +313,12 @@ BodyDumpWithConfig captures request and response payloads with config.
 
 ```go
 mw := webmiddleware.BodyDumpWithConfig(webmiddleware.BodyDumpConfig{
-	Handler: func(c web.Context, reqBody, resBody []byte) {},
+	Handler: func(c web.Context, reqBody, resBody []byte) { fmt.Println(string(resBody)) },
 })
-_ = mw
+ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.Text(http.StatusOK, "ok") })
+_ = handler(ctx)
+// ok
 ```
 
 #### <a id="webmiddleware-bodylimit"></a>webmiddleware.BodyLimit
@@ -412,7 +426,13 @@ fmt.Println(ctx.Response().Header().Get("Content-Encoding"))
 ContextTimeout sets a timeout on the request context.
 
 ```go
-_ = webmiddleware.ContextTimeout(2 * time.Second)
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := webmiddleware.ContextTimeout(2 * time.Second)(func(c web.Context) error {
+	fmt.Println(c.Request().Context().Err() == nil)
+	return nil
+})
+_ = handler(ctx)
+// true
 ```
 
 #### <a id="webmiddleware-contexttimeoutwithconfig"></a>webmiddleware.ContextTimeoutWithConfig
@@ -420,7 +440,13 @@ _ = webmiddleware.ContextTimeout(2 * time.Second)
 ContextTimeoutWithConfig sets a timeout on the request context with config.
 
 ```go
-_ = webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{Timeout: time.Second})
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{Timeout: time.Second})(func(c web.Context) error {
+	fmt.Println(c.Request().Context().Err() == nil)
+	return nil
+})
+_ = handler(ctx)
+// true
 ```
 
 #### <a id="webmiddleware-createextractors"></a>webmiddleware.CreateExtractors
@@ -438,7 +464,22 @@ fmt.Println(err == nil, len(extractors))
 Decompress decompresses gzip-encoded request bodies.
 
 ```go
-_ = webmiddleware.Decompress()
+var body string
+compressed := &bytes.Buffer{}
+gz := gzip.NewWriter(compressed)
+_, _ = gz.Write([]byte("hello"))
+_ = gz.Close()
+req := httptest.NewRequest(http.MethodPost, "/", compressed)
+req.Header.Set("Content-Encoding", webmiddleware.GZIPEncoding)
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := webmiddleware.Decompress()(func(c web.Context) error {
+	data, _ := io.ReadAll(c.Request().Body)
+	body = string(data)
+	return c.NoContent(http.StatusNoContent)
+})
+_ = handler(ctx)
+fmt.Println(body, ctx.Request().Header.Get("Content-Encoding"))
+// hello
 ```
 
 #### <a id="webmiddleware-decompresswithconfig"></a>webmiddleware.DecompressWithConfig
@@ -446,7 +487,15 @@ _ = webmiddleware.Decompress()
 DecompressWithConfig decompresses gzip-encoded request bodies with config.
 
 ```go
-_ = webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{})
+req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("plain"))
+ctx := webtest.NewContext(req, nil, "/", nil)
+handler := webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{})(func(c web.Context) error {
+	data, _ := io.ReadAll(c.Request().Body)
+	fmt.Println(string(data))
+	return nil
+})
+_ = handler(ctx)
+// plain
 ```
 
 #### <a id="webmiddleware-defaultskipper"></a>webmiddleware.DefaultSkipper
@@ -463,8 +512,15 @@ fmt.Println(webmiddleware.DefaultSkipper(nil))
 ErrorBodyDump captures response bodies for non-2xx and non-3xx responses.
 
 ```go
-mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {})
-_ = mw
+var captured string
+mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
+	captured = fmt.Sprintf("%d:%s", status, string(body))
+})
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.Text(http.StatusBadRequest, "nope") })
+_ = handler(ctx)
+fmt.Println(captured)
+// 400:nope
 ```
 
 #### <a id="webmiddleware-errorbodydumpwithconfig"></a>webmiddleware.ErrorBodyDumpWithConfig
@@ -473,9 +529,12 @@ ErrorBodyDumpWithConfig captures response bodies for non-success responses with 
 
 ```go
 mw := webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
-	Handler: func(c web.Context, status int, body []byte) {},
+	Handler: func(c web.Context, status int, body []byte) { fmt.Println(status) },
 })
-_ = mw
+ctx := webtest.NewContext(nil, nil, "/", nil)
+handler := mw(func(c web.Context) error { return c.Text(http.StatusInternalServerError, "boom") })
+_ = handler(ctx)
+// 500
 ```
 
 #### <a id="webmiddleware-gzip"></a>webmiddleware.Gzip
@@ -515,7 +574,11 @@ fmt.Println(ctx.Response().Header().Get("Content-Encoding") == "")
 HTTPSNonWWWRedirect redirects to https without www.
 
 ```go
-_ = webmiddleware.HTTPSNonWWWRedirect()
+req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSNonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Response().Header().Get("Location"))
+// https://example.com/docs
 ```
 
 #### <a id="webmiddleware-httpsnonwwwredirectwithconfig"></a>webmiddleware.HTTPSNonWWWRedirectWithConfig
@@ -523,7 +586,11 @@ _ = webmiddleware.HTTPSNonWWWRedirect()
 HTTPSNonWWWRedirectWithConfig returns HTTPS non-WWW redirect middleware with config.
 
 ```go
-_ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
 ```
 
 #### <a id="webmiddleware-httpsredirect"></a>webmiddleware.HTTPSRedirect
@@ -531,7 +598,11 @@ _ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Cod
 HTTPSRedirect redirects http requests to https.
 
 ```go
-_ = webmiddleware.HTTPSRedirect()
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
+// 301 https://example.com/docs
 ```
 
 #### <a id="webmiddleware-httpsredirectwithconfig"></a>webmiddleware.HTTPSRedirectWithConfig
@@ -539,7 +610,11 @@ _ = webmiddleware.HTTPSRedirect()
 HTTPSRedirectWithConfig returns HTTPS redirect middleware with config.
 
 ```go
-_ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
 ```
 
 #### <a id="webmiddleware-httpswwwredirect"></a>webmiddleware.HTTPSWWWRedirect
@@ -547,7 +622,11 @@ _ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: htt
 HTTPSWWWRedirect redirects to https + www.
 
 ```go
-_ = webmiddleware.HTTPSWWWRedirect()
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSWWWRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Response().Header().Get("Location"))
+// https://www.example.com/docs
 ```
 
 #### <a id="webmiddleware-httpswwwredirectwithconfig"></a>webmiddleware.HTTPSWWWRedirectWithConfig
@@ -555,7 +634,11 @@ _ = webmiddleware.HTTPSWWWRedirect()
 HTTPSWWWRedirectWithConfig returns HTTPS+WWW redirect middleware with config.
 
 ```go
-_ = webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
 ```
 
 #### <a id="webmiddleware-keyauth"></a>webmiddleware.KeyAuth
@@ -667,7 +750,8 @@ NewRandomBalancer creates a random proxy balancer.
 ```go
 target, _ := url.Parse("http://localhost:8080")
 balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
-_ = balancer
+fmt.Println(balancer.Next(nil).URL.Host)
+// localhost:8080
 ```
 
 #### <a id="webmiddleware-newratelimitermemorystore"></a>webmiddleware.NewRateLimiterMemoryStore
@@ -676,7 +760,10 @@ NewRateLimiterMemoryStore creates an in-memory rate limiter store.
 
 ```go
 store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
-_ = store
+allowed1, _ := store.Allow("192.0.2.1")
+allowed2, _ := store.Allow("192.0.2.1")
+fmt.Println(allowed1, allowed2)
+// true false
 ```
 
 #### <a id="webmiddleware-newratelimitermemorystorewithconfig"></a>webmiddleware.NewRateLimiterMemoryStoreWithConfig
@@ -685,7 +772,9 @@ NewRateLimiterMemoryStoreWithConfig creates an in-memory rate limiter store with
 
 ```go
 store := webmiddleware.NewRateLimiterMemoryStoreWithConfig(webmiddleware.RateLimiterMemoryStoreConfig{Rate: rate.Every(time.Second)})
-_ = store
+allowed, _ := store.Allow("192.0.2.1")
+fmt.Println(allowed)
+// true
 ```
 
 #### <a id="webmiddleware-newroundrobinbalancer"></a>webmiddleware.NewRoundRobinBalancer
@@ -695,7 +784,8 @@ NewRoundRobinBalancer creates a round-robin proxy balancer.
 ```go
 target, _ := url.Parse("http://localhost:8080")
 balancer := webmiddleware.NewRoundRobinBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
-_ = balancer
+fmt.Println(balancer.Next(nil).URL.Host)
+// localhost:8080
 ```
 
 #### <a id="webmiddleware-nonwwwredirect"></a>webmiddleware.NonWWWRedirect
@@ -703,7 +793,11 @@ _ = balancer
 NonWWWRedirect redirects to the non-www host.
 
 ```go
-_ = webmiddleware.NonWWWRedirect()
+req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.NonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Response().Header().Get("Location"))
+// http://example.com/docs
 ```
 
 #### <a id="webmiddleware-nonwwwredirectwithconfig"></a>webmiddleware.NonWWWRedirectWithConfig
@@ -711,7 +805,11 @@ _ = webmiddleware.NonWWWRedirect()
 NonWWWRedirectWithConfig returns non-WWW redirect middleware with config.
 
 ```go
-_ = webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
 ```
 
 #### <a id="webmiddleware-proxy"></a>webmiddleware.Proxy
@@ -721,7 +819,11 @@ Proxy creates a proxy middleware.
 ```go
 target, _ := url.Parse("http://localhost:8080")
 balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
-_ = webmiddleware.Proxy(balancer)
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+ctx := webtest.NewContext(req, nil, "/", nil)
+_ = webmiddleware.Proxy(balancer)(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Get("target").(*webmiddleware.ProxyTarget).URL.Host)
+// localhost:8080
 ```
 
 #### <a id="webmiddleware-proxywithconfig"></a>webmiddleware.ProxyWithConfig
@@ -733,7 +835,11 @@ target, _ := url.Parse("http://localhost:8080")
 mw := webmiddleware.ProxyWithConfig(webmiddleware.ProxyConfig{
 	Balancer: webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}}),
 })
-_ = mw
+req := httptest.NewRequest(http.MethodGet, "/old/path", nil)
+ctx := webtest.NewContext(req, nil, "/", nil)
+_ = mw(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Get("target").(*webmiddleware.ProxyTarget).URL.Host)
+// localhost:8080
 ```
 
 #### <a id="webmiddleware-ratelimiter"></a>webmiddleware.RateLimiter
@@ -951,7 +1057,14 @@ fmt.Println(ctx.Response().Header().Get("Referrer-Policy"))
 Static serves static content from the provided root.
 
 ```go
-_ = webmiddleware.Static(".")
+dir, _ := os.MkdirTemp("", "web-static-*")
+defer os.RemoveAll(dir)
+_ = os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hello"), 0o644)
+req := httptest.NewRequest(http.MethodGet, "/hello.txt", nil)
+ctx := webtest.NewContext(req, nil, "/hello.txt", nil)
+_ = webmiddleware.Static(dir)(func(c web.Context) error { return c.NoContent(http.StatusNotFound) })(ctx)
+fmt.Println(strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String()))
+// hello
 ```
 
 #### <a id="webmiddleware-staticwithconfig"></a>webmiddleware.StaticWithConfig
@@ -959,7 +1072,14 @@ _ = webmiddleware.Static(".")
 StaticWithConfig serves static content using config.
 
 ```go
-_ = webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{Root: "."})
+dir, _ := os.MkdirTemp("", "web-static-*")
+defer os.RemoveAll(dir)
+_ = os.WriteFile(filepath.Join(dir, "index.html"), []byte("<h1>home</h1>"), 0o644)
+req := httptest.NewRequest(http.MethodGet, "/", nil)
+ctx := webtest.NewContext(req, nil, "/", nil)
+_ = webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{Root: dir})(func(c web.Context) error { return c.NoContent(http.StatusNotFound) })(ctx)
+fmt.Println(strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String()))
+// <h1>home</h1>
 ```
 
 #### <a id="webmiddleware-timeout"></a>webmiddleware.Timeout
@@ -993,7 +1113,11 @@ fmt.Println(ctx.StatusCode())
 WWWRedirect redirects to the www host.
 
 ```go
-_ = webmiddleware.WWWRedirect()
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.WWWRedirect()(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.Response().Header().Get("Location"))
+// http://www.example.com/docs
 ```
 
 #### <a id="webmiddleware-wwwredirectwithconfig"></a>webmiddleware.WWWRedirectWithConfig
@@ -1001,7 +1125,11 @@ _ = webmiddleware.WWWRedirect()
 WWWRedirectWithConfig returns WWW redirect middleware with config.
 
 ```go
-_ = webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
+ctx := webtest.NewContext(req, nil, "/docs", nil)
+_ = webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
+fmt.Println(ctx.StatusCode())
+// 307
 ```
 
 ### Prometheus

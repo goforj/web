@@ -47,7 +47,8 @@ type roundRobinBalancer struct {
 // Example:
 // target, _ := url.Parse("http://localhost:8080")
 // balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
-// _ = balancer
+// fmt.Println(balancer.Next(nil).URL.Host)
+//	// localhost:8080
 func NewRandomBalancer(targets []*ProxyTarget) ProxyBalancer {
 	return &randomBalancer{
 		commonBalancer: commonBalancer{targets: targets},
@@ -60,7 +61,8 @@ func NewRandomBalancer(targets []*ProxyTarget) ProxyBalancer {
 // Example:
 // target, _ := url.Parse("http://localhost:8080")
 // balancer := webmiddleware.NewRoundRobinBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
-// _ = balancer
+// fmt.Println(balancer.Next(nil).URL.Host)
+//	// localhost:8080
 func NewRoundRobinBalancer(targets []*ProxyTarget) ProxyBalancer {
 	return &roundRobinBalancer{commonBalancer: commonBalancer{targets: targets}}
 }
@@ -138,7 +140,11 @@ var DefaultProxyConfig = ProxyConfig{
 // Example:
 // target, _ := url.Parse("http://localhost:8080")
 // balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
-// _ = webmiddleware.Proxy(balancer)
+// req := httptest.NewRequest(http.MethodGet, "/", nil)
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// _ = webmiddleware.Proxy(balancer)(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.Get("target").(*webmiddleware.ProxyTarget).URL.Host)
+//	// localhost:8080
 func Proxy(balancer ProxyBalancer) web.Middleware {
 	config := DefaultProxyConfig
 	config.Balancer = balancer
@@ -152,7 +158,11 @@ func Proxy(balancer ProxyBalancer) web.Middleware {
 // mw := webmiddleware.ProxyWithConfig(webmiddleware.ProxyConfig{
 // 	Balancer: webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}}),
 // })
-// _ = mw
+// req := httptest.NewRequest(http.MethodGet, "/old/path", nil)
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// _ = mw(func(c web.Context) error { return nil })(ctx)
+// fmt.Println(ctx.Get("target").(*webmiddleware.ProxyTarget).URL.Host)
+//	// localhost:8080
 func ProxyWithConfig(config ProxyConfig) web.Middleware {
 	if config.Balancer == nil {
 		panic("web: proxy middleware requires a balancer")

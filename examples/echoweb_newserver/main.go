@@ -15,7 +15,6 @@ func main() {
 			}),
 		},
 	})
-	_ = server
-	fmt.Println(err == nil)
-	// true
+	fmt.Println(err == nil, server.Router() != nil)
+	// true true
 }

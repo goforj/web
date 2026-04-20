@@ -18,7 +18,13 @@ type ContextTimeoutConfig struct {
 // ContextTimeout sets a timeout on the request context.
 // @group Middleware
 // Example:
-// _ = webmiddleware.ContextTimeout(2 * time.Second)
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// handler := webmiddleware.ContextTimeout(2 * time.Second)(func(c web.Context) error {
+// 	fmt.Println(c.Request().Context().Err() == nil)
+// 	return nil
+// })
+// _ = handler(ctx)
+//	// true
 func ContextTimeout(timeout time.Duration) web.Middleware {
 	return ContextTimeoutWithConfig(ContextTimeoutConfig{Timeout: timeout})
 }
@@ -26,7 +32,13 @@ func ContextTimeout(timeout time.Duration) web.Middleware {
 // ContextTimeoutWithConfig sets a timeout on the request context with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{Timeout: time.Second})
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// handler := webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{Timeout: time.Second})(func(c web.Context) error {
+// 	fmt.Println(c.Request().Context().Err() == nil)
+// 	return nil
+// })
+// _ = handler(ctx)
+//	// true
 func ContextTimeoutWithConfig(config ContextTimeoutConfig) web.Middleware {
 	if config.Timeout == 0 {
 		panic("web: context timeout requires a timeout")

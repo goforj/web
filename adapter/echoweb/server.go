@@ -34,9 +34,8 @@ type Server struct {
 // 		}),
 // 	},
 // })
-// _ = server
-// fmt.Println(err == nil)
-//	// true
+// fmt.Println(err == nil, server.Router() != nil)
+//	// true true
 func NewServer(config ServerConfig) (*Server, error) {
 	adapter := New()
 	router := adapter.Router()
@@ -66,7 +65,8 @@ func NewServer(config ServerConfig) (*Server, error) {
 // @group Adapter
 // Example:
 // server, _ := echoweb.NewServer(echoweb.ServerConfig{})
-// _ = server.Router()
+// fmt.Println(server.Router() != nil)
+//	// true
 func (s *Server) Router() web.Router {
 	if s == nil || s.adapter == nil {
 		return nil

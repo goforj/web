@@ -41,7 +41,22 @@ var DefaultDecompressConfig = DecompressConfig{
 // Decompress decompresses gzip-encoded request bodies.
 // @group Middleware
 // Example:
-// _ = webmiddleware.Decompress()
+// var body string
+// compressed := &bytes.Buffer{}
+// gz := gzip.NewWriter(compressed)
+// _, _ = gz.Write([]byte("hello"))
+// _ = gz.Close()
+// req := httptest.NewRequest(http.MethodPost, "/", compressed)
+// req.Header.Set("Content-Encoding", webmiddleware.GZIPEncoding)
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := webmiddleware.Decompress()(func(c web.Context) error {
+// 	data, _ := io.ReadAll(c.Request().Body)
+// 	body = string(data)
+// 	return c.NoContent(http.StatusNoContent)
+// })
+// _ = handler(ctx)
+// fmt.Println(body, ctx.Request().Header.Get("Content-Encoding"))
+//	// hello
 func Decompress() web.Middleware {
 	return DecompressWithConfig(DefaultDecompressConfig)
 }
@@ -49,7 +64,15 @@ func Decompress() web.Middleware {
 // DecompressWithConfig decompresses gzip-encoded request bodies with config.
 // @group Middleware
 // Example:
-// _ = webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{})
+// req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("plain"))
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// handler := webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{})(func(c web.Context) error {
+// 	data, _ := io.ReadAll(c.Request().Body)
+// 	fmt.Println(string(data))
+// 	return nil
+// })
+// _ = handler(ctx)
+//	// plain
 func DecompressWithConfig(config DecompressConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultSkipper

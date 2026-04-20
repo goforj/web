@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/goforj/web/webmiddleware"
 	"net/url"
 )
@@ -8,5 +9,6 @@ import (
 func main() {
 	target, _ := url.Parse("http://localhost:8080")
 	balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
-	_ = balancer
+	fmt.Println(balancer.Next(nil).URL.Host)
+	// localhost:8080
 }

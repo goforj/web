@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"github.com/goforj/web/adapter/echoweb"
 )
 
 func main() {
 	adapter := echoweb.New()
-	_ = adapter.Router()
+	fmt.Println(adapter.Router() != nil, adapter.Echo() != nil)
+	// true true
 }
