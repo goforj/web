@@ -22,10 +22,19 @@ var DefaultRedirectConfig = RedirectConfig{
 type redirectLogic func(scheme string, host string, uri string) (bool, string)
 
 // HTTPSRedirect redirects http requests to https.
+// @group Middleware
+// Example:
+// _ = webmiddleware.HTTPSRedirect()
+//	// true
 func HTTPSRedirect() web.Middleware {
 	return HTTPSRedirectWithConfig(DefaultRedirectConfig)
 }
 
+// HTTPSRedirectWithConfig returns HTTPS redirect middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+//	// true
 func HTTPSRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if scheme != "https" {
@@ -36,10 +45,19 @@ func HTTPSRedirectWithConfig(config RedirectConfig) web.Middleware {
 }
 
 // HTTPSWWWRedirect redirects to https + www.
+// @group Middleware
+// Example:
+// _ = webmiddleware.HTTPSWWWRedirect()
+//	// true
 func HTTPSWWWRedirect() web.Middleware {
 	return HTTPSWWWRedirectWithConfig(DefaultRedirectConfig)
 }
 
+// HTTPSWWWRedirectWithConfig returns HTTPS+WWW redirect middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+//	// true
 func HTTPSWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if scheme != "https" || !strings.HasPrefix(host, wwwPrefix) {
@@ -51,10 +69,19 @@ func HTTPSWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 }
 
 // HTTPSNonWWWRedirect redirects to https without www.
+// @group Middleware
+// Example:
+// _ = webmiddleware.HTTPSNonWWWRedirect()
+//	// true
 func HTTPSNonWWWRedirect() web.Middleware {
 	return HTTPSNonWWWRedirectWithConfig(DefaultRedirectConfig)
 }
 
+// HTTPSNonWWWRedirectWithConfig returns HTTPS non-WWW redirect middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+//	// true
 func HTTPSNonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if scheme != "https" || strings.HasPrefix(host, wwwPrefix) {
@@ -65,10 +92,19 @@ func HTTPSNonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 }
 
 // WWWRedirect redirects to the www host.
+// @group Middleware
+// Example:
+// _ = webmiddleware.WWWRedirect()
+//	// true
 func WWWRedirect() web.Middleware {
 	return WWWRedirectWithConfig(DefaultRedirectConfig)
 }
 
+// WWWRedirectWithConfig returns WWW redirect middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+//	// true
 func WWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if !strings.HasPrefix(host, wwwPrefix) {
@@ -79,10 +115,19 @@ func WWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 }
 
 // NonWWWRedirect redirects to the non-www host.
+// @group Middleware
+// Example:
+// _ = webmiddleware.NonWWWRedirect()
+//	// true
 func NonWWWRedirect() web.Middleware {
 	return NonWWWRedirectWithConfig(DefaultRedirectConfig)
 }
 
+// NonWWWRedirectWithConfig returns non-WWW redirect middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+//	// true
 func NonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	return redirect(config, func(scheme string, host string, uri string) (bool, string) {
 		if strings.HasPrefix(host, wwwPrefix) {

@@ -27,6 +27,12 @@ type Context struct {
 var _ web.Context = (*Context)(nil)
 
 // NewContext creates a new test context around the provided request/recorder pair.
+// @group Testing
+// Example:
+// req := httptest.NewRequest(http.MethodGet, "/users/42?expand=roles", nil)
+// ctx := webtest.NewContext(req, nil, "/users/:id", webtest.PathParams{"id": "42"})
+// fmt.Println(ctx.Param("id"), ctx.Query("expand"))
+//	// 42 roles
 func NewContext(request *http.Request, recorder *httptest.ResponseRecorder, path string, pathParams PathParams) *Context {
 	if request == nil {
 		request = httptest.NewRequest(http.MethodGet, "/", nil)

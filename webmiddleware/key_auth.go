@@ -42,6 +42,13 @@ func (e *ErrKeyAuthMissing) Unwrap() error {
 }
 
 // KeyAuth returns key auth middleware.
+// @group Middleware
+// Example:
+// mw := webmiddleware.KeyAuth(func(key string, c web.Context) (bool, error) {
+// 	return key == "demo-key", nil
+// })
+// _ = mw
+//	// true
 func KeyAuth(fn KeyAuthValidator) web.Middleware {
 	config := DefaultKeyAuthConfig
 	config.Validator = fn
@@ -49,6 +56,13 @@ func KeyAuth(fn KeyAuthValidator) web.Middleware {
 }
 
 // KeyAuthWithConfig returns key auth middleware with config.
+// @group Middleware
+// Example:
+// mw := webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
+// 	Validator: func(key string, c web.Context) (bool, error) { return true, nil },
+// })
+// _ = mw
+//	// true
 func KeyAuthWithConfig(config KeyAuthConfig) web.Middleware {
 	if config.AuthScheme == "" {
 		config.AuthScheme = DefaultKeyAuthConfig.AuthScheme

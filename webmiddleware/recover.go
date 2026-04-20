@@ -22,11 +22,19 @@ var DefaultRecoverConfig = RecoverConfig{
 }
 
 // Recover returns middleware that recovers panics from the handler chain.
+// @group Middleware
+// Example:
+// _ = webmiddleware.Recover()
+//	// true
 func Recover() web.Middleware {
 	return RecoverWithConfig(DefaultRecoverConfig)
 }
 
 // RecoverWithConfig returns recover middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{})
+//	// true
 func RecoverWithConfig(config RecoverConfig) web.Middleware {
 	if config.StackSize == 0 {
 		config.StackSize = DefaultRecoverConfig.StackSize

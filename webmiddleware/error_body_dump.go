@@ -23,6 +23,11 @@ var DefaultErrorBodyDumpConfig = ErrorBodyDumpConfig{
 }
 
 // ErrorBodyDump captures response bodies for non-2xx and non-3xx responses.
+// @group Middleware
+// Example:
+// mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {})
+// _ = mw
+//	// true
 func ErrorBodyDump(handler ErrorBodyDumpHandler) web.Middleware {
 	config := DefaultErrorBodyDumpConfig
 	config.Handler = handler
@@ -30,6 +35,13 @@ func ErrorBodyDump(handler ErrorBodyDumpHandler) web.Middleware {
 }
 
 // ErrorBodyDumpWithConfig captures response bodies for non-success responses with config.
+// @group Middleware
+// Example:
+// mw := webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
+// 	Handler: func(c web.Context, status int, body []byte) {},
+// })
+// _ = mw
+//	// true
 func ErrorBodyDumpWithConfig(config ErrorBodyDumpConfig) web.Middleware {
 	if config.Handler == nil {
 		panic("web: error body dump middleware requires a handler")

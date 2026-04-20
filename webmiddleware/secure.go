@@ -30,11 +30,19 @@ var DefaultSecureConfig = SecureConfig{
 }
 
 // Secure sets security-oriented response headers.
+// @group Middleware
+// Example:
+// _ = webmiddleware.Secure()
+//	// true
 func Secure() web.Middleware {
 	return SecureWithConfig(DefaultSecureConfig)
 }
 
 // SecureWithConfig sets security-oriented response headers with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{ReferrerPolicy: "same-origin"})
+//	// true
 func SecureWithConfig(config SecureConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultSecureConfig.Skipper

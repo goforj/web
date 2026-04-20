@@ -43,11 +43,20 @@ var DefaultCSRFConfig = CSRFConfig{
 }
 
 // CSRF enables token-based CSRF protection.
+// @group Middleware
+// Example:
+// _ = webmiddleware.CSRF()
+//	// true
 func CSRF() web.Middleware {
 	return CSRFWithConfig(DefaultCSRFConfig)
 }
 
 // CSRFWithConfig enables token-based CSRF protection with config.
+// @group Middleware
+// Example:
+// mw := webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{CookieName: "_csrf"})
+// _ = mw
+//	// true
 func CSRFWithConfig(config CSRFConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultCSRFConfig.Skipper

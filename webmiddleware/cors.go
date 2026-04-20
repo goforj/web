@@ -34,11 +34,20 @@ var DefaultCORSConfig = CORSConfig{
 }
 
 // CORS returns Cross-Origin Resource Sharing middleware.
+// @group Middleware
+// Example:
+// _ = webmiddleware.CORS()
+//	// true
 func CORS() web.Middleware {
 	return CORSWithConfig(DefaultCORSConfig)
 }
 
 // CORSWithConfig returns CORS middleware with config.
+// @group Middleware
+// Example:
+// mw := webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{AllowOrigins: []string{"https://example.com"}})
+// _ = mw
+//	// true
 func CORSWithConfig(config CORSConfig) web.Middleware {
 	if len(config.AllowOrigins) == 0 {
 		config.AllowOrigins = DefaultCORSConfig.AllowOrigins

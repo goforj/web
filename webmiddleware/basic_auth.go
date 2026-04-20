@@ -30,6 +30,13 @@ var DefaultBasicAuthConfig = BasicAuthConfig{
 }
 
 // BasicAuth returns basic auth middleware.
+// @group Middleware
+// Example:
+// mw := webmiddleware.BasicAuth(func(user, pass string, c web.Context) (bool, error) {
+// 	return user == "demo" && pass == "secret", nil
+// })
+// _ = mw
+//	// true
 func BasicAuth(fn BasicAuthValidator) web.Middleware {
 	config := DefaultBasicAuthConfig
 	config.Validator = fn
@@ -37,6 +44,14 @@ func BasicAuth(fn BasicAuthValidator) web.Middleware {
 }
 
 // BasicAuthWithConfig returns basic auth middleware with config.
+// @group Middleware
+// Example:
+// mw := webmiddleware.BasicAuthWithConfig(webmiddleware.BasicAuthConfig{
+// 	Realm: "Example",
+// 	Validator: func(user, pass string, c web.Context) (bool, error) { return true, nil },
+// })
+// _ = mw
+//	// true
 func BasicAuthWithConfig(config BasicAuthConfig) web.Middleware {
 	if config.Validator == nil {
 		panic("web: basic-auth middleware requires a validator function")

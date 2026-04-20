@@ -25,6 +25,17 @@ type Server struct {
 }
 
 // NewServer creates an Echo-backed server from web route groups and mounts.
+// @group Adapter
+// Example:
+// server, err := echoweb.NewServer(echoweb.ServerConfig{
+// 	RouteGroups: []web.RouteGroup{
+// 		web.NewRouteGroup("/api", []web.Route{
+// 			web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) }),
+// 		}),
+// 	},
+// })
+// fmt.Println(err == nil)
+//	// true true
 func NewServer(config ServerConfig) (*Server, error) {
 	adapter := New()
 	router := adapter.Router()
@@ -51,6 +62,11 @@ func NewServer(config ServerConfig) (*Server, error) {
 }
 
 // Router exposes the app-facing router contract.
+// @group Adapter
+// Example:
+// server, _ := echoweb.NewServer(echoweb.ServerConfig{})
+// _ = server.Router()
+//	// true
 func (s *Server) Router() web.Router {
 	if s == nil || s.adapter == nil {
 		return nil
@@ -59,6 +75,20 @@ func (s *Server) Router() web.Router {
 }
 
 // ServeHTTP exposes the server as an http.Handler for tests and local probing.
+// @group Adapter
+// Example:
+// server, _ := echoweb.NewServer(echoweb.ServerConfig{
+// 	RouteGroups: []web.RouteGroup{
+// 		web.NewRouteGroup("/api", []web.Route{
+// 			web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) }),
+// 		}),
+// 	},
+// })
+// rr := httptest.NewRecorder()
+// req := httptest.NewRequest(http.MethodGet, "/api/healthz", nil)
+// server.ServeHTTP(rr, req)
+// fmt.Println(rr.Code)
+//	// 204
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s == nil || s.httpServer == nil {
 		http.NotFound(w, r)
@@ -68,6 +98,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Serve starts the server and gracefully shuts it down when ctx is cancelled.
+// @group Adapter
+// Example:
+// server, _ := echoweb.NewServer(echoweb.ServerConfig{Addr: "127.0.0.1:0"})
+// ctx, cancel := context.WithCancel(context.Background())
+// cancel()
+// fmt.Println(server.Serve(ctx) == nil)
+//	// true
 func (s *Server) Serve(ctx context.Context) error {
 	if s == nil || s.httpServer == nil {
 		return nil

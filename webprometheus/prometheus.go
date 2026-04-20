@@ -88,6 +88,10 @@ var (
 )
 
 // Default returns the package-level Prometheus metrics instance.
+// @group Prometheus
+// Example:
+// _ = webprometheus.Default()
+//	// true
 func Default() *Metrics {
 	defaultOnce.Do(func() {
 		defaultMetrics = MustNew(Config{})
@@ -96,16 +100,28 @@ func Default() *Metrics {
 }
 
 // Middleware returns the package-level Prometheus middleware.
+// @group Prometheus
+// Example:
+// _ = webprometheus.Middleware()
+//	// true
 func Middleware() web.Middleware {
 	return Default().Middleware()
 }
 
 // Handler returns the package-level Prometheus scrape handler.
+// @group Prometheus
+// Example:
+// _ = webprometheus.Handler()
+//	// true
 func Handler() web.Handler {
 	return Default().Handler()
 }
 
 // MustNew creates a Metrics instance and panics on registration errors.
+// @group Prometheus
+// Example:
+// _ = webprometheus.MustNew(webprometheus.Config{})
+//	// true
 func MustNew(config Config) *Metrics {
 	metrics, err := New(config)
 	if err != nil {
@@ -115,6 +131,11 @@ func MustNew(config Config) *Metrics {
 }
 
 // New creates a Metrics instance backed by Prometheus collectors.
+// @group Prometheus
+// Example:
+// metrics, err := webprometheus.New(webprometheus.Config{Namespace: "app"})
+// fmt.Println(err == nil)
+//	// true true
 func New(config Config) (*Metrics, error) {
 	config = withDefaults(config)
 
@@ -202,6 +223,11 @@ func New(config Config) (*Metrics, error) {
 }
 
 // Middleware records Prometheus metrics for each request.
+// @group Prometheus
+// Example:
+// metrics, _ := webprometheus.New(webprometheus.Config{})
+// _ = metrics.Middleware()
+//	// true
 func (m *Metrics) Middleware() web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {
@@ -247,6 +273,11 @@ func (m *Metrics) Middleware() web.Middleware {
 }
 
 // Handler exposes the configured Prometheus metrics as a web.Handler.
+// @group Prometheus
+// Example:
+// metrics, _ := webprometheus.New(webprometheus.Config{})
+// _ = metrics.Handler()
+//	// true
 func (m *Metrics) Handler() web.Handler {
 	inner := promhttp.HandlerFor(m.gatherer, promhttp.HandlerOpts{
 		DisableCompression: m.config.DisableCompression,
@@ -261,6 +292,11 @@ func (m *Metrics) Handler() web.Handler {
 }
 
 // RunPushGatewayGatherer starts pushing collected metrics until the context finishes.
+// @group Prometheus
+// Example:
+// err := webprometheus.RunPushGatewayGatherer(context.Background(), webprometheus.PushGatewayConfig{})
+// fmt.Println(err != nil)
+//	// true
 func RunPushGatewayGatherer(ctx context.Context, config PushGatewayConfig) error {
 	if config.PushGatewayURL == "" {
 		return errors.New("push gateway URL is missing")
@@ -318,6 +354,12 @@ func RunPushGatewayGatherer(ctx context.Context, config PushGatewayConfig) error
 }
 
 // WriteGatheredMetrics gathers collected metrics and writes them to the given writer.
+// @group Prometheus
+// Example:
+// var buf bytes.Buffer
+// err := webprometheus.WriteGatheredMetrics(&buf, prometheus.NewRegistry())
+// fmt.Println(err == nil)
+//	// true
 func WriteGatheredMetrics(writer io.Writer, gatherer prometheus.Gatherer) error {
 	metricFamilies, err := gatherer.Gather()
 	if err != nil {

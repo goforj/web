@@ -32,6 +32,11 @@ func (c *websocketConnAdapter) Native() any {
 }
 
 // UnwrapWebSocketConn returns the underlying gorilla websocket connection.
+// @group Adapter
+// Example:
+// _, ok := echoweb.UnwrapWebSocketConn(nil)
+// fmt.Println(ok)
+//	// false
 func UnwrapWebSocketConn(conn web.WebSocketConn) (*websocket.Conn, bool) {
 	adapted, ok := conn.(*websocketConnAdapter)
 	if !ok || adapted == nil || adapted.conn == nil {

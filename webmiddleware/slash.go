@@ -15,10 +15,19 @@ type TrailingSlashConfig struct {
 var DefaultTrailingSlashConfig = TrailingSlashConfig{}
 
 // AddTrailingSlash adds a trailing slash to the request path.
+// @group Middleware
+// Example:
+// _ = webmiddleware.AddTrailingSlash()
+//	// true
 func AddTrailingSlash() web.Middleware {
 	return AddTrailingSlashWithConfig(DefaultTrailingSlashConfig)
 }
 
+// AddTrailingSlashWithConfig returns trailing-slash middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})
+//	// true
 func AddTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {
@@ -46,10 +55,19 @@ func AddTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 }
 
 // RemoveTrailingSlash removes the trailing slash from the request path.
+// @group Middleware
+// Example:
+// _ = webmiddleware.RemoveTrailingSlash()
+//	// true
 func RemoveTrailingSlash() web.Middleware {
 	return RemoveTrailingSlashWithConfig(DefaultTrailingSlashConfig)
 }
 
+// RemoveTrailingSlashWithConfig returns remove-trailing-slash middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})
+//	// true
 func RemoveTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {

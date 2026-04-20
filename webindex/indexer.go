@@ -31,6 +31,14 @@ type parsedFile struct {
 }
 
 // Run indexes API metadata from source and writes artifacts.
+// @group Indexing
+// Example:
+// manifest, err := webindex.Run(context.Background(), webindex.IndexOptions{
+// 	Root:    ".",
+// 	OutPath: "webindex.json",
+// })
+// fmt.Println(err == nil)
+//	// true true
 func Run(_ context.Context, opts IndexOptions) (Manifest, error) {
 	root := opts.Root
 	if root == "" {

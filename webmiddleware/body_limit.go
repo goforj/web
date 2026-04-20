@@ -14,11 +14,19 @@ type BodyLimitConfig struct {
 }
 
 // BodyLimit returns middleware that limits request body size.
+// @group Middleware
+// Example:
+// _ = webmiddleware.BodyLimit("2KB")
+//	// true
 func BodyLimit(limit string) web.Middleware {
 	return BodyLimitWithConfig(BodyLimitConfig{Limit: limit})
 }
 
 // BodyLimitWithConfig returns body limit middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.BodyLimitWithConfig(webmiddleware.BodyLimitConfig{Limit: "2KB"})
+//	// true
 func BodyLimitWithConfig(config BodyLimitConfig) web.Middleware {
 	limit, err := parseBodyLimit(config.Limit)
 	if err != nil {

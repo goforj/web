@@ -30,16 +30,28 @@ var DefaultGzipConfig = GzipConfig{
 }
 
 // Gzip compresses responses with gzip.
+// @group Middleware
+// Example:
+// _ = webmiddleware.Gzip()
+//	// true
 func Gzip() web.Middleware {
 	return GzipWithConfig(DefaultGzipConfig)
 }
 
 // Compress is an alias for Gzip to match the checklist naming.
+// @group Middleware
+// Example:
+// _ = webmiddleware.Compress()
+//	// true
 func Compress() web.Middleware {
 	return Gzip()
 }
 
 // GzipWithConfig compresses responses with gzip and config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{MinLength: 256})
+//	// true
 func GzipWithConfig(config GzipConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultGzipConfig.Skipper

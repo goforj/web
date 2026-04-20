@@ -42,6 +42,15 @@ type RouteEntry struct {
 }
 
 // BuildRouteEntries builds a sorted slice of route entries from registered groups and extra entries.
+// @group Route Reporting
+// Example:
+// entries := web.BuildRouteEntries([]web.RouteGroup{
+// 	web.NewRouteGroup("/api", []web.Route{
+// 		web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
+// 	}),
+// })
+// fmt.Println(entries[0].Path, entries[0].Methods[0])
+//	// /api/healthz GET
 func BuildRouteEntries(groups []RouteGroup, extra ...RouteEntry) []RouteEntry {
 	grouped := map[string]*RouteEntry{}
 
@@ -82,6 +91,15 @@ func BuildRouteEntries(groups []RouteGroup, extra ...RouteEntry) []RouteEntry {
 }
 
 // RenderRouteTable renders a route table using simple ASCII borders and ANSI colors.
+// @group Route Reporting
+// Example:
+// table := web.RenderRouteTable([]web.RouteEntry{{
+// 	Path:    "/api/healthz",
+// 	Handler: "monitoring.Healthz",
+// 	Methods: []string{"GET"},
+// }})
+// fmt.Println(strings.Contains(table, "/api/healthz"))
+//	// true
 func RenderRouteTable(entries []RouteEntry) string {
 	ptrs := make([]*RouteEntry, 0, len(entries))
 	for i := range entries {

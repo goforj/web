@@ -14,6 +14,11 @@ type Adapter struct {
 }
 
 // New creates a new Echo-backed web adapter.
+// @group Adapter
+// Example:
+// adapter := echoweb.New()
+// _ = adapter.Router()
+//	// true
 func New() *Adapter {
 	engine := echo.New()
 	engine.IPExtractor = echo.LegacyIPExtractor()
@@ -26,6 +31,11 @@ func New() *Adapter {
 }
 
 // Wrap exposes an existing Echo engine through the web.Router contract.
+// @group Adapter
+// Example:
+// adapter := echoweb.Wrap(nil)
+// _ = adapter.Echo()
+//	// true
 func Wrap(engine *echo.Echo) *Adapter {
 	if engine == nil {
 		engine = echo.New()
@@ -42,6 +52,11 @@ func Wrap(engine *echo.Echo) *Adapter {
 }
 
 // Echo returns the underlying Echo engine.
+// @group Adapter
+// Example:
+// adapter := echoweb.New()
+// _ = adapter.Echo()
+//	// true
 func (a *Adapter) Echo() *echo.Echo {
 	if a == nil {
 		return nil
@@ -50,6 +65,11 @@ func (a *Adapter) Echo() *echo.Echo {
 }
 
 // Router returns the app-facing router contract.
+// @group Adapter
+// Example:
+// adapter := echoweb.New()
+// _ = adapter.Router()
+//	// true
 func (a *Adapter) Router() web.Router {
 	if a == nil {
 		return nil
@@ -58,6 +78,15 @@ func (a *Adapter) Router() web.Router {
 }
 
 // ServeHTTP exposes the adapter as a standard http.Handler.
+// @group Adapter
+// Example:
+// adapter := echoweb.New()
+// adapter.Router().GET("/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) })
+// rr := httptest.NewRecorder()
+// req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+// adapter.ServeHTTP(rr, req)
+// fmt.Println(rr.Code)
+//	// 204
 func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if a == nil || a.engine == nil {
 		http.NotFound(w, r)

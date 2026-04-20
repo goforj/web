@@ -39,11 +39,19 @@ var DefaultDecompressConfig = DecompressConfig{
 }
 
 // Decompress decompresses gzip-encoded request bodies.
+// @group Middleware
+// Example:
+// _ = webmiddleware.Decompress()
+//	// true
 func Decompress() web.Middleware {
 	return DecompressWithConfig(DefaultDecompressConfig)
 }
 
 // DecompressWithConfig decompresses gzip-encoded request bodies with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{})
+//	// true
 func DecompressWithConfig(config DecompressConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultSkipper

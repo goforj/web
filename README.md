@@ -1,50 +1,1224 @@
-# goforj/web
+<p align="center">
+  <strong>web</strong>
+</p>
 
-Minimal app-facing HTTP abstraction for GoForj.
+<p align="center">
+  Minimal app-facing HTTP abstractions, middleware, adapters, and route indexing for GoForj.
+</p>
 
-## Attribution
+<p align="center">
+<!-- test-count:embed:start -->
+<img src="https://img.shields.io/badge/unit_tests-105-brightgreen" alt="Unit tests (executed count)">
+<img src="https://img.shields.io/badge/integration_tests-0-blue" alt="Integration tests (executed count)">
+<!-- test-count:embed:end -->
+</p>
 
-This library is inspired by Echo and started as an adapter-oriented layer over it.
-
-Echo has been an excellent reference point for:
-
-- route registration ergonomics
-- context and middleware shape
-- practical web framework design
-
-`goforj/web` is intentionally beginning from that proven foundation, with the goal of growing more first-class GoForj experiences over time while keeping application code decoupled from any single web engine.
-
-Current scope:
-
-- `Context`
-- `Handler`
-- `Middleware`
-- `Router`
-
-This repo is intentionally starting narrow. Echo will be the first adapter, but app code should depend on `github.com/goforj/web`, not the adapter directly.
-
-First adapter:
-
-- `github.com/goforj/web/adapter/echoweb`
-
-## Preferred API
-
-Application code should use:
-
-- `web.Handler`
-- `web.Middleware`
-- `webmiddleware`
-
-## Development
-
-Run the focused adapter benchmark suite with:
+## Installation
 
 ```bash
-make bench
+go get github.com/goforj/web
 ```
 
-Run the full test suite with:
+## Quick Start
 
-```bash
-make test
+```go
+package main
+
+import (
+	"net/http"
+
+	"github.com/goforj/web"
+	"github.com/goforj/web/webtest"
+)
+
+func main() {
+	handler := web.Handler(func(c web.Context) error {
+		return c.Text(http.StatusOK, "ok")
+	})
+
+	ctx := webtest.NewContext(nil, nil, "/healthz", nil)
+	_ = handler(ctx)
+}
 ```
+
+## Packages
+
+- `web`: app-facing interfaces and route registration helpers
+- `webmiddleware`: reusable HTTP middleware
+- `adapter/echoweb`: Echo-backed adapter implementation
+- `webprometheus`: Prometheus middleware and scrape handler
+- `webindex`: route and OpenAPI index generation
+- `webtest`: lightweight handler testing context
+
+## API
+
+<!-- api:embed:start -->
+## API Index
+
+| Group | Functions |
+|------:|:-----------|
+| **Adapter** | [echoweb.Adapter.Echo](#echoweb-adapter-echo) [echoweb.Adapter.Router](#echoweb-adapter-router) [echoweb.Adapter.ServeHTTP](#echoweb-adapter-servehttp) [echoweb.New](#echoweb-new) [echoweb.NewServer](#echoweb-newserver) [echoweb.Server.Router](#echoweb-server-router) [echoweb.Server.Serve](#echoweb-server-serve) [echoweb.Server.ServeHTTP](#echoweb-server-servehttp) [echoweb.UnwrapContext](#echoweb-unwrapcontext) [echoweb.UnwrapWebSocketConn](#echoweb-unwrapwebsocketconn) [echoweb.Wrap](#echoweb-wrap) |
+| **Indexing** | [webindex.Run](#webindex-run) |
+| **Middleware** | [webmiddleware.AddTrailingSlash](#webmiddleware-addtrailingslash) [webmiddleware.AddTrailingSlashWithConfig](#webmiddleware-addtrailingslashwithconfig) [webmiddleware.BasicAuth](#webmiddleware-basicauth) [webmiddleware.BasicAuthWithConfig](#webmiddleware-basicauthwithconfig) [webmiddleware.BodyDump](#webmiddleware-bodydump) [webmiddleware.BodyDumpWithConfig](#webmiddleware-bodydumpwithconfig) [webmiddleware.BodyLimit](#webmiddleware-bodylimit) [webmiddleware.BodyLimitWithConfig](#webmiddleware-bodylimitwithconfig) [webmiddleware.CORS](#webmiddleware-cors) [webmiddleware.CORSWithConfig](#webmiddleware-corswithconfig) [webmiddleware.CSRF](#webmiddleware-csrf) [webmiddleware.CSRFWithConfig](#webmiddleware-csrfwithconfig) [webmiddleware.Compress](#webmiddleware-compress) [webmiddleware.ContextTimeout](#webmiddleware-contexttimeout) [webmiddleware.ContextTimeoutWithConfig](#webmiddleware-contexttimeoutwithconfig) [webmiddleware.CreateExtractors](#webmiddleware-createextractors) [webmiddleware.Decompress](#webmiddleware-decompress) [webmiddleware.DecompressWithConfig](#webmiddleware-decompresswithconfig) [webmiddleware.DefaultSkipper](#webmiddleware-defaultskipper) [webmiddleware.ErrorBodyDump](#webmiddleware-errorbodydump) [webmiddleware.ErrorBodyDumpWithConfig](#webmiddleware-errorbodydumpwithconfig) [webmiddleware.Gzip](#webmiddleware-gzip) [webmiddleware.GzipWithConfig](#webmiddleware-gzipwithconfig) [webmiddleware.HTTPSNonWWWRedirect](#webmiddleware-httpsnonwwwredirect) [webmiddleware.HTTPSNonWWWRedirectWithConfig](#webmiddleware-httpsnonwwwredirectwithconfig) [webmiddleware.HTTPSRedirect](#webmiddleware-httpsredirect) [webmiddleware.HTTPSRedirectWithConfig](#webmiddleware-httpsredirectwithconfig) [webmiddleware.HTTPSWWWRedirect](#webmiddleware-httpswwwredirect) [webmiddleware.HTTPSWWWRedirectWithConfig](#webmiddleware-httpswwwredirectwithconfig) [webmiddleware.KeyAuth](#webmiddleware-keyauth) [webmiddleware.KeyAuthWithConfig](#webmiddleware-keyauthwithconfig) [webmiddleware.MethodFromForm](#webmiddleware-methodfromform) [webmiddleware.MethodFromHeader](#webmiddleware-methodfromheader) [webmiddleware.MethodFromQuery](#webmiddleware-methodfromquery) [webmiddleware.MethodOverride](#webmiddleware-methodoverride) [webmiddleware.MethodOverrideWithConfig](#webmiddleware-methodoverridewithconfig) [webmiddleware.NewRandomBalancer](#webmiddleware-newrandombalancer) [webmiddleware.NewRateLimiterMemoryStore](#webmiddleware-newratelimitermemorystore) [webmiddleware.NewRateLimiterMemoryStoreWithConfig](#webmiddleware-newratelimitermemorystorewithconfig) [webmiddleware.NewRoundRobinBalancer](#webmiddleware-newroundrobinbalancer) [webmiddleware.NonWWWRedirect](#webmiddleware-nonwwwredirect) [webmiddleware.NonWWWRedirectWithConfig](#webmiddleware-nonwwwredirectwithconfig) [webmiddleware.Proxy](#webmiddleware-proxy) [webmiddleware.ProxyWithConfig](#webmiddleware-proxywithconfig) [webmiddleware.RateLimiter](#webmiddleware-ratelimiter) [webmiddleware.RateLimiterMemoryStore.Allow](#webmiddleware-ratelimitermemorystore-allow) [webmiddleware.RateLimiterWithConfig](#webmiddleware-ratelimiterwithconfig) [webmiddleware.Recover](#webmiddleware-recover) [webmiddleware.RecoverWithConfig](#webmiddleware-recoverwithconfig) [webmiddleware.RemoveTrailingSlash](#webmiddleware-removetrailingslash) [webmiddleware.RemoveTrailingSlashWithConfig](#webmiddleware-removetrailingslashwithconfig) [webmiddleware.RequestID](#webmiddleware-requestid) [webmiddleware.RequestIDWithConfig](#webmiddleware-requestidwithconfig) [webmiddleware.RequestLoggerWithConfig](#webmiddleware-requestloggerwithconfig) [webmiddleware.Rewrite](#webmiddleware-rewrite) [webmiddleware.RewriteWithConfig](#webmiddleware-rewritewithconfig) [webmiddleware.Secure](#webmiddleware-secure) [webmiddleware.SecureWithConfig](#webmiddleware-securewithconfig) [webmiddleware.Static](#webmiddleware-static) [webmiddleware.StaticWithConfig](#webmiddleware-staticwithconfig) [webmiddleware.Timeout](#webmiddleware-timeout) [webmiddleware.TimeoutWithConfig](#webmiddleware-timeoutwithconfig) [webmiddleware.WWWRedirect](#webmiddleware-wwwredirect) [webmiddleware.WWWRedirectWithConfig](#webmiddleware-wwwredirectwithconfig) |
+| **Prometheus** | [webprometheus.Default](#webprometheus-default) [webprometheus.Handler](#webprometheus-handler) [webprometheus.Metrics.Handler](#webprometheus-metrics-handler) [webprometheus.Metrics.Middleware](#webprometheus-metrics-middleware) [webprometheus.Middleware](#webprometheus-middleware) [webprometheus.MustNew](#webprometheus-mustnew) [webprometheus.New](#webprometheus-new) [webprometheus.RunPushGatewayGatherer](#webprometheus-runpushgatewaygatherer) [webprometheus.WriteGatheredMetrics](#webprometheus-writegatheredmetrics) |
+| **Route Reporting** | [BuildRouteEntries](#buildrouteentries) [RenderRouteTable](#renderroutetable) |
+| **Routing** | [MountRouter](#mountrouter) [NewRoute](#newroute) [NewRouteGroup](#newroutegroup) [NewWebSocketRoute](#newwebsocketroute) [RegisterRoutes](#registerroutes) [Route.Handler](#route-handler) [Route.HandlerName](#route-handlername) [Route.IsWebSocket](#route-iswebsocket) [Route.Method](#route-method) [Route.MiddlewareNames](#route-middlewarenames) [Route.Middlewares](#route-middlewares) [Route.Path](#route-path) [Route.WebSocketHandler](#route-websockethandler) [Route.WithMiddlewareNames](#route-withmiddlewarenames) [RouteGroup.MiddlewareNames](#routegroup-middlewarenames) [RouteGroup.Middlewares](#routegroup-middlewares) [RouteGroup.RoutePrefix](#routegroup-routeprefix) [RouteGroup.Routes](#routegroup-routes) [RouteGroup.WithMiddlewareNames](#routegroup-withmiddlewarenames) |
+| **Testing** | [webtest.NewContext](#webtest-newcontext) |
+
+
+## API Reference
+
+_Generated from public API comments and examples._
+
+### Adapter
+
+#### <a id="echoweb-adapter-echo"></a>echoweb.Adapter.Echo
+
+Echo returns the underlying Echo engine.
+
+```go
+adapter := echoweb.New()
+_ = adapter.Echo()
+// true
+```
+
+#### <a id="echoweb-adapter-router"></a>echoweb.Adapter.Router
+
+Router returns the app-facing router contract.
+
+```go
+adapter := echoweb.New()
+_ = adapter.Router()
+// true
+```
+
+#### <a id="echoweb-adapter-servehttp"></a>echoweb.Adapter.ServeHTTP
+
+ServeHTTP exposes the adapter as a standard http.Handler.
+
+```go
+adapter := echoweb.New()
+adapter.Router().GET("/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) })
+rr := httptest.NewRecorder()
+req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+adapter.ServeHTTP(rr, req)
+fmt.Println(rr.Code)
+// 204
+```
+
+#### <a id="echoweb-new"></a>echoweb.New
+
+New creates a new Echo-backed web adapter.
+
+```go
+adapter := echoweb.New()
+_ = adapter.Router()
+// true
+```
+
+#### <a id="echoweb-newserver"></a>echoweb.NewServer
+
+NewServer creates an Echo-backed server from web route groups and mounts.
+
+```go
+server, err := echoweb.NewServer(echoweb.ServerConfig{
+	RouteGroups: []web.RouteGroup{
+		web.NewRouteGroup("/api", []web.Route{
+			web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) }),
+		}),
+	},
+})
+fmt.Println(err == nil)
+// true true
+```
+
+#### <a id="echoweb-server-router"></a>echoweb.Server.Router
+
+Router exposes the app-facing router contract.
+
+```go
+server, _ := echoweb.NewServer(echoweb.ServerConfig{})
+_ = server.Router()
+// true
+```
+
+#### <a id="echoweb-server-serve"></a>echoweb.Server.Serve
+
+Serve starts the server and gracefully shuts it down when ctx is cancelled.
+
+```go
+server, _ := echoweb.NewServer(echoweb.ServerConfig{Addr: "127.0.0.1:0"})
+ctx, cancel := context.WithCancel(context.Background())
+cancel()
+fmt.Println(server.Serve(ctx) == nil)
+// true
+```
+
+#### <a id="echoweb-server-servehttp"></a>echoweb.Server.ServeHTTP
+
+ServeHTTP exposes the server as an http.Handler for tests and local probing.
+
+```go
+server, _ := echoweb.NewServer(echoweb.ServerConfig{
+	RouteGroups: []web.RouteGroup{
+		web.NewRouteGroup("/api", []web.Route{
+			web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) }),
+		}),
+	},
+})
+rr := httptest.NewRecorder()
+req := httptest.NewRequest(http.MethodGet, "/api/healthz", nil)
+server.ServeHTTP(rr, req)
+fmt.Println(rr.Code)
+// 204
+```
+
+#### <a id="echoweb-unwrapcontext"></a>echoweb.UnwrapContext
+
+UnwrapContext returns the underlying Echo context when the web.Context came from this adapter.
+
+```go
+adapter := echoweb.New()
+adapter.Router().GET("/healthz", func(c web.Context) error {
+	_, ok := echoweb.UnwrapContext(c)
+	fmt.Println(ok)
+	return c.NoContent(http.StatusOK)
+})
+rr := httptest.NewRecorder()
+req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+adapter.ServeHTTP(rr, req)
+// true
+```
+
+#### <a id="echoweb-unwrapwebsocketconn"></a>echoweb.UnwrapWebSocketConn
+
+UnwrapWebSocketConn returns the underlying gorilla websocket connection.
+
+```go
+_, ok := echoweb.UnwrapWebSocketConn(nil)
+fmt.Println(ok)
+// false
+```
+
+#### <a id="echoweb-wrap"></a>echoweb.Wrap
+
+Wrap exposes an existing Echo engine through the web.Router contract.
+
+```go
+adapter := echoweb.Wrap(nil)
+_ = adapter.Echo()
+// true
+```
+
+### Indexing
+
+#### <a id="webindex-run"></a>webindex.Run
+
+Run indexes API metadata from source and writes artifacts.
+
+```go
+manifest, err := webindex.Run(context.Background(), webindex.IndexOptions{
+	Root:    ".",
+	OutPath: "webindex.json",
+})
+fmt.Println(err == nil)
+// true true
+```
+
+### Middleware
+
+#### <a id="webmiddleware-addtrailingslash"></a>webmiddleware.AddTrailingSlash
+
+AddTrailingSlash adds a trailing slash to the request path.
+
+```go
+_ = webmiddleware.AddTrailingSlash()
+// true
+```
+
+#### <a id="webmiddleware-addtrailingslashwithconfig"></a>webmiddleware.AddTrailingSlashWithConfig
+
+AddTrailingSlashWithConfig returns trailing-slash middleware with config.
+
+```go
+_ = webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})
+// true
+```
+
+#### <a id="webmiddleware-basicauth"></a>webmiddleware.BasicAuth
+
+BasicAuth returns basic auth middleware.
+
+```go
+mw := webmiddleware.BasicAuth(func(user, pass string, c web.Context) (bool, error) {
+	return user == "demo" && pass == "secret", nil
+})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-basicauthwithconfig"></a>webmiddleware.BasicAuthWithConfig
+
+BasicAuthWithConfig returns basic auth middleware with config.
+
+```go
+mw := webmiddleware.BasicAuthWithConfig(webmiddleware.BasicAuthConfig{
+	Realm: "Example",
+	Validator: func(user, pass string, c web.Context) (bool, error) { return true, nil },
+})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-bodydump"></a>webmiddleware.BodyDump
+
+BodyDump captures request and response payloads.
+
+```go
+mw := webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-bodydumpwithconfig"></a>webmiddleware.BodyDumpWithConfig
+
+BodyDumpWithConfig captures request and response payloads with config.
+
+```go
+mw := webmiddleware.BodyDumpWithConfig(webmiddleware.BodyDumpConfig{
+	Handler: func(c web.Context, reqBody, resBody []byte) {},
+})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-bodylimit"></a>webmiddleware.BodyLimit
+
+BodyLimit returns middleware that limits request body size.
+
+```go
+_ = webmiddleware.BodyLimit("2KB")
+// true
+```
+
+#### <a id="webmiddleware-bodylimitwithconfig"></a>webmiddleware.BodyLimitWithConfig
+
+BodyLimitWithConfig returns body limit middleware with config.
+
+```go
+_ = webmiddleware.BodyLimitWithConfig(webmiddleware.BodyLimitConfig{Limit: "2KB"})
+// true
+```
+
+#### <a id="webmiddleware-cors"></a>webmiddleware.CORS
+
+CORS returns Cross-Origin Resource Sharing middleware.
+
+```go
+_ = webmiddleware.CORS()
+// true
+```
+
+#### <a id="webmiddleware-corswithconfig"></a>webmiddleware.CORSWithConfig
+
+CORSWithConfig returns CORS middleware with config.
+
+```go
+mw := webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{AllowOrigins: []string{"https://example.com"}})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-csrf"></a>webmiddleware.CSRF
+
+CSRF enables token-based CSRF protection.
+
+```go
+_ = webmiddleware.CSRF()
+// true
+```
+
+#### <a id="webmiddleware-csrfwithconfig"></a>webmiddleware.CSRFWithConfig
+
+CSRFWithConfig enables token-based CSRF protection with config.
+
+```go
+mw := webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{CookieName: "_csrf"})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-compress"></a>webmiddleware.Compress
+
+Compress is an alias for Gzip to match the checklist naming.
+
+```go
+_ = webmiddleware.Compress()
+// true
+```
+
+#### <a id="webmiddleware-contexttimeout"></a>webmiddleware.ContextTimeout
+
+ContextTimeout sets a timeout on the request context.
+
+```go
+_ = webmiddleware.ContextTimeout(2 * time.Second)
+// true
+```
+
+#### <a id="webmiddleware-contexttimeoutwithconfig"></a>webmiddleware.ContextTimeoutWithConfig
+
+ContextTimeoutWithConfig sets a timeout on the request context with config.
+
+```go
+_ = webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{Timeout: time.Second})
+// true
+```
+
+#### <a id="webmiddleware-createextractors"></a>webmiddleware.CreateExtractors
+
+CreateExtractors creates extractors from a lookup definition.
+
+```go
+extractors, err := webmiddleware.CreateExtractors("header:X-API-Key,query:token")
+fmt.Println(err == nil, len(extractors))
+// true 2
+```
+
+#### <a id="webmiddleware-decompress"></a>webmiddleware.Decompress
+
+Decompress decompresses gzip-encoded request bodies.
+
+```go
+_ = webmiddleware.Decompress()
+// true
+```
+
+#### <a id="webmiddleware-decompresswithconfig"></a>webmiddleware.DecompressWithConfig
+
+DecompressWithConfig decompresses gzip-encoded request bodies with config.
+
+```go
+_ = webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{})
+// true
+```
+
+#### <a id="webmiddleware-defaultskipper"></a>webmiddleware.DefaultSkipper
+
+DefaultSkipper always runs the middleware.
+
+```go
+fmt.Println(webmiddleware.DefaultSkipper(nil))
+// false
+```
+
+#### <a id="webmiddleware-errorbodydump"></a>webmiddleware.ErrorBodyDump
+
+ErrorBodyDump captures response bodies for non-2xx and non-3xx responses.
+
+```go
+mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-errorbodydumpwithconfig"></a>webmiddleware.ErrorBodyDumpWithConfig
+
+ErrorBodyDumpWithConfig captures response bodies for non-success responses with config.
+
+```go
+mw := webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
+	Handler: func(c web.Context, status int, body []byte) {},
+})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-gzip"></a>webmiddleware.Gzip
+
+Gzip compresses responses with gzip.
+
+```go
+_ = webmiddleware.Gzip()
+// true
+```
+
+#### <a id="webmiddleware-gzipwithconfig"></a>webmiddleware.GzipWithConfig
+
+GzipWithConfig compresses responses with gzip and config.
+
+```go
+_ = webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{MinLength: 256})
+// true
+```
+
+#### <a id="webmiddleware-httpsnonwwwredirect"></a>webmiddleware.HTTPSNonWWWRedirect
+
+HTTPSNonWWWRedirect redirects to https without www.
+
+```go
+_ = webmiddleware.HTTPSNonWWWRedirect()
+// true
+```
+
+#### <a id="webmiddleware-httpsnonwwwredirectwithconfig"></a>webmiddleware.HTTPSNonWWWRedirectWithConfig
+
+HTTPSNonWWWRedirectWithConfig returns HTTPS non-WWW redirect middleware with config.
+
+```go
+_ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// true
+```
+
+#### <a id="webmiddleware-httpsredirect"></a>webmiddleware.HTTPSRedirect
+
+HTTPSRedirect redirects http requests to https.
+
+```go
+_ = webmiddleware.HTTPSRedirect()
+// true
+```
+
+#### <a id="webmiddleware-httpsredirectwithconfig"></a>webmiddleware.HTTPSRedirectWithConfig
+
+HTTPSRedirectWithConfig returns HTTPS redirect middleware with config.
+
+```go
+_ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// true
+```
+
+#### <a id="webmiddleware-httpswwwredirect"></a>webmiddleware.HTTPSWWWRedirect
+
+HTTPSWWWRedirect redirects to https + www.
+
+```go
+_ = webmiddleware.HTTPSWWWRedirect()
+// true
+```
+
+#### <a id="webmiddleware-httpswwwredirectwithconfig"></a>webmiddleware.HTTPSWWWRedirectWithConfig
+
+HTTPSWWWRedirectWithConfig returns HTTPS+WWW redirect middleware with config.
+
+```go
+_ = webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// true
+```
+
+#### <a id="webmiddleware-keyauth"></a>webmiddleware.KeyAuth
+
+KeyAuth returns key auth middleware.
+
+```go
+mw := webmiddleware.KeyAuth(func(key string, c web.Context) (bool, error) {
+	return key == "demo-key", nil
+})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-keyauthwithconfig"></a>webmiddleware.KeyAuthWithConfig
+
+KeyAuthWithConfig returns key auth middleware with config.
+
+```go
+mw := webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
+	Validator: func(key string, c web.Context) (bool, error) { return true, nil },
+})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-methodfromform"></a>webmiddleware.MethodFromForm
+
+MethodFromForm gets an override method from a form field.
+
+```go
+getter := webmiddleware.MethodFromForm("_method")
+req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("_method=DELETE"))
+req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+ctx := webtest.NewContext(req, nil, "/", nil)
+fmt.Println(getter(ctx))
+// DELETE
+```
+
+#### <a id="webmiddleware-methodfromheader"></a>webmiddleware.MethodFromHeader
+
+MethodFromHeader gets an override method from a request header.
+
+```go
+getter := webmiddleware.MethodFromHeader("X-HTTP-Method-Override")
+ctx := webtest.NewContext(nil, nil, "/", nil)
+ctx.Request().Header.Set("X-HTTP-Method-Override", "PATCH")
+fmt.Println(getter(ctx))
+// PATCH
+```
+
+#### <a id="webmiddleware-methodfromquery"></a>webmiddleware.MethodFromQuery
+
+MethodFromQuery gets an override method from a query parameter.
+
+```go
+getter := webmiddleware.MethodFromQuery("_method")
+req := httptest.NewRequest(http.MethodPost, "/?_method=PUT", nil)
+ctx := webtest.NewContext(req, nil, "/", nil)
+fmt.Println(getter(ctx))
+// PUT
+```
+
+#### <a id="webmiddleware-methodoverride"></a>webmiddleware.MethodOverride
+
+MethodOverride returns method override middleware.
+
+```go
+_ = webmiddleware.MethodOverride()
+// true
+```
+
+#### <a id="webmiddleware-methodoverridewithconfig"></a>webmiddleware.MethodOverrideWithConfig
+
+MethodOverrideWithConfig returns method override middleware with config.
+
+```go
+_ = webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{})
+// true
+```
+
+#### <a id="webmiddleware-newrandombalancer"></a>webmiddleware.NewRandomBalancer
+
+NewRandomBalancer creates a random proxy balancer.
+
+```go
+target, _ := url.Parse("http://localhost:8080")
+balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
+_ = balancer
+// true
+```
+
+#### <a id="webmiddleware-newratelimitermemorystore"></a>webmiddleware.NewRateLimiterMemoryStore
+
+NewRateLimiterMemoryStore creates an in-memory rate limiter store.
+
+```go
+store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
+_ = store
+// true
+```
+
+#### <a id="webmiddleware-newratelimitermemorystorewithconfig"></a>webmiddleware.NewRateLimiterMemoryStoreWithConfig
+
+NewRateLimiterMemoryStoreWithConfig creates an in-memory rate limiter store with config.
+
+```go
+store := webmiddleware.NewRateLimiterMemoryStoreWithConfig(webmiddleware.RateLimiterMemoryStoreConfig{Rate: rate.Every(time.Second)})
+_ = store
+// true
+```
+
+#### <a id="webmiddleware-newroundrobinbalancer"></a>webmiddleware.NewRoundRobinBalancer
+
+NewRoundRobinBalancer creates a round-robin proxy balancer.
+
+```go
+target, _ := url.Parse("http://localhost:8080")
+balancer := webmiddleware.NewRoundRobinBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
+_ = balancer
+// true
+```
+
+#### <a id="webmiddleware-nonwwwredirect"></a>webmiddleware.NonWWWRedirect
+
+NonWWWRedirect redirects to the non-www host.
+
+```go
+_ = webmiddleware.NonWWWRedirect()
+// true
+```
+
+#### <a id="webmiddleware-nonwwwredirectwithconfig"></a>webmiddleware.NonWWWRedirectWithConfig
+
+NonWWWRedirectWithConfig returns non-WWW redirect middleware with config.
+
+```go
+_ = webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// true
+```
+
+#### <a id="webmiddleware-proxy"></a>webmiddleware.Proxy
+
+Proxy creates a proxy middleware.
+
+```go
+target, _ := url.Parse("http://localhost:8080")
+balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
+_ = webmiddleware.Proxy(balancer)
+// true
+```
+
+#### <a id="webmiddleware-proxywithconfig"></a>webmiddleware.ProxyWithConfig
+
+ProxyWithConfig creates a proxy middleware with config.
+
+```go
+target, _ := url.Parse("http://localhost:8080")
+mw := webmiddleware.ProxyWithConfig(webmiddleware.ProxyConfig{
+	Balancer: webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}}),
+})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-ratelimiter"></a>webmiddleware.RateLimiter
+
+RateLimiter creates a rate limiting middleware.
+
+```go
+store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
+_ = webmiddleware.RateLimiter(store)
+// true
+```
+
+#### <a id="webmiddleware-ratelimitermemorystore-allow"></a>webmiddleware.RateLimiterMemoryStore.Allow
+
+Allow checks whether the given identifier is allowed through.
+
+```go
+store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
+allowed, err := store.Allow("127.0.0.1")
+fmt.Println(err == nil, allowed)
+// true true
+```
+
+#### <a id="webmiddleware-ratelimiterwithconfig"></a>webmiddleware.RateLimiterWithConfig
+
+RateLimiterWithConfig creates a rate limiting middleware with config.
+
+```go
+store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
+mw := webmiddleware.RateLimiterWithConfig(webmiddleware.RateLimiterConfig{Store: store})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-recover"></a>webmiddleware.Recover
+
+Recover returns middleware that recovers panics from the handler chain.
+
+```go
+_ = webmiddleware.Recover()
+// true
+```
+
+#### <a id="webmiddleware-recoverwithconfig"></a>webmiddleware.RecoverWithConfig
+
+RecoverWithConfig returns recover middleware with config.
+
+```go
+_ = webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{})
+// true
+```
+
+#### <a id="webmiddleware-removetrailingslash"></a>webmiddleware.RemoveTrailingSlash
+
+RemoveTrailingSlash removes the trailing slash from the request path.
+
+```go
+_ = webmiddleware.RemoveTrailingSlash()
+// true
+```
+
+#### <a id="webmiddleware-removetrailingslashwithconfig"></a>webmiddleware.RemoveTrailingSlashWithConfig
+
+RemoveTrailingSlashWithConfig returns remove-trailing-slash middleware with config.
+
+```go
+_ = webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})
+// true
+```
+
+#### <a id="webmiddleware-requestid"></a>webmiddleware.RequestID
+
+RequestID returns middleware that sets a request id header and context value.
+
+```go
+mw := webmiddleware.RequestID()
+handler := mw(func(c web.Context) error {
+	fmt.Println(c.Get("request_id") != nil)
+	return c.NoContent(http.StatusOK)
+})
+ctx := webtest.NewContext(nil, nil, "/", nil)
+_ = handler(ctx)
+fmt.Println(ctx.Response().Header().Get("X-Request-ID") != "")
+// true
+// true
+```
+
+#### <a id="webmiddleware-requestidwithconfig"></a>webmiddleware.RequestIDWithConfig
+
+RequestIDWithConfig returns RequestID middleware with config.
+
+```go
+mw := webmiddleware.RequestIDWithConfig(webmiddleware.RequestIDConfig{
+	Generator: func() string { return "fixed-id" },
+})
+handler := mw(func(c web.Context) error { return c.NoContent(http.StatusOK) })
+ctx := webtest.NewContext(nil, nil, "/", nil)
+_ = handler(ctx)
+fmt.Println(ctx.Response().Header().Get("X-Request-ID"))
+// fixed-id
+```
+
+#### <a id="webmiddleware-requestloggerwithconfig"></a>webmiddleware.RequestLoggerWithConfig
+
+RequestLoggerWithConfig returns request logger middleware with config.
+
+```go
+mw := webmiddleware.RequestLoggerWithConfig(webmiddleware.RequestLoggerConfig{
+	LogValuesFunc: func(c web.Context, values webmiddleware.RequestLoggerValues) error { return nil },
+})
+_ = mw
+// true
+```
+
+#### <a id="webmiddleware-rewrite"></a>webmiddleware.Rewrite
+
+Rewrite rewrites the request path using wildcard rules.
+
+```go
+_ = webmiddleware.Rewrite(map[string]string{"/old/*": "/new/$1"})
+// true
+```
+
+#### <a id="webmiddleware-rewritewithconfig"></a>webmiddleware.RewriteWithConfig
+
+RewriteWithConfig rewrites the request path using wildcard and regex rules.
+
+```go
+fmt.Println(webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
+	Rules: map[string]string{"/old/*": "/new/$1"},
+}) != nil)
+// true
+```
+
+#### <a id="webmiddleware-secure"></a>webmiddleware.Secure
+
+Secure sets security-oriented response headers.
+
+```go
+_ = webmiddleware.Secure()
+// true
+```
+
+#### <a id="webmiddleware-securewithconfig"></a>webmiddleware.SecureWithConfig
+
+SecureWithConfig sets security-oriented response headers with config.
+
+```go
+_ = webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{ReferrerPolicy: "same-origin"})
+// true
+```
+
+#### <a id="webmiddleware-static"></a>webmiddleware.Static
+
+Static serves static content from the provided root.
+
+```go
+_ = webmiddleware.Static(".")
+// true
+```
+
+#### <a id="webmiddleware-staticwithconfig"></a>webmiddleware.StaticWithConfig
+
+StaticWithConfig serves static content using config.
+
+```go
+_ = webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{Root: "."})
+// true
+```
+
+#### <a id="webmiddleware-timeout"></a>webmiddleware.Timeout
+
+Timeout returns a response-timeout middleware.
+
+```go
+_ = webmiddleware.Timeout()
+// true
+```
+
+#### <a id="webmiddleware-timeoutwithconfig"></a>webmiddleware.TimeoutWithConfig
+
+TimeoutWithConfig returns a response-timeout middleware with config.
+
+```go
+_ = webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{Timeout: time.Second})
+// true
+```
+
+#### <a id="webmiddleware-wwwredirect"></a>webmiddleware.WWWRedirect
+
+WWWRedirect redirects to the www host.
+
+```go
+_ = webmiddleware.WWWRedirect()
+// true
+```
+
+#### <a id="webmiddleware-wwwredirectwithconfig"></a>webmiddleware.WWWRedirectWithConfig
+
+WWWRedirectWithConfig returns WWW redirect middleware with config.
+
+```go
+_ = webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})
+// true
+```
+
+### Prometheus
+
+#### <a id="webprometheus-default"></a>webprometheus.Default
+
+Default returns the package-level Prometheus metrics instance.
+
+```go
+_ = webprometheus.Default()
+// true
+```
+
+#### <a id="webprometheus-handler"></a>webprometheus.Handler
+
+Handler returns the package-level Prometheus scrape handler.
+
+```go
+_ = webprometheus.Handler()
+// true
+```
+
+#### <a id="webprometheus-metrics-handler"></a>webprometheus.Metrics.Handler
+
+Handler exposes the configured Prometheus metrics as a web.Handler.
+
+```go
+metrics, _ := webprometheus.New(webprometheus.Config{})
+_ = metrics.Handler()
+// true
+```
+
+#### <a id="webprometheus-metrics-middleware"></a>webprometheus.Metrics.Middleware
+
+Middleware records Prometheus metrics for each request.
+
+```go
+metrics, _ := webprometheus.New(webprometheus.Config{})
+_ = metrics.Middleware()
+// true
+```
+
+#### <a id="webprometheus-middleware"></a>webprometheus.Middleware
+
+Middleware returns the package-level Prometheus middleware.
+
+```go
+_ = webprometheus.Middleware()
+// true
+```
+
+#### <a id="webprometheus-mustnew"></a>webprometheus.MustNew
+
+MustNew creates a Metrics instance and panics on registration errors.
+
+```go
+_ = webprometheus.MustNew(webprometheus.Config{})
+// true
+```
+
+#### <a id="webprometheus-new"></a>webprometheus.New
+
+New creates a Metrics instance backed by Prometheus collectors.
+
+```go
+metrics, err := webprometheus.New(webprometheus.Config{Namespace: "app"})
+fmt.Println(err == nil)
+// true true
+```
+
+#### <a id="webprometheus-runpushgatewaygatherer"></a>webprometheus.RunPushGatewayGatherer
+
+RunPushGatewayGatherer starts pushing collected metrics until the context finishes.
+
+```go
+err := webprometheus.RunPushGatewayGatherer(context.Background(), webprometheus.PushGatewayConfig{})
+fmt.Println(err != nil)
+// true
+```
+
+#### <a id="webprometheus-writegatheredmetrics"></a>webprometheus.WriteGatheredMetrics
+
+WriteGatheredMetrics gathers collected metrics and writes them to the given writer.
+
+```go
+var buf bytes.Buffer
+err := webprometheus.WriteGatheredMetrics(&buf, prometheus.NewRegistry())
+fmt.Println(err == nil)
+// true
+```
+
+### Route Reporting
+
+#### <a id="buildrouteentries"></a>BuildRouteEntries
+
+BuildRouteEntries builds a sorted slice of route entries from registered groups and extra entries.
+
+```go
+entries := web.BuildRouteEntries([]web.RouteGroup{
+	web.NewRouteGroup("/api", []web.Route{
+		web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
+	}),
+})
+fmt.Println(entries[0].Path, entries[0].Methods[0])
+// /api/healthz GET
+```
+
+#### <a id="renderroutetable"></a>RenderRouteTable
+
+RenderRouteTable renders a route table using simple ASCII borders and ANSI colors.
+
+```go
+table := web.RenderRouteTable([]web.RouteEntry{{
+	Path:    "/api/healthz",
+	Handler: "monitoring.Healthz",
+	Methods: []string{"GET"},
+}})
+fmt.Println(strings.Contains(table, "/api/healthz"))
+// true
+```
+
+### Routing
+
+#### <a id="mountrouter"></a>MountRouter
+
+MountRouter applies mount-style router configuration in declaration order.
+
+```go
+adapter := echoweb.New()
+err := web.MountRouter(adapter.Router(), []web.RouterMount{
+	func(r web.Router) error {
+		r.GET("/healthz", func(c web.Context) error { return nil })
+		return nil
+	},
+})
+fmt.Println(err == nil)
+// true
+```
+
+#### <a id="newroute"></a>NewRoute
+
+NewRoute creates a new route using the app-facing web handler contract directly.
+
+```go
+route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error {
+	return c.NoContent(http.StatusOK)
+})
+fmt.Println(route.Method(), route.Path())
+// GET /healthz
+```
+
+#### <a id="newroutegroup"></a>NewRouteGroup
+
+NewRouteGroup wraps routes and their accompanied web middleware.
+
+```go
+group := web.NewRouteGroup("/api", []web.Route{
+	web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
+})
+fmt.Println(group.RoutePrefix(), len(group.Routes()))
+// /api 1
+```
+
+#### <a id="newwebsocketroute"></a>NewWebSocketRoute
+
+NewWebSocketRoute creates a websocket route using the app-facing websocket handler contract.
+
+```go
+route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error {
+	return nil
+})
+fmt.Println(route.IsWebSocket())
+// true
+```
+
+#### <a id="registerroutes"></a>RegisterRoutes
+
+RegisterRoutes registers route groups onto a router.
+
+```go
+adapter := echoweb.New()
+groups := []web.RouteGroup{
+	web.NewRouteGroup("/api", []web.Route{
+		web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
+	}),
+}
+err := web.RegisterRoutes(adapter.Router(), groups)
+fmt.Println(err == nil)
+// true
+```
+
+#### <a id="route-handler"></a>Route.Handler
+
+Handler returns the route handler.
+
+```go
+route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil })
+_ = route.Handler()
+// true
+```
+
+#### <a id="route-handlername"></a>Route.HandlerName
+
+HandlerName returns the original handler name for route reporting.
+
+```go
+route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil })
+fmt.Println(route.HandlerName() != "")
+// true
+```
+
+#### <a id="route-iswebsocket"></a>Route.IsWebSocket
+
+IsWebSocket reports whether this route upgrades to a websocket connection.
+
+```go
+route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error { return nil })
+fmt.Println(route.IsWebSocket())
+// true
+```
+
+#### <a id="route-method"></a>Route.Method
+
+Method returns the HTTP method.
+
+```go
+route := web.NewRoute(http.MethodPost, "/users", func(c web.Context) error { return nil })
+fmt.Println(route.Method())
+// POST
+```
+
+#### <a id="route-middlewarenames"></a>Route.MiddlewareNames
+
+MiddlewareNames returns original middleware names for route reporting.
+
+```go
+route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }).WithMiddlewareNames("auth")
+fmt.Println(route.MiddlewareNames()[0])
+// auth
+```
+
+#### <a id="route-middlewares"></a>Route.Middlewares
+
+Middlewares returns the route middleware slice.
+
+```go
+route := web.NewRoute(
+	http.MethodGet,
+	"/healthz",
+	func(c web.Context) error { return nil },
+	func(next web.Handler) web.Handler { return next },
+)
+fmt.Println(len(route.Middlewares()))
+// 1
+```
+
+#### <a id="route-path"></a>Route.Path
+
+Path returns the path of the route.
+
+```go
+route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil })
+fmt.Println(route.Path())
+// /healthz
+```
+
+#### <a id="route-websockethandler"></a>Route.WebSocketHandler
+
+WebSocketHandler returns the websocket route handler.
+
+```go
+route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error { return nil })
+_ = route.WebSocketHandler()
+// true
+```
+
+#### <a id="route-withmiddlewarenames"></a>Route.WithMiddlewareNames
+
+WithMiddlewareNames attaches reporting-only middleware names to the route.
+
+```go
+route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }).WithMiddlewareNames("auth", "trace")
+fmt.Println(len(route.MiddlewareNames()))
+// 2
+```
+
+#### <a id="routegroup-middlewarenames"></a>RouteGroup.MiddlewareNames
+
+MiddlewareNames returns original middleware names for route reporting.
+
+```go
+group := web.NewRouteGroup("/api", nil).WithMiddlewareNames("auth")
+fmt.Println(group.MiddlewareNames()[0])
+// auth
+```
+
+#### <a id="routegroup-middlewares"></a>RouteGroup.Middlewares
+
+Middlewares returns the middleware slice for the group.
+
+```go
+group := web.NewRouteGroup("/api", nil, func(next web.Handler) web.Handler { return next })
+fmt.Println(len(group.Middlewares()))
+// 1
+```
+
+#### <a id="routegroup-routeprefix"></a>RouteGroup.RoutePrefix
+
+RoutePrefix returns the group prefix.
+
+```go
+group := web.NewRouteGroup("/api", nil)
+fmt.Println(group.RoutePrefix())
+// /api
+```
+
+#### <a id="routegroup-routes"></a>RouteGroup.Routes
+
+Routes returns the routes in the group.
+
+```go
+group := web.NewRouteGroup("/api", []web.Route{
+	web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
+})
+fmt.Println(len(group.Routes()))
+// 1
+```
+
+#### <a id="routegroup-withmiddlewarenames"></a>RouteGroup.WithMiddlewareNames
+
+WithMiddlewareNames attaches reporting-only middleware names to the group.
+
+```go
+group := web.NewRouteGroup("/api", nil).WithMiddlewareNames("auth", "trace")
+fmt.Println(len(group.MiddlewareNames()))
+// 2
+```
+
+### Testing
+
+#### <a id="webtest-newcontext"></a>webtest.NewContext
+
+NewContext creates a new test context around the provided request/recorder pair.
+
+```go
+req := httptest.NewRequest(http.MethodGet, "/users/42?expand=roles", nil)
+ctx := webtest.NewContext(req, nil, "/users/:id", webtest.PathParams{"id": "42"})
+fmt.Println(ctx.Param("id"), ctx.Query("expand"))
+// 42 roles
+```
+<!-- api:embed:end -->

@@ -19,6 +19,10 @@ type RewriteConfig struct {
 var DefaultRewriteConfig = RewriteConfig{}
 
 // Rewrite rewrites the request path using wildcard rules.
+// @group Middleware
+// Example:
+// _ = webmiddleware.Rewrite(map[string]string{"/old/*": "/new/$1"})
+//	// true
 func Rewrite(rules map[string]string) web.Middleware {
 	config := DefaultRewriteConfig
 	config.Rules = rules
@@ -26,6 +30,12 @@ func Rewrite(rules map[string]string) web.Middleware {
 }
 
 // RewriteWithConfig rewrites the request path using wildcard and regex rules.
+// @group Middleware
+// Example:
+// fmt.Println(webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
+// 	Rules: map[string]string{"/old/*": "/new/$1"},
+// }) != nil)
+//	// true
 func RewriteWithConfig(config RewriteConfig) web.Middleware {
 	if config.Rules == nil && config.RegexRules == nil {
 		panic("web: rewrite middleware requires rewrite rules")

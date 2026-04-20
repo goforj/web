@@ -20,11 +20,19 @@ var DefaultMethodOverrideConfig = MethodOverrideConfig{
 }
 
 // MethodOverride returns method override middleware.
+// @group Middleware
+// Example:
+// _ = webmiddleware.MethodOverride()
+//	// true
 func MethodOverride() web.Middleware {
 	return MethodOverrideWithConfig(DefaultMethodOverrideConfig)
 }
 
 // MethodOverrideWithConfig returns method override middleware with config.
+// @group Middleware
+// Example:
+// _ = webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{})
+//	// true
 func MethodOverrideWithConfig(config MethodOverrideConfig) web.Middleware {
 	if config.Getter == nil {
 		config.Getter = DefaultMethodOverrideConfig.Getter
@@ -45,6 +53,13 @@ func MethodOverrideWithConfig(config MethodOverrideConfig) web.Middleware {
 }
 
 // MethodFromHeader gets an override method from a request header.
+// @group Middleware
+// Example:
+// getter := webmiddleware.MethodFromHeader("X-HTTP-Method-Override")
+// ctx := webtest.NewContext(nil, nil, "/", nil)
+// ctx.Request().Header.Set("X-HTTP-Method-Override", "PATCH")
+// fmt.Println(getter(ctx))
+//	// PATCH
 func MethodFromHeader(header string) MethodOverrideGetter {
 	return func(r web.Context) string {
 		return r.Header(header)
@@ -52,6 +67,14 @@ func MethodFromHeader(header string) MethodOverrideGetter {
 }
 
 // MethodFromForm gets an override method from a form field.
+// @group Middleware
+// Example:
+// getter := webmiddleware.MethodFromForm("_method")
+// req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("_method=DELETE"))
+// req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// fmt.Println(getter(ctx))
+//	// DELETE
 func MethodFromForm(param string) MethodOverrideGetter {
 	return func(r web.Context) string {
 		req := r.Request()
@@ -66,6 +89,13 @@ func MethodFromForm(param string) MethodOverrideGetter {
 }
 
 // MethodFromQuery gets an override method from a query parameter.
+// @group Middleware
+// Example:
+// getter := webmiddleware.MethodFromQuery("_method")
+// req := httptest.NewRequest(http.MethodPost, "/?_method=PUT", nil)
+// ctx := webtest.NewContext(req, nil, "/", nil)
+// fmt.Println(getter(ctx))
+//	// PUT
 func MethodFromQuery(param string) MethodOverrideGetter {
 	return func(r web.Context) string {
 		return r.Query(param)
