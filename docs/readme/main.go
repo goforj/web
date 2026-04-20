@@ -329,9 +329,14 @@ func renderAPI(funcs []*FuncDoc) string {
 		sort.Slice(items, func(i, j int) bool {
 			return items[i].DisplayName < items[j].DisplayName
 		})
+		commonPrefix := commonPackagePrefix(items)
 		links := make([]string, 0, len(items))
 		for _, fn := range items {
-			links = append(links, fmt.Sprintf("[%s](#%s)", fn.DisplayName, fn.Anchor))
+			label := fn.DisplayName
+			if commonPrefix != "" {
+				label = strings.TrimPrefix(label, commonPrefix+".")
+			}
+			links = append(links, fmt.Sprintf("[%s](#%s)", label, fn.Anchor))
 		}
 		buf.WriteString(fmt.Sprintf("| **%s** | %s |\n", group, strings.Join(links, " ")))
 	}
@@ -367,6 +372,27 @@ func renderAPI(funcs []*FuncDoc) string {
 		}
 	}
 	return strings.TrimSpace(buf.String()) + "\n"
+}
+
+func commonPackagePrefix(items []*FuncDoc) string {
+	if len(items) == 0 {
+		return ""
+	}
+	var prefix string
+	for i, fn := range items {
+		head, _, ok := strings.Cut(fn.DisplayName, ".")
+		if !ok {
+			return ""
+		}
+		if i == 0 {
+			prefix = head
+			continue
+		}
+		if head != prefix {
+			return ""
+		}
+	}
+	return prefix
 }
 
 func replaceSection(input, start, end, replacement string) (string, error) {
