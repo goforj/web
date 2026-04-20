@@ -283,6 +283,9 @@ func TestDefaultConvenienceAPIsAndHelpers(t *testing.T) {
 		if !strings.Contains(out.String(), "demo_total") {
 			t.Fatalf("metrics output = %s", out.String())
 		}
+		if err := WriteGatheredMetrics(failingWriter{}, registry); err == nil {
+			t.Fatal("WriteGatheredMetrics() should surface writer errors")
+		}
 
 		cfg := withDefaults(Config{})
 		if cfg.Namespace != defaultNamespace {
@@ -315,6 +318,9 @@ func TestDefaultConvenienceAPIsAndHelpers(t *testing.T) {
 		}
 		if got := normalizeStatus(true, http.StatusAccepted, "/path", nil); got != http.StatusAccepted {
 			t.Fatalf("normalizeStatus(committed) = %d", got)
+		}
+		if got := normalizeStatus(false, 0, "/path", nil); got != http.StatusOK {
+			t.Fatalf("normalizeStatus(default ok) = %d", got)
 		}
 		if got := normalizeSize(-1); got != 0 {
 			t.Fatalf("normalizeSize(-1) = %d", got)
@@ -370,6 +376,13 @@ func TestDefaultConvenienceAPIsAndHelpers(t *testing.T) {
 		_ = MustNew(Config{Registerer: failingRegisterer{err: errors.New("register failed")}, Gatherer: prometheus.NewRegistry()})
 	})
 
+	t.Run("new surfaces later collector registration failures", func(t *testing.T) {
+		registry := &countingRegisterer{failAt: 3, err: errors.New("register failed")}
+		if _, err := New(Config{Registerer: registry, Gatherer: prometheus.NewRegistry()}); err == nil || !strings.Contains(err.Error(), "register failed") {
+			t.Fatalf("New() error = %v", err)
+		}
+	})
+
 	t.Run("run push gateway handler paths", func(t *testing.T) {
 		registry := prometheus.NewRegistry()
 		counter := prometheus.NewCounter(prometheus.CounterOpts{Name: "push_total", Help: "push"})
@@ -396,9 +409,24 @@ func TestDefaultConvenienceAPIsAndHelpers(t *testing.T) {
 		if !errors.Is(err, handlerErr) {
 			t.Fatalf("RunPushGatewayGatherer() error = %v", err)
 		}
+
+		err = RunPushGatewayGatherer(context.Background(), PushGatewayConfig{
+			PushGatewayURL: "://bad",
+			PushInterval:   time.Millisecond,
+			Gatherer:       registry,
+			ErrorHandler: func(err error) error {
+				return handlerErr
+			},
+		})
+		if !errors.Is(err, handlerErr) {
+			t.Fatalf("RunPushGatewayGatherer(bad url) = %v", err)
+		}
 	})
 
 	t.Run("misc helpers", func(t *testing.T) {
+		if got := containsAt([]string{"a", "b"}, "a"); got != 0 {
+			t.Fatalf("containsAt(found) = %d", got)
+		}
 		if got := containsAt([]string{"a", "b"}, "z"); got != -1 {
 			t.Fatalf("containsAt() = %d", got)
 		}
@@ -419,43 +447,63 @@ type failingRegisterer struct {
 	err error
 }
 
-func (f failingRegisterer) Register(prometheus.Collector) error { return f.err }
+func (f failingRegisterer) Register(prometheus.Collector) error  { return f.err }
 func (f failingRegisterer) MustRegister(...prometheus.Collector) {}
 func (f failingRegisterer) Unregister(prometheus.Collector) bool { return false }
 
+type countingRegisterer struct {
+	count  int
+	failAt int
+	err    error
+}
+
+func (r *countingRegisterer) Register(prometheus.Collector) error {
+	r.count++
+	if r.count == r.failAt {
+		return r.err
+	}
+	return nil
+}
+func (*countingRegisterer) MustRegister(...prometheus.Collector) {}
+func (*countingRegisterer) Unregister(prometheus.Collector) bool { return false }
+
 type requestOnlyContext struct{}
 
-func (requestOnlyContext) Context() context.Context                    { return context.Background() }
-func (requestOnlyContext) Method() string                              { return http.MethodGet }
-func (requestOnlyContext) Path() string                                { return "" }
-func (requestOnlyContext) URI() string                                 { return "" }
-func (requestOnlyContext) Scheme() string                              { return "http" }
-func (requestOnlyContext) Host() string                                { return "example.com" }
-func (requestOnlyContext) Param(string) string                         { return "" }
-func (requestOnlyContext) Query(string) string                         { return "" }
-func (requestOnlyContext) Header(string) string                        { return "" }
-func (requestOnlyContext) Cookie(string) (*http.Cookie, error)         { return nil, http.ErrNoCookie }
-func (requestOnlyContext) RealIP() string                              { return "127.0.0.1" }
-func (requestOnlyContext) Request() *http.Request                      { return nil }
-func (requestOnlyContext) SetRequest(*http.Request)                    {}
-func (requestOnlyContext) Response() web.Response                      { return nil }
-func (requestOnlyContext) ResponseWriter() http.ResponseWriter         { return httptest.NewRecorder() }
-func (requestOnlyContext) SetResponseWriter(http.ResponseWriter)       {}
-func (requestOnlyContext) Bind(any) error                              { return nil }
-func (requestOnlyContext) Set(string, any)                             {}
-func (requestOnlyContext) Get(string) any                              { return nil }
-func (requestOnlyContext) AddHeader(string, string)                    {}
-func (requestOnlyContext) SetHeader(string, string)                    {}
-func (requestOnlyContext) SetCookie(*http.Cookie)                      {}
-func (requestOnlyContext) JSON(int, any) error                         { return nil }
-func (requestOnlyContext) Blob(int, string, []byte) error              { return nil }
-func (requestOnlyContext) File(string) error                           { return nil }
-func (requestOnlyContext) Text(int, string) error                      { return nil }
-func (requestOnlyContext) HTML(int, string) error                      { return nil }
-func (requestOnlyContext) NoContent(int) error                         { return nil }
-func (requestOnlyContext) Redirect(int, string) error                  { return nil }
-func (requestOnlyContext) StatusCode() int                             { return 0 }
-func (requestOnlyContext) Native() any                                 { return nil }
+func (requestOnlyContext) Context() context.Context              { return context.Background() }
+func (requestOnlyContext) Method() string                        { return http.MethodGet }
+func (requestOnlyContext) Path() string                          { return "" }
+func (requestOnlyContext) URI() string                           { return "" }
+func (requestOnlyContext) Scheme() string                        { return "http" }
+func (requestOnlyContext) Host() string                          { return "example.com" }
+func (requestOnlyContext) Param(string) string                   { return "" }
+func (requestOnlyContext) Query(string) string                   { return "" }
+func (requestOnlyContext) Header(string) string                  { return "" }
+func (requestOnlyContext) Cookie(string) (*http.Cookie, error)   { return nil, http.ErrNoCookie }
+func (requestOnlyContext) RealIP() string                        { return "127.0.0.1" }
+func (requestOnlyContext) Request() *http.Request                { return nil }
+func (requestOnlyContext) SetRequest(*http.Request)              {}
+func (requestOnlyContext) Response() web.Response                { return nil }
+func (requestOnlyContext) ResponseWriter() http.ResponseWriter   { return httptest.NewRecorder() }
+func (requestOnlyContext) SetResponseWriter(http.ResponseWriter) {}
+func (requestOnlyContext) Bind(any) error                        { return nil }
+func (requestOnlyContext) Set(string, any)                       {}
+func (requestOnlyContext) Get(string) any                        { return nil }
+func (requestOnlyContext) AddHeader(string, string)              {}
+func (requestOnlyContext) SetHeader(string, string)              {}
+func (requestOnlyContext) SetCookie(*http.Cookie)                {}
+func (requestOnlyContext) JSON(int, any) error                   { return nil }
+func (requestOnlyContext) Blob(int, string, []byte) error        { return nil }
+func (requestOnlyContext) File(string) error                     { return nil }
+func (requestOnlyContext) Text(int, string) error                { return nil }
+func (requestOnlyContext) HTML(int, string) error                { return nil }
+func (requestOnlyContext) NoContent(int) error                   { return nil }
+func (requestOnlyContext) Redirect(int, string) error            { return nil }
+func (requestOnlyContext) StatusCode() int                       { return 0 }
+func (requestOnlyContext) Native() any                           { return nil }
 
 var _ prometheus.Registerer = failingRegisterer{}
 var _ web.Context = requestOnlyContext{}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("write failed") }

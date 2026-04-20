@@ -14,10 +14,20 @@
   <a href="https://goreportcard.com/report/github.com/goforj/web"><img src="https://goreportcard.com/badge/github.com/goforj/web" alt="Go Report Card"></a>
   <a href="https://codecov.io/gh/goforj/web"><img src="https://codecov.io/gh/goforj/web/graph/badge.svg?token=Q0S6BVOM7R" alt="Codecov"></a>
 <!-- test-count:embed:start -->
-<img src="https://img.shields.io/badge/unit_tests-105-brightgreen" alt="Unit tests (executed count)">
-<img src="https://img.shields.io/badge/integration_tests-0-blue" alt="Integration tests (executed count)">
+<img src="https://img.shields.io/badge/unit_tests-213-brightgreen" alt="Unit tests (executed count)">
 <!-- test-count:embed:end -->
 </p>
+
+<!-- package-coverage:embed:start -->
+| Package | Coverage |
+|------|---------:|
+| `web` | 94.3% |
+| `adapter/echoweb` | 90.0% |
+| `webindex` | 90.3% |
+| `webmiddleware` | 89.2% |
+| `webprometheus` | 89.8% |
+| `webtest` | 100.0% |
+<!-- package-coverage:embed:end -->
 
 `web` is built on top of [Echo](https://echo.labstack.com/), which is a fantastic HTTP framework with a fast router, strong middleware story, and a mature ecosystem. GoForj wraps it so applications can code against a smaller app-facing contract while still getting a high-quality underlying engine, reusable middleware packages, testing helpers, route indexing, and framework-owned integration points like Prometheus and generated wiring.
 

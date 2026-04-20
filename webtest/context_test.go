@@ -2,6 +2,7 @@ package webtest
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -261,4 +262,54 @@ func TestNewContextProvidesDefaults(t *testing.T) {
 	if got := ctx.Param("missing"); got != "" {
 		t.Fatalf("Param(missing) = %q", got)
 	}
+}
+
+func TestContextRequestEdgeHelpers(t *testing.T) {
+	t.Run("uri handles nil url", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.URL = nil
+		ctx := NewContext(req, nil, "/", nil)
+		if got := ctx.URI(); got != "" {
+			t.Fatalf("URI() = %q", got)
+		}
+	})
+
+	t.Run("scheme covers tls forwarded and default", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "https://example.com", nil)
+		req.TLS = &tls.ConnectionState{}
+		if got := NewContext(req, nil, "/", nil).Scheme(); got != "https" {
+			t.Fatalf("Scheme(tls) = %q", got)
+		}
+
+		req = httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+		req.Header.Set("X-Forwarded-Proto", "https")
+		if got := NewContext(req, nil, "/", nil).Scheme(); got != "https" {
+			t.Fatalf("Scheme(forwarded) = %q", got)
+		}
+
+		req = httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+		if got := NewContext(req, nil, "/", nil).Scheme(); got != "http" {
+			t.Fatalf("Scheme(default) = %q", got)
+		}
+	})
+
+	t.Run("real ip covers header split hostport and fallback", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("X-Real-IP", "198.51.100.7")
+		if got := NewContext(req, nil, "/", nil).RealIP(); got != "198.51.100.7" {
+			t.Fatalf("RealIP(X-Real-IP) = %q", got)
+		}
+
+		req = httptest.NewRequest(http.MethodGet, "/", nil)
+		req.RemoteAddr = "203.0.113.9:4040"
+		if got := NewContext(req, nil, "/", nil).RealIP(); got != "203.0.113.9" {
+			t.Fatalf("RealIP(split hostport) = %q", got)
+		}
+
+		req = httptest.NewRequest(http.MethodGet, "/", nil)
+		req.RemoteAddr = "malformed-addr"
+		if got := NewContext(req, nil, "/", nil).RealIP(); got != "malformed-addr" {
+			t.Fatalf("RealIP(fallback) = %q", got)
+		}
+	})
 }

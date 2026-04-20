@@ -107,6 +107,110 @@ func TestRenderRouteTableIncludesTitleAndLegend(t *testing.T) {
 	}
 }
 
+func TestRouteListHelperFunctions(t *testing.T) {
+	t.Run("normalize methods and colorization", func(t *testing.T) {
+		all := append([]string(nil), allHTTPMethods...)
+		if got := normalizeMethods(all); got != "ALL" {
+			t.Fatalf("normalizeMethods(all) = %q", got)
+		}
+		notAll := append([]string(nil), allHTTPMethods...)
+		notAll[len(notAll)-1] = "CUSTOM"
+		if got := normalizeMethods(notAll); got == "ALL" {
+			t.Fatalf("normalizeMethods(notAll) = %q", got)
+		}
+		if got := normalizeMethods([]string{"POST", "GET", "GET"}); got != "GET, POST" {
+			t.Fatalf("normalizeMethods(mixed) = %q", got)
+		}
+		if got := colorize(ansiCell, ""); got != "" {
+			t.Fatalf("colorize(\"\") = %q", got)
+		}
+		if got := colorizeMethod("GET"); !strings.Contains(got, ansiGet) {
+			t.Fatalf("colorizeMethod(GET) = %q", got)
+		}
+		if got := colorizeMethod("GETWS"); !strings.Contains(got, ansiGet) {
+			t.Fatalf("colorizeMethod(GETWS) = %q", got)
+		}
+		if got := colorizeMethod("POST"); !strings.Contains(got, ansiPost) {
+			t.Fatalf("colorizeMethod(POST) = %q", got)
+		}
+		if got := colorizeMethod("PUT"); !strings.Contains(got, ansiPut) {
+			t.Fatalf("colorizeMethod(PUT) = %q", got)
+		}
+		if got := colorizeMethod("PATCH"); !strings.Contains(got, ansiPatch) {
+			t.Fatalf("colorizeMethod(PATCH) = %q", got)
+		}
+		if got := colorizeMethod("DELETE"); !strings.Contains(got, ansiDelete) {
+			t.Fatalf("colorizeMethod(DELETE) = %q", got)
+		}
+		if got := colorizeMethod("TRACE"); !strings.Contains(got, ansiCell) {
+			t.Fatalf("colorizeMethod(TRACE) = %q", got)
+		}
+		if got := colorizeMiddleware("auth"); !strings.Contains(got, ansiMiddleware) {
+			t.Fatalf("colorizeMiddleware(auth) = %q", got)
+		}
+	})
+
+	t.Run("middleware shortcode helpers", func(t *testing.T) {
+		entry := &RouteEntry{Middlewares: []string{
+			"webmiddleware.RequestID",
+			strings.Repeat("webmiddleware.ReallyLongMiddlewareName", 2),
+		}}
+		if !shouldUseMiddlewareShortcodes([]*RouteEntry{entry}) {
+			t.Fatal("shouldUseMiddlewareShortcodes() should enable legend for long middleware cells")
+		}
+		if shouldUseMiddlewareShortcodes([]*RouteEntry{{Middlewares: []string{"mw"}}}) {
+			t.Fatal("shouldUseMiddlewareShortcodes() should keep short middleware inline")
+		}
+		codeToName, nameToCode := buildMiddlewareShortcodes([]*RouteEntry{entry})
+		if len(codeToName) != 2 || len(nameToCode) != 2 {
+			t.Fatalf("shortcodes = %#v %#v", codeToName, nameToCode)
+		}
+		cfg := middlewareRenderConfig{useShortcodes: true, nameToCode: nameToCode}
+		rendered := renderMiddlewareCell(entry.Middlewares, cfg)
+		if strings.Contains(rendered, "ReallyLongMiddlewareName") {
+			t.Fatalf("renderMiddlewareCell() should use shortcode, got %q", rendered)
+		}
+		if got := renderMiddlewareCell([]string{"mw"}, middlewareRenderConfig{}); got != "mw" {
+			t.Fatalf("renderMiddlewareCell(default) = %q", got)
+		}
+	})
+
+	t.Run("name helpers", func(t *testing.T) {
+		if got := friendlyMiddlewareCode("webmiddleware.RequestID"); got == "" {
+			t.Fatal("friendlyMiddlewareCode() returned empty code")
+		}
+		if got := friendlyMiddlewareCode("requestOnly"); got != "O" {
+			t.Fatalf("friendlyMiddlewareCode(single) = %q", got)
+		}
+		if got := friendlyMiddlewareCode("."); got != "MW" {
+			t.Fatalf("friendlyMiddlewareCode(empty) = %q", got)
+		}
+		if got := uppercaseHint("RequestID"); got != "RID" {
+			t.Fatalf("uppercaseHint(RequestID) = %q", got)
+		}
+		if got := uppercaseHint("HTTPRequestWriter"); got != "HTTP" {
+			t.Fatalf("uppercaseHint(HTTPRequestWriter) = %q", got)
+		}
+		if got := uppercaseHint("request"); got != "R" {
+			t.Fatalf("uppercaseHint(request) = %q", got)
+		}
+		if got := uppercaseHint(""); got != "" {
+			t.Fatalf("uppercaseHint(empty) = %q", got)
+		}
+		pkg, fn := splitMiddlewareName("webmiddleware.RequestID")
+		if pkg != "webmiddleware" || fn != "RequestID" {
+			t.Fatalf("splitMiddlewareName() = (%q, %q)", pkg, fn)
+		}
+		pkg, fn = splitMiddlewareName("single")
+		if pkg != "single" || fn != "" {
+			t.Fatalf("splitMiddlewareName(single) = (%q, %q)", pkg, fn)
+		}
+		if got := fnvSuffix("demo", 1); got == 0 {
+			t.Fatal("fnvSuffix() should produce a non-zero byte")
+		}
+	})
+}
+
 func testRouteHandler(r Context) error { return nil }
 
 func testGroupMiddleware(next Handler) Handler {

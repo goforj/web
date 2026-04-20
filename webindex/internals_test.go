@@ -576,6 +576,94 @@ func TestIndexerHelpers(t *testing.T) {
 	}
 }
 
+func TestAdditionalIndexerHelpers(t *testing.T) {
+	t.Run("join path and string literal helpers", func(t *testing.T) {
+		if got := joinPath("", "/users"); got != "/users" {
+			t.Fatalf("joinPath(empty) = %q", got)
+		}
+		if got := joinPath("/api", "users"); got != "/api/users" {
+			t.Fatalf("joinPath(no leading slash) = %q", got)
+		}
+		if got := joinPath("/api/", "/users"); got != "/api/users" {
+			t.Fatalf("joinPath(trim) = %q", got)
+		}
+		if got := extractStringLiteral(&ast.BasicLit{Kind: token.STRING, Value: `"ok"`}); got != "ok" {
+			t.Fatalf("extractStringLiteral(string) = %q", got)
+		}
+		if got := extractStringLiteral(&ast.BasicLit{Kind: token.STRING, Value: `"unterminated`}); got != "" {
+			t.Fatalf("extractStringLiteral(bad quote) = %q", got)
+		}
+		if got := extractStringLiteral(&ast.Ident{Name: "value"}); got != "" {
+			t.Fatalf("extractStringLiteral(non-string) = %q", got)
+		}
+	})
+
+	t.Run("expr string and title helpers", func(t *testing.T) {
+		if got := exprString(nil); got != "" {
+			t.Fatalf("exprString(nil) = %q", got)
+		}
+		if got := exprString(&ast.Ident{Name: "payload"}); got != "payload" {
+			t.Fatalf("exprString(ident) = %q", got)
+		}
+		if got := openAPITitleFromRoot(""); got != "Forj Generated API" {
+			t.Fatalf("openAPITitleFromRoot(empty) = %q", got)
+		}
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, ".env"), []byte("# comment\nOTHER=1\nAPP_NAME=\"Quoted App\"\n"), 0o644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		if got := appNameFromDotEnv(root); got != "Quoted App" {
+			t.Fatalf("appNameFromDotEnv(quoted) = %q", got)
+		}
+	})
+
+	t.Run("json tag and candidate helpers", func(t *testing.T) {
+		if name, omitEmpty, ok := jsonTag(nil); name != "" || omitEmpty || ok {
+			t.Fatalf("jsonTag(nil) = (%q, %v, %v)", name, omitEmpty, ok)
+		}
+		if name, omitEmpty, ok := jsonTag(&ast.BasicLit{Kind: token.STRING, Value: "`yaml:\"name\"`"}); name != "" || omitEmpty || ok {
+			t.Fatalf("jsonTag(no json) = (%q, %v, %v)", name, omitEmpty, ok)
+		}
+		if name, omitEmpty, ok := jsonTag(&ast.BasicLit{Kind: token.STRING, Value: "`json:\",omitempty\"`"}); name != "" || !omitEmpty || !ok {
+			t.Fatalf("jsonTag(empty name) = (%q, %v, %v)", name, omitEmpty, ok)
+		}
+
+		only := []discoveredHandler{{Package: "api", Receiver: "*Controller"}}
+		if got := pickBestCandidate(only, "", ""); got != only[0] {
+			t.Fatalf("pickBestCandidate(single) = %+v", got)
+		}
+		candidates := []discoveredHandler{
+			{Package: "public", Receiver: "*Controller"},
+			{Package: "admin", Receiver: "*AdminController"},
+		}
+		if got := pickBestCandidate(candidates, "admin", "AdminController"); got.Package != "admin" {
+			t.Fatalf("pickBestCandidate(pkg+recv) = %+v", got)
+		}
+		if got := pickBestCandidate(candidates, "", "Controller"); got.Package != "public" {
+			t.Fatalf("pickBestCandidate(recv) = %+v", got)
+		}
+	})
+
+	t.Run("resolve type schema and json tag helpers", func(t *testing.T) {
+		typeSchemas := map[string]any{
+			typeSchemaKey("hello", "Input"):           map[string]any{"type": "object"},
+			typeSchemaKey("actualpkg", "CreateInput"): map[string]any{"type": "string"},
+		}
+		if _, ok := resolveTypeSchema("hello", "", typeSchemas); ok {
+			t.Fatal("resolveTypeSchema(empty) should fail")
+		}
+		if schema, ok := resolveTypeSchema("hello", "*Input", typeSchemas); !ok || schema == nil {
+			t.Fatalf("resolveTypeSchema(local) = (%v, %v)", schema, ok)
+		}
+		if schema, ok := resolveTypeSchema("hello", "alias.CreateInput", typeSchemas); !ok || schema == nil {
+			t.Fatalf("resolveTypeSchema(alias suffix) = (%v, %v)", schema, ok)
+		}
+		if _, ok := resolveTypeSchema("hello", "alias.Missing", typeSchemas); ok {
+			t.Fatal("resolveTypeSchema(missing) should fail")
+		}
+	})
+}
+
 func TestRunReturnsErrorWhenOutputPathIsDirectory(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
