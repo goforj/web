@@ -33,13 +33,13 @@ go get github.com/goforj/web
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/goforj/web"
 	"github.com/goforj/web/adapter/echoweb"
 	"github.com/goforj/web/webmiddleware"
-	"github.com/goforj/web/webprometheus"
 )
 
 func main() {
@@ -47,22 +47,24 @@ func main() {
 	adapter := echoweb.New()
 	router := adapter.Router()
 
-	// Attach reusable middleware for request IDs and Prometheus metrics.
-	metrics, _ := webprometheus.New(webprometheus.Config{Namespace: "app"})
-	prometheusMW := metrics.Middleware()
-	requestID := webmiddleware.RequestID()
+	// Attach common app middleware once near the top of the stack.
+	router.Use(
+		webmiddleware.Recover(),
+		webmiddleware.RequestID(),
+	)
 
-	router.Use(func(next web.Handler) web.Handler {
-		return requestID(prometheusMW(next))
-	})
-
-	// Register normal application routes.
+	// Register a basic health route for uptime checks and local smoke tests.
 	router.GET("/healthz", func(c web.Context) error {
 		return c.Text(http.StatusOK, "ok")
 	})
 
-	// Expose operational diagnostics on a dedicated route.
-	router.GET("/metrics", metrics.Handler())
+	// Register an actual application route that returns JSON.
+	router.GET("/users/:id", func(c web.Context) error {
+		return c.JSON(http.StatusOK, map[string]any{
+			"id":   c.Param("id"),
+			"name": fmt.Sprintf("user-%s", c.Param("id")),
+		})
+	})
 
 	// Boot the HTTP server with the adapter as the final handler.
 	log.Fatal(http.ListenAndServe(":8080", adapter))
