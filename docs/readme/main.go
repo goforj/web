@@ -338,7 +338,7 @@ func renderAPI(funcs []*FuncDoc) string {
 			}
 			links = append(links, fmt.Sprintf("[%s](#%s)", label, fn.Anchor))
 		}
-		buf.WriteString(fmt.Sprintf("| **%s** | %s |\n", group, strings.Join(links, " ")))
+		buf.WriteString(fmt.Sprintf("| **%s** | %s |\n", formatGroupLabelForIndex(group), strings.Join(links, " ")))
 	}
 
 	buf.WriteString("\n\n")
@@ -393,6 +393,13 @@ func commonPackagePrefix(items []*FuncDoc) string {
 		}
 	}
 	return prefix
+}
+
+func formatGroupLabelForIndex(group string) string {
+	if strings.HasPrefix(group, "Middleware - ") {
+		return "Middleware<br>" + strings.TrimPrefix(group, "Middleware - ")
+	}
+	return group
 }
 
 func replaceSection(input, start, end, replacement string) (string, error) {
