@@ -16,18 +16,19 @@
 <!-- test-count:embed:start -->
 <img src="https://img.shields.io/badge/unit_tests-213-brightgreen" alt="Unit tests (executed count)">
 <!-- test-count:embed:end -->
-</p>
-
-`web` is built on top of [Echo](https://echo.labstack.com/), which is a fantastic HTTP framework with a fast router, strong middleware story, and a mature ecosystem. GoForj wraps it so applications can code against a smaller app-facing contract while still getting a high-quality underlying engine, reusable middleware packages, testing helpers, route indexing, and framework-owned integration points like Prometheus and generated wiring.
-
 <!-- package-coverage:embed:start -->
+<p align="center">
 <img src="https://img.shields.io/badge/web-94.3%25-4c9a2a" alt="web coverage">
 <img src="https://img.shields.io/badge/adapter--echoweb-90.0%25-4c9a2a" alt="adapter/echoweb coverage">
 <img src="https://img.shields.io/badge/webindex-90.3%25-4c9a2a" alt="webindex coverage">
 <img src="https://img.shields.io/badge/webmiddleware-89.2%25-4c9a2a" alt="webmiddleware coverage">
 <img src="https://img.shields.io/badge/webprometheus-91.4%25-4c9a2a" alt="webprometheus coverage">
 <img src="https://img.shields.io/badge/webtest-100.0%25-4c9a2a" alt="webtest coverage">
+</p>
 <!-- package-coverage:embed:end -->
+</p>
+
+`web` is built on top of [Echo](https://echo.labstack.com/), which is a fantastic HTTP framework with a fast router, strong middleware story, and a mature ecosystem. GoForj wraps it so applications can code against a smaller app-facing contract while still getting a high-quality underlying engine, reusable middleware packages, testing helpers, route indexing, and framework-owned integration points like Prometheus and generated wiring.
 
 ## Installation
 
