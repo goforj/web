@@ -13,6 +13,8 @@
 <!-- test-count:embed:end -->
 </p>
 
+`web` is built on top of [Echo](https://echo.labstack.com/), which is a fantastic HTTP framework with a fast router, strong middleware story, and a mature ecosystem. GoForj wraps it so applications can code against a smaller app-facing contract while still getting a high-quality underlying engine, reusable middleware packages, testing helpers, route indexing, and framework-owned integration points like Prometheus and generated wiring.
+
 ## Installation
 
 ```bash
