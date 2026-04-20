@@ -21,7 +21,7 @@ type RequestLoggerConfig struct {
 }
 
 // RequestLoggerWithConfig returns request logger middleware with config.
-// @group Middleware
+// @group Middleware - Request Lifecycle
 // Example:
 // var loggedURI string
 // mw := webmiddleware.RequestLoggerWithConfig(webmiddleware.RequestLoggerConfig{

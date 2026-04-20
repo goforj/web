@@ -24,7 +24,7 @@ var DefaultTimeoutConfig = TimeoutConfig{
 }
 
 // Timeout returns a response-timeout middleware.
-// @group Middleware
+// @group Middleware - Request Lifecycle
 // Example:
 // ctx := webtest.NewContext(nil, nil, "/", nil)
 // handler := webmiddleware.Timeout()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
@@ -36,7 +36,7 @@ func Timeout() web.Middleware {
 }
 
 // TimeoutWithConfig returns a response-timeout middleware with config.
-// @group Middleware
+// @group Middleware - Request Lifecycle
 // Example:
 // ctx := webtest.NewContext(nil, nil, "/", nil)
 // handler := webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{Timeout: time.Second})(func(c web.Context) error {

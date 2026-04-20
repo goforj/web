@@ -30,7 +30,7 @@ var DefaultSecureConfig = SecureConfig{
 }
 
 // Secure sets security-oriented response headers.
-// @group Middleware
+// @group Middleware - Security
 // Example:
 // ctx := webtest.NewContext(nil, nil, "/", nil)
 // handler := webmiddleware.Secure()(func(c web.Context) error { return c.NoContent(http.StatusOK) })
@@ -42,7 +42,7 @@ func Secure() web.Middleware {
 }
 
 // SecureWithConfig sets security-oriented response headers with config.
-// @group Middleware
+// @group Middleware - Security
 // Example:
 // ctx := webtest.NewContext(nil, nil, "/", nil)
 // handler := webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{ReferrerPolicy: "same-origin"})(func(c web.Context) error {

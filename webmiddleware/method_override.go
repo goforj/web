@@ -20,7 +20,7 @@ var DefaultMethodOverrideConfig = MethodOverrideConfig{
 }
 
 // MethodOverride returns method override middleware.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodPost, "/", nil)
 // req.Header.Set("X-HTTP-Method-Override", http.MethodPatch)
@@ -36,7 +36,7 @@ func MethodOverride() web.Middleware {
 }
 
 // MethodOverrideWithConfig returns method override middleware with config.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodPost, "/?_method=DELETE", nil)
 // ctx := webtest.NewContext(req, nil, "/", nil)
@@ -68,7 +68,7 @@ func MethodOverrideWithConfig(config MethodOverrideConfig) web.Middleware {
 }
 
 // MethodFromHeader gets an override method from a request header.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // getter := webmiddleware.MethodFromHeader("X-HTTP-Method-Override")
 // ctx := webtest.NewContext(nil, nil, "/", nil)
@@ -82,7 +82,7 @@ func MethodFromHeader(header string) MethodOverrideGetter {
 }
 
 // MethodFromForm gets an override method from a form field.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // getter := webmiddleware.MethodFromForm("_method")
 // req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("_method=DELETE"))
@@ -104,7 +104,7 @@ func MethodFromForm(param string) MethodOverrideGetter {
 }
 
 // MethodFromQuery gets an override method from a query parameter.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // getter := webmiddleware.MethodFromQuery("_method")
 // req := httptest.NewRequest(http.MethodPost, "/?_method=PUT", nil)

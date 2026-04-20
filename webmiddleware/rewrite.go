@@ -19,7 +19,7 @@ type RewriteConfig struct {
 var DefaultRewriteConfig = RewriteConfig{}
 
 // Rewrite rewrites the request path using wildcard rules.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
 // ctx := webtest.NewContext(req, nil, "/old/*", nil)
@@ -36,7 +36,7 @@ func Rewrite(rules map[string]string) web.Middleware {
 }
 
 // RewriteWithConfig rewrites the request path using wildcard and regex rules.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
 // ctx := webtest.NewContext(req, nil, "/old/*", nil)

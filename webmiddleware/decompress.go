@@ -39,7 +39,7 @@ var DefaultDecompressConfig = DecompressConfig{
 }
 
 // Decompress decompresses gzip-encoded request bodies.
-// @group Middleware
+// @group Middleware - Compression
 // Example:
 // var body string
 // compressed := &bytes.Buffer{}
@@ -62,7 +62,7 @@ func Decompress() web.Middleware {
 }
 
 // DecompressWithConfig decompresses gzip-encoded request bodies with config.
-// @group Middleware
+// @group Middleware - Compression
 // Example:
 // req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("plain"))
 // ctx := webtest.NewContext(req, nil, "/", nil)

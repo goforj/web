@@ -23,7 +23,7 @@ var DefaultRequestIDConfig = RequestIDConfig{
 }
 
 // RequestID returns middleware that sets a request id header and context value.
-// @group Middleware
+// @group Middleware - Request Lifecycle
 // Example:
 // mw := webmiddleware.RequestID()
 // handler := mw(func(c web.Context) error {
@@ -40,7 +40,7 @@ func RequestID() web.Middleware {
 }
 
 // RequestIDWithConfig returns RequestID middleware with config.
-// @group Middleware
+// @group Middleware - Request Lifecycle
 // Example:
 // mw := webmiddleware.RequestIDWithConfig(webmiddleware.RequestIDConfig{
 // 	Generator: func() string { return "fixed-id" },

@@ -22,7 +22,7 @@ var DefaultRedirectConfig = RedirectConfig{
 type redirectLogic func(scheme string, host string, uri string) (bool, string)
 
 // HTTPSRedirect redirects http requests to https.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -34,7 +34,7 @@ func HTTPSRedirect() web.Middleware {
 }
 
 // HTTPSRedirectWithConfig returns HTTPS redirect middleware with config.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -51,7 +51,7 @@ func HTTPSRedirectWithConfig(config RedirectConfig) web.Middleware {
 }
 
 // HTTPSWWWRedirect redirects to https + www.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -63,7 +63,7 @@ func HTTPSWWWRedirect() web.Middleware {
 }
 
 // HTTPSWWWRedirectWithConfig returns HTTPS+WWW redirect middleware with config.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -81,7 +81,7 @@ func HTTPSWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 }
 
 // HTTPSNonWWWRedirect redirects to https without www.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -93,7 +93,7 @@ func HTTPSNonWWWRedirect() web.Middleware {
 }
 
 // HTTPSNonWWWRedirectWithConfig returns HTTPS non-WWW redirect middleware with config.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -110,7 +110,7 @@ func HTTPSNonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 }
 
 // WWWRedirect redirects to the www host.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -122,7 +122,7 @@ func WWWRedirect() web.Middleware {
 }
 
 // WWWRedirectWithConfig returns WWW redirect middleware with config.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -139,7 +139,7 @@ func WWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 }
 
 // NonWWWRedirect redirects to the non-www host.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)
@@ -151,7 +151,7 @@ func NonWWWRedirect() web.Middleware {
 }
 
 // NonWWWRedirectWithConfig returns non-WWW redirect middleware with config.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
 // ctx := webtest.NewContext(req, nil, "/docs", nil)

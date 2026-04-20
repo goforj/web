@@ -23,7 +23,7 @@ var DefaultErrorBodyDumpConfig = ErrorBodyDumpConfig{
 }
 
 // ErrorBodyDump captures response bodies for non-2xx and non-3xx responses.
-// @group Middleware
+// @group Middleware - Payloads
 // Example:
 // var captured string
 // mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
@@ -41,7 +41,7 @@ func ErrorBodyDump(handler ErrorBodyDumpHandler) web.Middleware {
 }
 
 // ErrorBodyDumpWithConfig captures response bodies for non-success responses with config.
-// @group Middleware
+// @group Middleware - Payloads
 // Example:
 // mw := webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
 // 	Handler: func(c web.Context, status int, body []byte) { fmt.Println(status) },

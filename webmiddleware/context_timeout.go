@@ -16,7 +16,7 @@ type ContextTimeoutConfig struct {
 }
 
 // ContextTimeout sets a timeout on the request context.
-// @group Middleware
+// @group Middleware - Request Lifecycle
 // Example:
 // ctx := webtest.NewContext(nil, nil, "/", nil)
 // handler := webmiddleware.ContextTimeout(2 * time.Second)(func(c web.Context) error {
@@ -30,7 +30,7 @@ func ContextTimeout(timeout time.Duration) web.Middleware {
 }
 
 // ContextTimeoutWithConfig sets a timeout on the request context with config.
-// @group Middleware
+// @group Middleware - Request Lifecycle
 // Example:
 // ctx := webtest.NewContext(nil, nil, "/", nil)
 // handler := webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{Timeout: time.Second})(func(c web.Context) error {

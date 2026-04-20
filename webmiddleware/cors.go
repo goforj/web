@@ -34,7 +34,7 @@ var DefaultCORSConfig = CORSConfig{
 }
 
 // CORS returns Cross-Origin Resource Sharing middleware.
-// @group Middleware
+// @group Middleware - Security
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/", nil)
 // req.Header.Set("Origin", "https://example.com")
@@ -48,7 +48,7 @@ func CORS() web.Middleware {
 }
 
 // CORSWithConfig returns CORS middleware with config.
-// @group Middleware
+// @group Middleware - Security
 // Example:
 // mw := webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{AllowOrigins: []string{"https://example.com"}})
 // req := httptest.NewRequest(http.MethodGet, "/", nil)

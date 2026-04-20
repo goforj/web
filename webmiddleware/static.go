@@ -46,7 +46,7 @@ const staticIndexHTML = `
 `
 
 // Static serves static content from the provided root.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // dir, _ := os.MkdirTemp("", "web-static-*")
 // defer os.RemoveAll(dir)
@@ -63,7 +63,7 @@ func Static(root string) web.Middleware {
 }
 
 // StaticWithConfig serves static content using config.
-// @group Middleware
+// @group Middleware - Routing
 // Example:
 // dir, _ := os.MkdirTemp("", "web-static-*")
 // defer os.RemoveAll(dir)

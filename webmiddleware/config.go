@@ -6,7 +6,7 @@ import "github.com/goforj/web"
 type Skipper func(web.Context) bool
 
 // DefaultSkipper always runs the middleware.
-// @group Middleware
+// @group Middleware - Request Lifecycle
 // Example:
 // fmt.Println(webmiddleware.DefaultSkipper(nil))
 //	// false

@@ -30,7 +30,7 @@ var DefaultGzipConfig = GzipConfig{
 }
 
 // Gzip compresses responses with gzip.
-// @group Middleware
+// @group Middleware - Compression
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/", nil)
 // req.Header.Set("Accept-Encoding", "gzip")
@@ -46,7 +46,7 @@ func Gzip() web.Middleware {
 }
 
 // Compress is an alias for Gzip to match the checklist naming.
-// @group Middleware
+// @group Middleware - Compression
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/", nil)
 // req.Header.Set("Accept-Encoding", "gzip")
@@ -62,7 +62,7 @@ func Compress() web.Middleware {
 }
 
 // GzipWithConfig compresses responses with gzip and config.
-// @group Middleware
+// @group Middleware - Compression
 // Example:
 // req := httptest.NewRequest(http.MethodGet, "/", nil)
 // req.Header.Set("Accept-Encoding", "gzip")

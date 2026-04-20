@@ -14,7 +14,7 @@ type BodyLimitConfig struct {
 }
 
 // BodyLimit returns middleware that limits request body size.
-// @group Middleware
+// @group Middleware - Payloads
 // Example:
 // req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("hello"))
 // ctx := webtest.NewContext(req, nil, "/", nil)
@@ -29,7 +29,7 @@ func BodyLimit(limit string) web.Middleware {
 }
 
 // BodyLimitWithConfig returns body limit middleware with config.
-// @group Middleware
+// @group Middleware - Payloads
 // Example:
 // req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ok"))
 // ctx := webtest.NewContext(req, nil, "/", nil)

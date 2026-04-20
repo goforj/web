@@ -53,7 +53,7 @@ var DefaultRateLimiterConfig = RateLimiterConfig{
 }
 
 // RateLimiter creates a rate limiting middleware.
-// @group Middleware
+// @group Middleware - Rate Limiting
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 // handler := webmiddleware.RateLimiter(store)(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
@@ -74,7 +74,7 @@ func RateLimiter(store RateLimiterStore) web.Middleware {
 }
 
 // RateLimiterWithConfig creates a rate limiting middleware with config.
-// @group Middleware
+// @group Middleware - Rate Limiting
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 // mw := webmiddleware.RateLimiterWithConfig(webmiddleware.RateLimiterConfig{Store: store})
@@ -150,7 +150,7 @@ type visitor struct {
 }
 
 // NewRateLimiterMemoryStore creates an in-memory rate limiter store.
-// @group Middleware
+// @group Middleware - Rate Limiting
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 // allowed1, _ := store.Allow("192.0.2.1")
@@ -162,7 +162,7 @@ func NewRateLimiterMemoryStore(limit rate.Limit) *RateLimiterMemoryStore {
 }
 
 // NewRateLimiterMemoryStoreWithConfig creates an in-memory rate limiter store with config.
-// @group Middleware
+// @group Middleware - Rate Limiting
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStoreWithConfig(webmiddleware.RateLimiterMemoryStoreConfig{Rate: rate.Every(time.Second)})
 // allowed, _ := store.Allow("192.0.2.1")
@@ -187,7 +187,7 @@ func NewRateLimiterMemoryStoreWithConfig(config RateLimiterMemoryStoreConfig) *R
 }
 
 // Allow checks whether the given identifier is allowed through.
-// @group Middleware
+// @group Middleware - Rate Limiting
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 // allowed, err := store.Allow("127.0.0.1")

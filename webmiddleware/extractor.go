@@ -24,7 +24,7 @@ var (
 type ValuesExtractor func(web.Context) ([]string, error)
 
 // CreateExtractors creates extractors from a lookup definition.
-// @group Middleware
+// @group Middleware - Auth
 // Example:
 // extractors, err := webmiddleware.CreateExtractors("header:X-API-Key,query:token")
 // fmt.Println(err == nil, len(extractors))

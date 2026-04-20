@@ -43,7 +43,7 @@ type roundRobinBalancer struct {
 }
 
 // NewRandomBalancer creates a random proxy balancer.
-// @group Middleware
+// @group Middleware - Proxying
 // Example:
 // target, _ := url.Parse("http://localhost:8080")
 // balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
@@ -57,7 +57,7 @@ func NewRandomBalancer(targets []*ProxyTarget) ProxyBalancer {
 }
 
 // NewRoundRobinBalancer creates a round-robin proxy balancer.
-// @group Middleware
+// @group Middleware - Proxying
 // Example:
 // target, _ := url.Parse("http://localhost:8080")
 // balancer := webmiddleware.NewRoundRobinBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
@@ -136,7 +136,7 @@ var DefaultProxyConfig = ProxyConfig{
 }
 
 // Proxy creates a proxy middleware.
-// @group Middleware
+// @group Middleware - Proxying
 // Example:
 // target, _ := url.Parse("http://localhost:8080")
 // balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
@@ -152,7 +152,7 @@ func Proxy(balancer ProxyBalancer) web.Middleware {
 }
 
 // ProxyWithConfig creates a proxy middleware with config.
-// @group Middleware
+// @group Middleware - Proxying
 // Example:
 // target, _ := url.Parse("http://localhost:8080")
 // mw := webmiddleware.ProxyWithConfig(webmiddleware.ProxyConfig{

@@ -26,7 +26,7 @@ var DefaultBodyDumpConfig = BodyDumpConfig{
 }
 
 // BodyDump captures request and response payloads.
-// @group Middleware
+// @group Middleware - Payloads
 // Example:
 // var captured string
 // mw := webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {
@@ -45,7 +45,7 @@ func BodyDump(handler BodyDumpHandler) web.Middleware {
 }
 
 // BodyDumpWithConfig captures request and response payloads with config.
-// @group Middleware
+// @group Middleware - Payloads
 // Example:
 // mw := webmiddleware.BodyDumpWithConfig(webmiddleware.BodyDumpConfig{
 // 	Handler: func(c web.Context, reqBody, resBody []byte) { fmt.Println(string(resBody)) },

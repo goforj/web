@@ -22,7 +22,7 @@ var DefaultRecoverConfig = RecoverConfig{
 }
 
 // Recover returns middleware that recovers panics from the handler chain.
-// @group Middleware
+// @group Middleware - Reliability
 // Example:
 // ctx := webtest.NewContext(nil, nil, "/", nil)
 // handler := webmiddleware.Recover()(func(c web.Context) error {
@@ -35,7 +35,7 @@ func Recover() web.Middleware {
 }
 
 // RecoverWithConfig returns recover middleware with config.
-// @group Middleware
+// @group Middleware - Reliability
 // Example:
 // ctx := webtest.NewContext(nil, nil, "/", nil)
 // handler := webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{DisableErrorHandler: true})(func(c web.Context) error {
