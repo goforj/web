@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            examples/go.mod
+            examples/go.sum
+
+      - name: Download dependencies
+        run: |
+          go mod download
+          cd examples
+          GOWORK=off go mod download
+
+      - name: Run root tests
+        run: go test ./... -v
+
+      - name: Verify generated examples compile
+        run: |
+          cd examples
+          GOWORK=off go test ./... -v
+
+  race:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: true
+          cache-dependency-path: |
+            go.sum
+
+      - name: Run race tests
+        run: go test -race ./...
+
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "stable"
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            examples/go.mod
+            examples/go.sum
+
+      - name: Run combined coverage
+        run: scripts/coverage-codecov.sh
+
+      - name: Upload results to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.txt
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
