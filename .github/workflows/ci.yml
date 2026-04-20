@@ -74,7 +74,7 @@ jobs:
             examples/go.sum
 
       - name: Run combined coverage
-        run: scripts/coverage-codecov.sh
+        run: bash scripts/coverage-codecov.sh
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
