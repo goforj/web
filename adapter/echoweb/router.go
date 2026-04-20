@@ -130,20 +130,23 @@ func (r *routerAdapter) Group(prefix string, middleware ...web.Middleware) web.R
 
 func adaptRouterMiddlewares(r *routerAdapter) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c *echo.Context) error {
-			if len(r.middlewares) == 0 {
-				return next(c)
+		if len(r.middlewares) == 0 {
+			return next
+		}
+
+		adapted := func(ctx web.Context) error {
+			native, ok := UnwrapContext(ctx)
+			if !ok {
+				return echo.ErrInternalServerError
 			}
+			return next(native)
+		}
+		applied := applyMiddlewares(adapted, r.middlewares...)
+
+		return func(c *echo.Context) error {
 			adaptedCtx := acquireContextAdapter(c)
 			defer releaseContextAdapter(adaptedCtx)
-			adapted := func(ctx web.Context) error {
-				native, ok := UnwrapContext(ctx)
-				if !ok {
-					return echo.ErrInternalServerError
-				}
-				return next(native)
-			}
-			return applyMiddlewares(adapted, r.middlewares...)(adaptedCtx)
+			return applied(adaptedCtx)
 		}
 	}
 }

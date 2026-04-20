@@ -55,6 +55,9 @@ func TimeoutWithConfig(config TimeoutConfig) web.Middleware {
 			if config.Skipper(r) || config.Timeout == 0 {
 				return next(r)
 			}
+			if protectable, ok := r.(interface{ DisableReuse() }); ok {
+				protectable.DisableReuse()
+			}
 
 			errCh := make(chan error, 1)
 			wrapper := timeoutHandler{

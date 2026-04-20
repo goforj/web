@@ -10,31 +10,39 @@ import (
 )
 
 type contextAdapter struct {
-	echo     *echo.Context
-	response responseAdapter
+	echo           *echo.Context
+	echoResponse   *echo.Response
+	responseWriter http.ResponseWriter
+	reusable       bool
+	response       responseAdapter
 }
 
 var _ web.Context = (*contextAdapter)(nil)
 
 var contextAdapterPool = sync.Pool{
 	New: func() any {
-		return new(contextAdapter)
+		adapted := &contextAdapter{}
+		adapted.response.context = adapted
+		return adapted
 	},
 }
 
 func acquireContextAdapter(c *echo.Context) *contextAdapter {
 	adapted := contextAdapterPool.Get().(*contextAdapter)
 	adapted.echo = c
-	adapted.response.context = adapted
+	adapted.reusable = true
+	adapted.echoResponse = nil
+	adapted.responseWriter = nil
 	return adapted
 }
 
 func releaseContextAdapter(adapted *contextAdapter) {
-	if adapted == nil {
+	if adapted == nil || !adapted.reusable {
 		return
 	}
-	adapted.response.context = nil
 	adapted.echo = nil
+	adapted.echoResponse = nil
+	adapted.responseWriter = nil
 	contextAdapterPool.Put(adapted)
 }
 
@@ -100,6 +108,7 @@ func (c *contextAdapter) ResponseWriter() http.ResponseWriter {
 
 func (c *contextAdapter) SetResponseWriter(writer http.ResponseWriter) {
 	c.echo.SetResponse(writer)
+	c.refreshResponse()
 }
 
 func (c *contextAdapter) Bind(target any) error {
@@ -163,6 +172,26 @@ func (c *contextAdapter) Native() any {
 	return c.echo
 }
 
+func (c *contextAdapter) DisableReuse() {
+	c.reusable = false
+}
+
+func (c *contextAdapter) refreshResponse() {
+	if c == nil || c.echo == nil {
+		c.echoResponse = nil
+		c.responseWriter = nil
+		return
+	}
+	writer := c.echo.Response()
+	c.responseWriter = writer
+	response, err := echo.UnwrapResponse(writer)
+	if err != nil {
+		c.echoResponse = nil
+		return
+	}
+	c.echoResponse = response
+}
+
 type responseAdapter struct {
 	context *contextAdapter
 }
@@ -179,27 +208,28 @@ func (r *responseAdapter) Writer() http.ResponseWriter {
 
 func (r *responseAdapter) SetWriter(writer http.ResponseWriter) {
 	r.context.echo.SetResponse(writer)
+	r.context.refreshResponse()
 }
 
 func (r *responseAdapter) StatusCode() int {
-	response, err := echo.UnwrapResponse(r.context.echo.Response())
-	if err != nil || response == nil {
+	response := r.currentResponse()
+	if response == nil {
 		return 0
 	}
 	return response.Status
 }
 
 func (r *responseAdapter) Size() int64 {
-	response, err := echo.UnwrapResponse(r.context.echo.Response())
-	if err != nil || response == nil {
+	response := r.currentResponse()
+	if response == nil {
 		return 0
 	}
 	return response.Size
 }
 
 func (r *responseAdapter) Committed() bool {
-	response, err := echo.UnwrapResponse(r.context.echo.Response())
-	if err != nil || response == nil {
+	response := r.currentResponse()
+	if response == nil {
 		return false
 	}
 	return response.Committed
@@ -207,6 +237,16 @@ func (r *responseAdapter) Committed() bool {
 
 func (r *responseAdapter) Native() any {
 	return r.context.echo.Response()
+}
+
+func (r *responseAdapter) currentResponse() *echo.Response {
+	if r == nil || r.context == nil {
+		return nil
+	}
+	if r.context.responseWriter != r.context.echo.Response() {
+		r.context.refreshResponse()
+	}
+	return r.context.echoResponse
 }
 
 // UnwrapContext returns the underlying Echo context when the web.Context came from this adapter.
