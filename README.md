@@ -25,29 +25,131 @@ go get github.com/goforj/web
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/goforj/web"
-	"github.com/goforj/web/webtest"
+	"github.com/goforj/web/adapter/echoweb"
+	"github.com/goforj/web/webmiddleware"
+	"github.com/goforj/web/webprometheus"
 )
 
 func main() {
-	handler := web.Handler(func(c web.Context) error {
+	// Pick an adapter that satisfies the app-facing web.Router contract.
+	adapter := echoweb.New()
+	router := adapter.Router()
+
+	// Attach reusable middleware for request IDs and Prometheus metrics.
+	metrics, _ := webprometheus.New(webprometheus.Config{Namespace: "app"})
+	prometheusMW := metrics.Middleware()
+	requestID := webmiddleware.RequestID()
+
+	router.Use(func(next web.Handler) web.Handler {
+		return requestID(prometheusMW(next))
+	})
+
+	// Register normal application routes.
+	router.GET("/healthz", func(c web.Context) error {
 		return c.Text(http.StatusOK, "ok")
 	})
 
-	ctx := webtest.NewContext(nil, nil, "/healthz", nil)
-	_ = handler(ctx)
+	// Expose operational diagnostics on a dedicated route.
+	router.GET("/metrics", metrics.Handler())
+
+	// Boot the HTTP server with the adapter as the final handler.
+	log.Fatal(http.ListenAndServe(":8080", adapter))
 }
+```
+
+## Common Patterns
+
+### Route Groups
+
+```go
+routes := []web.Route{
+	web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error {
+		return c.NoContent(http.StatusOK)
+	}),
+	web.NewRoute(http.MethodGet, "/users", func(c web.Context) error {
+		return c.JSON(http.StatusOK, []map[string]any{{"id": 1}})
+	}),
+}
+
+group := web.NewRouteGroup("/api", routes)
+
+adapter := echoweb.New()
+_ = web.RegisterRoutes(adapter.Router(), []web.RouteGroup{group})
+```
+
+### Compose Middleware Around A Handler
+
+```go
+requestID := webmiddleware.RequestID()
+recoverer := webmiddleware.Recover()
+limiter := webmiddleware.RateLimiter(
+	webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second)),
+)
+
+handler := web.Handler(func(c web.Context) error {
+	return c.Text(http.StatusOK, "ok")
+})
+
+wrapped := requestID(recoverer(limiter(handler)))
+_ = wrapped
+```
+
+### Test A Handler End To End
+
+```go
+req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+ctx := webtest.NewContext(req, nil, "/healthz", nil)
+
+handler := webmiddleware.RequestID()(func(c web.Context) error {
+	return c.Text(http.StatusOK, "ok")
+})
+
+_ = handler(ctx)
+
+fmt.Println(ctx.StatusCode())
+fmt.Println(ctx.Response().Header().Get("X-Request-ID") != "")
+fmt.Println(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String())
+// 200
+// true
+// ok
+```
+
+### Expose Prometheus Metrics
+
+```go
+adapter := echoweb.New()
+metrics, _ := webprometheus.New(webprometheus.Config{Namespace: "app"})
+
+adapter.Router().Use(metrics.Middleware())
+adapter.Router().GET("/users", func(c web.Context) error {
+	return c.NoContent(http.StatusOK)
+})
+adapter.Router().GET("/metrics", metrics.Handler())
+```
+
+### Generate A Route Index
+
+```go
+manifest, err := webindex.Run(context.Background(), webindex.IndexOptions{
+	Root:    ".",
+	OutPath: "webindex.json",
+})
+
+fmt.Println(err == nil, manifest.Version != "")
+// true true
 ```
 
 ## Packages
 
-- `web`: app-facing interfaces and route registration helpers
-- `webmiddleware`: reusable HTTP middleware
-- `adapter/echoweb`: Echo-backed adapter implementation
+- `web`: app-facing interfaces, route registration, route reporting helpers
+- `adapter/echoweb`: Echo-backed adapter and server bootstrap
+- `webmiddleware`: grouped HTTP middleware for auth, routing, payloads, rate limiting, and more
 - `webprometheus`: Prometheus middleware and scrape handler
-- `webindex`: route and OpenAPI index generation
+- `webindex`: route manifest and OpenAPI index generation
 - `webtest`: lightweight handler testing context
 
 ## API
