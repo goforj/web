@@ -1,8 +1,4 @@
 <p align="center">
-  <strong>web</strong>
-</p>
-
-<p align="center">
   Minimal app-facing HTTP abstractions, middleware, adapters, and route indexing for GoForj.
 </p>
 
