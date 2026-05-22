@@ -33,6 +33,7 @@ func CreateExtractors(lookups string) ([]ValuesExtractor, error) {
 	return createExtractors(lookups, "")
 }
 
+// createExtractors builds value extractors from a comma-separated lookup specification.
 func createExtractors(lookups string, authScheme string) ([]ValuesExtractor, error) {
 	if lookups == "" {
 		return nil, nil
@@ -70,6 +71,7 @@ func createExtractors(lookups string, authScheme string) ([]ValuesExtractor, err
 	return out, nil
 }
 
+// parseLookup parses one lookup directive into its source, name, and trim-prefix parts.
 func parseLookup(raw string, authScheme string) (source string, name string, cutPrefix string, err error) {
 	parts := strings.Split(raw, ":")
 	if len(parts) < 2 {
@@ -91,6 +93,7 @@ func parseLookup(raw string, authScheme string) (source string, name string, cut
 	return source, name, cutPrefix, nil
 }
 
+// headerExtractor reads one or more values from a request header.
 func headerExtractor(name string, cutPrefix string) ValuesExtractor {
 	prefixLen := len(cutPrefix)
 	name = textproto.CanonicalMIMEHeaderKey(name)
@@ -124,6 +127,7 @@ func headerExtractor(name string, cutPrefix string) ValuesExtractor {
 	}
 }
 
+// queryExtractor reads one value from the request query string.
 func queryExtractor(name string) ValuesExtractor {
 	return func(r web.Context) ([]string, error) {
 		req := r.Request()
@@ -141,6 +145,7 @@ func queryExtractor(name string) ValuesExtractor {
 	}
 }
 
+// paramExtractor reads one value from a path parameter.
 func paramExtractor(name string) ValuesExtractor {
 	return func(r web.Context) ([]string, error) {
 		value := strings.TrimSpace(r.Param(name))
@@ -151,6 +156,7 @@ func paramExtractor(name string) ValuesExtractor {
 	}
 }
 
+// cookieExtractor reads one value from a cookie.
 func cookieExtractor(name string) ValuesExtractor {
 	return func(r web.Context) ([]string, error) {
 		cookie, err := r.Cookie(name)
@@ -161,6 +167,7 @@ func cookieExtractor(name string) ValuesExtractor {
 	}
 }
 
+// formExtractor reads one or more values from a submitted form.
 func formExtractor(name string) ValuesExtractor {
 	return func(r web.Context) ([]string, error) {
 		req := r.Request()

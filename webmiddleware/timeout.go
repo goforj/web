@@ -88,6 +88,7 @@ type timeoutHandler struct {
 	errCh      chan error
 }
 
+// ServeHTTP proxies a timed request while suppressing late writes after timeout.
 func (t timeoutHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	t.ctx.SetRequest(req)
 	originalWriter := t.ctx.ResponseWriter()
@@ -122,12 +123,14 @@ type ignorableWriter struct {
 	ignoreWrites bool
 }
 
+// Ignore toggles whether subsequent writes should be discarded.
 func (w *ignorableWriter) Ignore(ignore bool) {
 	w.lock.Lock()
 	w.ignoreWrites = ignore
 	w.lock.Unlock()
 }
 
+// WriteHeader forwards the response status unless writes are being ignored.
 func (w *ignorableWriter) WriteHeader(code int) {
 	w.lock.Lock()
 	defer w.lock.Unlock()
@@ -137,6 +140,7 @@ func (w *ignorableWriter) WriteHeader(code int) {
 	w.ResponseWriter.WriteHeader(code)
 }
 
+// Write forwards the response body unless writes are being ignored.
 func (w *ignorableWriter) Write(body []byte) (int, error) {
 	w.lock.Lock()
 	defer w.lock.Unlock()

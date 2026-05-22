@@ -102,6 +102,7 @@ func BasicAuthWithConfig(config BasicAuthConfig) web.Middleware {
 	}
 }
 
+// basicAuthChallenge formats a WWW-Authenticate challenge for the configured realm.
 func basicAuthChallenge(realm string) string {
 	if realm == defaultAuthRealm {
 		return basicAuthScheme + " realm=" + defaultAuthRealm

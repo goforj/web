@@ -103,6 +103,9 @@ func runLiveLoopbackBenchmark(b *testing.B, handler http.Handler, path string) {
 	transport.MaxIdleConnsPerHost = 256
 	transport.MaxConnsPerHost = 256
 
+	// Keep the benchmark on a real loopback server/client path so adapter
+	// comparisons include request parsing and socket churn instead of only
+	// in-process handler dispatch.
 	url := server.URL + path
 	var failures atomic.Int64
 

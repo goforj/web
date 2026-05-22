@@ -118,6 +118,7 @@ func RemoveTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 	}
 }
 
+// sanitizeURI normalizes an incoming URI so slash middleware can rewrite it safely.
 func sanitizeURI(uri string) string {
 	if len(uri) > 1 && (uri[0] == '\\' || uri[0] == '/') && (uri[1] == '\\' || uri[1] == '/') {
 		uri = "/" + strings.TrimLeft(uri, `/\`)

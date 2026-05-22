@@ -77,6 +77,7 @@ func RequestIDWithConfig(config RequestIDConfig) web.Middleware {
 	}
 }
 
+// defaultRequestIDGenerator generates the fallback request ID format.
 func defaultRequestIDGenerator() string {
 	var buf [16]byte
 	if _, err := rand.Read(buf[:]); err == nil {

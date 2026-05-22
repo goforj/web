@@ -22,6 +22,7 @@ type Decompressor interface {
 // DefaultGzipDecompressPool is the default gzip reader pool.
 type DefaultGzipDecompressPool struct{}
 
+// gzipDecompressPool returns the shared gzip reader pool used by the default decompressor.
 func (d *DefaultGzipDecompressPool) gzipDecompressPool() sync.Pool {
 	return sync.Pool{New: func() any { return new(gzip.Reader) }}
 }

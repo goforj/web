@@ -214,6 +214,7 @@ func (store *RateLimiterMemoryStore) Allow(identifier string) (bool, error) {
 	return limiter.AllowN(now, 1), nil
 }
 
+// cleanupStaleVisitors prunes expired visitor entries from the in-memory store.
 func (store *RateLimiterMemoryStore) cleanupStaleVisitors() {
 	now := store.timeNow()
 	for identifier, limiter := range store.visitors {

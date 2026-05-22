@@ -55,6 +55,7 @@ func run() error {
 	return os.WriteFile(readmePath, []byte(out), 0o644)
 }
 
+// FuncDoc describes one exported symbol for README API generation.
 type FuncDoc struct {
 	Key         string
 	DisplayName string
@@ -64,6 +65,7 @@ type FuncDoc struct {
 	Examples    []Example
 }
 
+// Example captures one extracted code example for a documented symbol.
 type Example struct {
 	Label string
 	Code  string

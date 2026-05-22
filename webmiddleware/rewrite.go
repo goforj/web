@@ -75,6 +75,7 @@ func RewriteWithConfig(config RewriteConfig) web.Middleware {
 	}
 }
 
+// wildcardRewriteRules compiles rewrite rules that contain wildcard patterns.
 func wildcardRewriteRules(rules map[string]string) map[*regexp.Regexp]string {
 	if len(rules) == 0 {
 		return nil
@@ -93,6 +94,7 @@ func wildcardRewriteRules(rules map[string]string) map[*regexp.Regexp]string {
 	return regexRules
 }
 
+// rewriteRequest rewrites the incoming request URL using the configured rules.
 func rewriteRequest(rules map[*regexp.Regexp]string, req *http.Request) error {
 	if len(rules) == 0 || req == nil || req.URL == nil {
 		return nil
@@ -133,6 +135,7 @@ func rewriteRequest(rules map[*regexp.Regexp]string, req *http.Request) error {
 	return nil
 }
 
+// rewriteCaptureTokens builds a replacer for regexp capture group tokens.
 func rewriteCaptureTokens(pattern *regexp.Regexp, input string) *strings.Replacer {
 	groups := pattern.FindAllStringSubmatch(input, -1)
 	if groups == nil {

@@ -164,10 +164,12 @@ func CSRFWithConfig(config CSRFConfig) web.Middleware {
 	}
 }
 
+// validateCSRFToken compares the masked token sent by the client with the stored token.
 func validateCSRFToken(token, clientToken string) bool {
 	return subtle.ConstantTimeCompare([]byte(token), []byte(clientToken)) == 1
 }
 
+// randomString returns a URL-safe random string of the requested length.
 func randomString(length uint8) string {
 	if length == 0 {
 		return ""

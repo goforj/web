@@ -143,6 +143,7 @@ func CORSWithConfig(config CORSConfig) web.Middleware {
 	}
 }
 
+// corsAllowedOrigin resolves the effective allowed origin for one request.
 func corsAllowedOrigin(origin string, config CORSConfig, allowOriginPatterns []*regexp.Regexp) (string, error) {
 	if config.AllowOriginFunc != nil {
 		allowed, err := config.AllowOriginFunc(origin)
@@ -174,6 +175,7 @@ func corsAllowedOrigin(origin string, config CORSConfig, allowOriginPatterns []*
 	return "", nil
 }
 
+// corsMatchSubdomain reports whether origin matches a wildcard subdomain pattern.
 func corsMatchSubdomain(origin string, pattern string) bool {
 	if !strings.Contains(pattern, "*") {
 		return false

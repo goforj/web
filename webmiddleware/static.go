@@ -166,10 +166,12 @@ func StaticWithConfig(config StaticConfig) web.Middleware {
 	}
 }
 
+// isIgnorableOpenFileError reports whether a static-file open error should fall through.
 func isIgnorableOpenFileError(err error) bool {
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, fs.ErrPermission)
 }
 
+// listDir renders a directory listing for the current request.
 func listDir(tpl *template.Template, name string, dir http.File, r web.Context) error {
 	files, err := dir.Readdir(-1)
 	if err != nil {

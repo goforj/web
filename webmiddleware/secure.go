@@ -97,6 +97,7 @@ func SecureWithConfig(config SecureConfig) web.Middleware {
 	}
 }
 
+// requestIsHTTPS reports whether the request should be treated as HTTPS.
 func requestIsHTTPS(r web.Context) bool {
 	if strings.EqualFold(r.Scheme(), "https") {
 		return true

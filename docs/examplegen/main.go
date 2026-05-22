@@ -94,6 +94,7 @@ replace %s => ..
 	return os.WriteFile(filepath.Join(examplesDir, "go.mod"), []byte(content), 0o644)
 }
 
+// FuncDoc describes one exported symbol for example-page generation.
 type FuncDoc struct {
 	Name       string
 	Slug       string
@@ -101,6 +102,7 @@ type FuncDoc struct {
 	Examples   []Example
 }
 
+// Example captures one extracted code example for a generated example page.
 type Example struct {
 	Label string
 	Line  int

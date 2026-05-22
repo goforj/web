@@ -242,6 +242,7 @@ func (c *Context) Native() any {
 	return c.recorder
 }
 
+// Response exposes the recorded response state for a test Context.
 type Response struct {
 	context *Context
 }

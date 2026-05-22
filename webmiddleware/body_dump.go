@@ -100,14 +100,17 @@ type bodyDumpResponseWriter struct {
 	http.ResponseWriter
 }
 
+// WriteHeader captures the response status code before forwarding it.
 func (w *bodyDumpResponseWriter) WriteHeader(code int) {
 	w.ResponseWriter.WriteHeader(code)
 }
 
+// Write captures response bytes before forwarding them.
 func (w *bodyDumpResponseWriter) Write(body []byte) (int, error) {
 	return w.Writer.Write(body)
 }
 
+// Flush forwards flushing when the wrapped writer supports it.
 func (w *bodyDumpResponseWriter) Flush() {
 	err := http.NewResponseController(w.ResponseWriter).Flush()
 	if err != nil && errors.Is(err, http.ErrNotSupported) {
@@ -115,10 +118,12 @@ func (w *bodyDumpResponseWriter) Flush() {
 	}
 }
 
+// Hijack forwards connection hijacking when the wrapped writer supports it.
 func (w *bodyDumpResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return http.NewResponseController(w.ResponseWriter).Hijack()
 }
 
+// Unwrap returns the wrapped response writer.
 func (w *bodyDumpResponseWriter) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }

@@ -67,6 +67,7 @@ func NewRoundRobinBalancer(targets []*ProxyTarget) ProxyBalancer {
 	return &roundRobinBalancer{commonBalancer: commonBalancer{targets: targets}}
 }
 
+// AddTarget adds a backend target when it is not already present.
 func (b *commonBalancer) AddTarget(target *ProxyTarget) bool {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -79,6 +80,7 @@ func (b *commonBalancer) AddTarget(target *ProxyTarget) bool {
 	return true
 }
 
+// RemoveTarget removes a backend target by name.
 func (b *commonBalancer) RemoveTarget(name string) bool {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -91,6 +93,7 @@ func (b *commonBalancer) RemoveTarget(name string) bool {
 	return false
 }
 
+// Next picks a random backend target.
 func (b *randomBalancer) Next(_ web.Context) *ProxyTarget {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -103,6 +106,7 @@ func (b *randomBalancer) Next(_ web.Context) *ProxyTarget {
 	return b.targets[b.random.Intn(len(b.targets))]
 }
 
+// Next picks the next backend target in round-robin order.
 func (b *roundRobinBalancer) Next(_ web.Context) *ProxyTarget {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()

@@ -68,6 +68,7 @@ func BodyLimitWithConfig(config BodyLimitConfig) web.Middleware {
 	}
 }
 
+// parseBodyLimit parses the configured body-size limit into bytes.
 func parseBodyLimit(raw string) (int64, error) {
 	value := strings.TrimSpace(strings.ToUpper(raw))
 	if value == "" {

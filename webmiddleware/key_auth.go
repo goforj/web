@@ -33,10 +33,12 @@ var DefaultKeyAuthConfig = KeyAuthConfig{
 	AuthScheme: "Bearer",
 }
 
+// Error reports that the configured key auth extractor could not find credentials.
 func (e *ErrKeyAuthMissing) Error() string {
 	return e.Err.Error()
 }
 
+// Unwrap returns the underlying cause for a missing key auth credential.
 func (e *ErrKeyAuthMissing) Unwrap() error {
 	return e.Err
 }
@@ -132,6 +134,7 @@ func KeyAuthWithConfig(config KeyAuthConfig) web.Middleware {
 	}
 }
 
+// normalizeExtractorError maps extractor failures to the public missing-key error shape.
 func normalizeExtractorError(err error) error {
 	switch err {
 	case nil:

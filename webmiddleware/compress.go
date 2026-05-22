@@ -156,12 +156,14 @@ type gzipResponseWriter struct {
 	code              int
 }
 
+// WriteHeader marks the response as compressed before writing the status code.
 func (w *gzipResponseWriter) WriteHeader(code int) {
 	w.Header().Del("Content-Length")
 	w.wroteHeader = true
 	w.code = code
 }
 
+// Write compresses response bytes before forwarding them.
 func (w *gzipResponseWriter) Write(body []byte) (int, error) {
 	if w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", http.DetectContentType(body))
@@ -184,6 +186,7 @@ func (w *gzipResponseWriter) Write(body []byte) (int, error) {
 	return w.Writer.Write(body)
 }
 
+// Flush flushes the gzip stream and then the underlying writer when possible.
 func (w *gzipResponseWriter) Flush() {
 	if !w.minLengthExceeded {
 		w.minLengthExceeded = true
@@ -200,14 +203,17 @@ func (w *gzipResponseWriter) Flush() {
 	_ = http.NewResponseController(w.ResponseWriter).Flush()
 }
 
+// Unwrap returns the wrapped response writer.
 func (w *gzipResponseWriter) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }
 
+// Hijack forwards connection hijacking when the wrapped writer supports it.
 func (w *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return http.NewResponseController(w.ResponseWriter).Hijack()
 }
 
+// Push forwards HTTP/2 server pushes when the wrapped writer supports them.
 func (w *gzipResponseWriter) Push(target string, opts *http.PushOptions) error {
 	if p, ok := w.ResponseWriter.(http.Pusher); ok {
 		return p.Push(target, opts)
@@ -215,6 +221,7 @@ func (w *gzipResponseWriter) Push(target string, opts *http.PushOptions) error {
 	return http.ErrNotSupported
 }
 
+// gzipCompressPool returns the gzip writer pool for one middleware config.
 func gzipCompressPool(config GzipConfig) sync.Pool {
 	return sync.Pool{
 		New: func() any {
@@ -227,6 +234,7 @@ func gzipCompressPool(config GzipConfig) sync.Pool {
 	}
 }
 
+// gzipBufferPool returns the buffer pool used by compressed responses.
 func gzipBufferPool() sync.Pool {
 	return sync.Pool{
 		New: func() any { return &bytes.Buffer{} },

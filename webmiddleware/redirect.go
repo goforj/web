@@ -167,6 +167,7 @@ func NonWWWRedirectWithConfig(config RedirectConfig) web.Middleware {
 	})
 }
 
+// redirect builds one redirect middleware from shared redirect logic.
 func redirect(config RedirectConfig, logic redirectLogic) web.Middleware {
 	if config.Code == 0 {
 		config.Code = DefaultRedirectConfig.Code

@@ -403,6 +403,7 @@ func WriteGatheredMetrics(writer io.Writer, gatherer prometheus.Gatherer) error 
 	return nil
 }
 
+// withDefaults fills any zero-valued config fields with package defaults.
 func withDefaults(config Config) Config {
 	if config.Namespace == "" {
 		config.Namespace = defaultNamespace
@@ -429,6 +430,7 @@ func withDefaults(config Config) Config {
 	return config
 }
 
+// bucketsOrDefault returns provided histogram buckets or a fallback when none were configured.
 func bucketsOrDefault(provided, fallback []float64) []float64 {
 	if len(provided) == 0 {
 		return fallback
@@ -436,6 +438,7 @@ func bucketsOrDefault(provided, fallback []float64) []float64 {
 	return provided
 }
 
+// routeLabel resolves the label value used for the request URL dimension.
 func routeLabel(r web.Context, doNotUseRequestPathFor404 bool) string {
 	url := r.Path()
 	if url == "" && !doNotUseRequestPathFor404 && r.Request() != nil && r.Request().URL != nil {
@@ -450,6 +453,7 @@ func routeLabel(r web.Context, doNotUseRequestPathFor404 bool) string {
 	return url
 }
 
+// normalizeStatus resolves the final HTTP status code used for metrics labels.
 func normalizeStatus(committed bool, status int, path string, err error) int {
 	if err != nil && !committed && path == "" {
 		return http.StatusNotFound
@@ -466,6 +470,7 @@ func normalizeStatus(committed bool, status int, path string, err error) int {
 	return http.StatusOK
 }
 
+// normalizeSize clamps negative response sizes to zero for metrics.
 func normalizeSize(size int64) int64 {
 	if size < 0 {
 		return 0
@@ -473,6 +478,7 @@ func normalizeSize(size int64) int64 {
 	return size
 }
 
+// createLabels builds the final collector label list and custom label positions.
 func createLabels(customLabelFuncs map[string]LabelValueFunc) ([]string, []customLabelValuer) {
 	labelNames := []string{"code", "method", "host", "url"}
 	if len(customLabelFuncs) == 0 {
@@ -500,6 +506,7 @@ func createLabels(customLabelFuncs map[string]LabelValueFunc) ([]string, []custo
 	return labelNames, customValuers
 }
 
+// containsAt returns the index of needle in haystack, or -1 when absent.
 func containsAt[T comparable](haystack []T, needle T) int {
 	for i, v := range haystack {
 		if v == needle {
@@ -509,6 +516,7 @@ func containsAt[T comparable](haystack []T, needle T) int {
 	return -1
 }
 
+// computeApproximateRequestSize estimates request size from the request line, headers, and body length.
 func computeApproximateRequestSize(r *http.Request) int {
 	if r == nil {
 		return 0
@@ -532,6 +540,7 @@ func computeApproximateRequestSize(r *http.Request) int {
 	return size
 }
 
+// registerCollector registers a collector and reuses the existing instance on duplicate registration.
 func registerCollector[T prometheus.Collector](registerer prometheus.Registerer, collector T) (T, error) {
 	if err := registerer.Register(collector); err != nil {
 		var zero T
