@@ -22,6 +22,8 @@ type Context struct {
 	path       string
 	pathParams PathParams
 	values     map[string]any
+	sourceName string
+	sourceCtx  context.Context
 }
 
 var _ web.Context = (*Context)(nil)
@@ -55,6 +57,15 @@ func NewContext(request *http.Request, recorder *httptest.ResponseRecorder, path
 }
 
 func (c *Context) Context() context.Context {
+	if c.sourceName != "" {
+		if c.sourceCtx == nil {
+			c.sourceCtx = sourceNameContext{
+				Context: c.request.Context(),
+				source:  c.sourceName,
+			}
+		}
+		return c.sourceCtx
+	}
 	return c.request.Context()
 }
 
@@ -123,8 +134,18 @@ func (c *Context) Request() *http.Request {
 	return c.request
 }
 
+func (c *Context) RawRequest() *http.Request {
+	return c.request
+}
+
 func (c *Context) SetRequest(request *http.Request) {
 	c.request = request
+	c.sourceCtx = nil
+}
+
+func (c *Context) SetAppSourceName(source string) {
+	c.sourceName = source
+	c.sourceCtx = nil
 }
 
 func (c *Context) Response() web.Response {
@@ -219,6 +240,15 @@ func (c *Context) Native() any {
 
 type Response struct {
 	context *Context
+}
+
+type sourceNameContext struct {
+	context.Context
+	source string
+}
+
+func (c sourceNameContext) AppSourceName() string {
+	return c.source
 }
 
 var _ web.Response = (*Response)(nil)

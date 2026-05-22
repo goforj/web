@@ -13,6 +13,10 @@ type contextAdapter struct {
 	echo           *echo.Context
 	echoResponse   *echo.Response
 	responseWriter http.ResponseWriter
+	context        context.Context
+	request        *http.Request
+	sourceName     string
+	sourceContext  context.Context
 	reusable       bool
 	response       responseAdapter
 }
@@ -33,6 +37,10 @@ func acquireContextAdapter(c *echo.Context) *contextAdapter {
 	adapted.reusable = true
 	adapted.echoResponse = nil
 	adapted.responseWriter = nil
+	adapted.context = nil
+	adapted.request = nil
+	adapted.sourceName = ""
+	adapted.sourceContext = nil
 	return adapted
 }
 
@@ -43,11 +51,28 @@ func releaseContextAdapter(adapted *contextAdapter) {
 	adapted.echo = nil
 	adapted.echoResponse = nil
 	adapted.responseWriter = nil
+	adapted.context = nil
+	adapted.request = nil
+	adapted.sourceName = ""
+	adapted.sourceContext = nil
 	contextAdapterPool.Put(adapted)
 }
 
 func (c *contextAdapter) Context() context.Context {
-	return c.echo.Request().Context()
+	if c.context != nil {
+		return c.context
+	}
+	base := c.echo.Request().Context()
+	if c.sourceName == "" {
+		return base
+	}
+	if c.sourceContext == nil {
+		c.sourceContext = sourceNameContext{
+			Context: base,
+			source:  c.sourceName,
+		}
+	}
+	return c.sourceContext
 }
 
 func (c *contextAdapter) Method() string {
@@ -91,11 +116,38 @@ func (c *contextAdapter) RealIP() string {
 }
 
 func (c *contextAdapter) Request() *http.Request {
+	base := c.echo.Request()
+	if c.context == nil || base == nil {
+		return base
+	}
+	if c.request == nil || c.request.Context() != c.context {
+		c.request = base.WithContext(c.context)
+	}
+	return c.request
+}
+
+func (c *contextAdapter) RawRequest() *http.Request {
+	if c == nil || c.echo == nil {
+		return nil
+	}
 	return c.echo.Request()
 }
 
 func (c *contextAdapter) SetRequest(request *http.Request) {
 	c.echo.SetRequest(request)
+	c.request = nil
+}
+
+func (c *contextAdapter) SetContext(ctx context.Context) {
+	c.context = ctx
+	c.request = nil
+	c.sourceName = ""
+	c.sourceContext = nil
+}
+
+func (c *contextAdapter) SetAppSourceName(source string) {
+	c.sourceName = source
+	c.sourceContext = nil
 }
 
 func (c *contextAdapter) Response() web.Response {
@@ -194,6 +246,15 @@ func (c *contextAdapter) refreshResponse() {
 
 type responseAdapter struct {
 	context *contextAdapter
+}
+
+type sourceNameContext struct {
+	context.Context
+	source string
+}
+
+func (c sourceNameContext) AppSourceName() string {
+	return c.source
 }
 
 var _ web.Response = (*responseAdapter)(nil)

@@ -3,6 +3,7 @@ package echoweb
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,27 @@ import (
 	echo "github.com/labstack/echo/v5"
 	echomiddleware "github.com/labstack/echo/v5/middleware"
 )
+
+type benchmarkContextKey struct{}
+
+func BenchmarkNetHTTPPlainText(b *testing.B) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/plain", nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			b.Fatalf("status = %d", rec.Code)
+		}
+	}
+}
 
 func BenchmarkEchoPlainText(b *testing.B) {
 	engine := echo.New()
@@ -34,8 +56,84 @@ func BenchmarkEchoPlainText(b *testing.B) {
 	}
 }
 
+func BenchmarkEchoPlainTextWithContextRebind(b *testing.B) {
+	engine := echo.New()
+	engine.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c *echo.Context) error {
+			req := c.Request()
+			ctx := context.WithValue(req.Context(), benchmarkContextKey{}, "http")
+			c.SetRequest(req.WithContext(ctx))
+			return next(c)
+		}
+	})
+	engine.GET("/plain", func(c *echo.Context) error {
+		return c.String(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/plain", nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rec := httptest.NewRecorder()
+		engine.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			b.Fatalf("status = %d", rec.Code)
+		}
+	}
+}
+
 func BenchmarkWebPlainText(b *testing.B) {
 	adapter := New()
+	adapter.Router().GET("/plain", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/plain", nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rec := httptest.NewRecorder()
+		adapter.Echo().ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			b.Fatalf("status = %d", rec.Code)
+		}
+	}
+}
+
+func BenchmarkWebPlainTextWithContextRebind(b *testing.B) {
+	adapter := New()
+	adapter.Router().Use(func(next web.Handler) web.Handler {
+		return func(r web.Context) error {
+			req := r.Request()
+			ctx := context.WithValue(req.Context(), benchmarkContextKey{}, "http")
+			r.SetRequest(req.WithContext(ctx))
+			return next(r)
+		}
+	})
+	adapter.Router().GET("/plain", func(r web.Context) error {
+		return r.Text(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/plain", nil)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		rec := httptest.NewRecorder()
+		adapter.Echo().ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			b.Fatalf("status = %d", rec.Code)
+		}
+	}
+}
+
+func BenchmarkWebPlainTextWithContextOverride(b *testing.B) {
+	adapter := New()
+	adapter.Router().Use(func(next web.Handler) web.Handler {
+		return func(r web.Context) error {
+			web.BindContext(r, context.WithValue(r.Context(), benchmarkContextKey{}, "http"))
+			return next(r)
+		}
+	})
 	adapter.Router().GET("/plain", func(r web.Context) error {
 		return r.Text(http.StatusOK, "ok")
 	})

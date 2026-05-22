@@ -95,14 +95,14 @@ func CORSWithConfig(config CORSConfig) web.Middleware {
 			origin := r.Header("Origin")
 			preflight := r.Method() == http.MethodOptions
 
-			r.AddHeader("Vary", "Origin")
-
 			if origin == "" {
 				if preflight {
 					return r.NoContent(http.StatusNoContent)
 				}
 				return next(r)
 			}
+
+			r.AddHeader("Vary", "Origin")
 
 			allowOrigin, err := corsAllowedOrigin(origin, config, allowOriginPatterns)
 			if err != nil {
@@ -159,7 +159,7 @@ func corsAllowedOrigin(origin string, config CORSConfig, allowOriginPatterns []*
 		if item == "*" || item == origin {
 			return item, nil
 		}
-		if corsMatchSubdomain(origin, item) {
+		if len(allowOriginPatterns) == 0 && corsMatchSubdomain(origin, item) {
 			return origin, nil
 		}
 	}
@@ -178,9 +178,9 @@ func corsMatchSubdomain(origin string, pattern string) bool {
 	if !strings.Contains(pattern, "*") {
 		return false
 	}
-	replacer := regexp.QuoteMeta(pattern)
-	replacer = strings.ReplaceAll(replacer, "\\*", ".*")
-	re, err := regexp.Compile("^" + replacer + "$")
+	pattern = regexp.QuoteMeta(pattern)
+	pattern = strings.ReplaceAll(pattern, "\\*", ".*")
+	re, err := regexp.Compile("^" + pattern + "$")
 	if err != nil {
 		return false
 	}

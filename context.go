@@ -39,3 +39,46 @@ type Context interface {
 	StatusCode() int
 	Native() any
 }
+
+type contextSetter interface {
+	SetContext(context.Context)
+}
+
+type rawRequester interface {
+	RawRequest() *http.Request
+}
+
+// BindContext attaches ctx to the request-scoped web.Context without forcing
+// callers to replace the underlying *http.Request when the adapter can carry
+// an override more cheaply.
+func BindContext(target Context, ctx context.Context) {
+	if target == nil {
+		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if setter, ok := target.(contextSetter); ok {
+		setter.SetContext(ctx)
+		return
+	}
+	req := target.Request()
+	if req == nil {
+		return
+	}
+	target.SetRequest(req.WithContext(ctx))
+}
+
+// RawRequest returns the adapter's underlying request when available, without
+// forcing a context-rebound clone. Callers should prefer Context() for scoped
+// execution state and use RawRequest only when they need direct request body or
+// header access.
+func RawRequest(target Context) *http.Request {
+	if target == nil {
+		return nil
+	}
+	if requester, ok := target.(rawRequester); ok {
+		return requester.RawRequest()
+	}
+	return target.Request()
+}
