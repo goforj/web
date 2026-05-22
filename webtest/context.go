@@ -148,6 +148,10 @@ func (c *Context) SetAppSourceName(source string) {
 	c.sourceCtx = nil
 }
 
+func (c *Context) AppSourceName() string {
+	return c.sourceName
+}
+
 func (c *Context) Response() web.Response {
 	return &c.response
 }

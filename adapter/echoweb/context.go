@@ -150,6 +150,10 @@ func (c *contextAdapter) SetAppSourceName(source string) {
 	c.sourceContext = nil
 }
 
+func (c *contextAdapter) AppSourceName() string {
+	return c.sourceName
+}
+
 func (c *contextAdapter) Response() web.Response {
 	return &c.response
 }
