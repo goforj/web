@@ -148,12 +148,16 @@ func parseFuncsInDir(out map[string]*FuncDoc, dir, prefix string) error {
 				if prefix != "" {
 					displayName = prefix + "." + displayName
 				}
+				group := extractGroup(fn.Doc)
+				if group == "" {
+					continue
+				}
 				key := displayName
 				item := &FuncDoc{
 					Key:         key,
 					DisplayName: displayName,
 					Anchor:      anchorFor(displayName),
-					Group:       extractGroup(fn.Doc),
+					Group:       group,
 					Description: extractDescription(fn.Doc),
 					Examples:    extractExamples(fset, fn.Doc),
 				}
@@ -197,7 +201,7 @@ func extractGroup(group *ast.CommentGroup) string {
 			return strings.TrimSpace(strings.TrimPrefix(line, "@group "))
 		}
 	}
-	return "Core"
+	return ""
 }
 
 func extractDescription(group *ast.CommentGroup) string {
@@ -352,7 +356,7 @@ func renderAPI(funcs []*FuncDoc) string {
 		sort.Slice(items, func(i, j int) bool {
 			return items[i].DisplayName < items[j].DisplayName
 		})
-		buf.WriteString("### " + group + "\n\n")
+		buf.WriteString("### " + formatGroupHeading(group) + "\n\n")
 
 		for _, fn := range items {
 			buf.WriteString(fmt.Sprintf("#### <a id=\"%s\"></a>%s\n\n", fn.Anchor, fn.DisplayName))
@@ -400,6 +404,13 @@ func commonPackagePrefix(items []*FuncDoc) string {
 func formatGroupLabelForIndex(group string) string {
 	if strings.HasPrefix(group, "Middleware - ") {
 		return "Middleware<br>" + strings.TrimPrefix(group, "Middleware - ")
+	}
+	return group
+}
+
+func formatGroupHeading(group string) string {
+	if strings.HasPrefix(group, "Middleware - ") {
+		return strings.TrimPrefix(group, "Middleware - ") + " Middleware"
 	}
 	return group
 }

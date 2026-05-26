@@ -353,7 +353,7 @@ fmt.Println(err == nil, manifest.Version != "")
 // true true
 ```
 
-### Middleware - Auth
+### Auth Middleware
 
 #### <a id="webmiddleware-basicauth"></a>webmiddleware.BasicAuth
 
@@ -455,7 +455,7 @@ fmt.Println(ctx.StatusCode())
 // 400
 ```
 
-### Middleware - Compression
+### Compression Middleware
 
 #### <a id="webmiddleware-compress"></a>webmiddleware.Compress
 
@@ -544,7 +544,7 @@ fmt.Println(ctx.Response().Header().Get("Content-Encoding") == "")
 // true
 ```
 
-### Middleware - Method Override
+### Method Override Middleware
 
 #### <a id="webmiddleware-methodfromform"></a>webmiddleware.MethodFromForm
 
@@ -616,7 +616,7 @@ _ = handler(ctx)
 // DELETE
 ```
 
-### Middleware - Path Rewriting
+### Path Rewriting Middleware
 
 #### <a id="webmiddleware-addtrailingslash"></a>webmiddleware.AddTrailingSlash
 
@@ -710,7 +710,7 @@ _ = handler(ctx)
 // /v2/users
 ```
 
-### Middleware - Payloads
+### Payloads Middleware
 
 #### <a id="webmiddleware-bodydump"></a>webmiddleware.BodyDump
 
@@ -803,7 +803,7 @@ _ = handler(ctx)
 // 500
 ```
 
-### Middleware - Proxying
+### Proxying Middleware
 
 #### <a id="webmiddleware-newrandombalancer"></a>webmiddleware.NewRandomBalancer
 
@@ -857,7 +857,7 @@ fmt.Println(ctx.Get("target").(*webmiddleware.ProxyTarget).URL.Host)
 // localhost:8080
 ```
 
-### Middleware - Rate Limiting
+### Rate Limiting Middleware
 
 #### <a id="webmiddleware-newratelimitermemorystore"></a>webmiddleware.NewRateLimiterMemoryStore
 
@@ -926,7 +926,7 @@ fmt.Println(ctx.StatusCode())
 // 202
 ```
 
-### Middleware - Redirects
+### Redirects Middleware
 
 #### <a id="webmiddleware-httpsnonwwwredirect"></a>webmiddleware.HTTPSNonWWWRedirect
 
@@ -1048,7 +1048,7 @@ fmt.Println(ctx.StatusCode())
 // 307
 ```
 
-### Middleware - Reliability
+### Reliability Middleware
 
 #### <a id="webmiddleware-recover"></a>webmiddleware.Recover
 
@@ -1076,7 +1076,7 @@ fmt.Println(handler(ctx) != nil)
 // true
 ```
 
-### Middleware - Request Lifecycle
+### Request Lifecycle Middleware
 
 #### <a id="webmiddleware-contexttimeout"></a>webmiddleware.ContextTimeout
 
@@ -1193,7 +1193,7 @@ fmt.Println(ctx.StatusCode())
 // 202
 ```
 
-### Middleware - Security
+### Security Middleware
 
 #### <a id="webmiddleware-cors"></a>webmiddleware.CORS
 
@@ -1250,7 +1250,7 @@ fmt.Println(ctx.Response().Header().Get("Referrer-Policy"))
 // same-origin
 ```
 
-### Middleware - Static Files
+### Static Files Middleware
 
 #### <a id="webmiddleware-static"></a>webmiddleware.Static
 
