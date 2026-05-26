@@ -25,16 +25,14 @@ var DefaultRequestIDConfig = RequestIDConfig{
 // RequestID returns middleware that sets a request id header and context value.
 // @group Middleware - Request Lifecycle
 // Example:
-// mw := webmiddleware.RequestID()
-// handler := mw(func(c web.Context) error {
-// 	_ = c.Get("request_id")
-// 	return c.NoContent(http.StatusOK)
-// })
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("X-Request-ID") != "")
-//	// true
-//	// true
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.RequestID())
+//
+//	router.GET("/healthz", func(c web.Context) error {
+//		return c.JSON(200, map[string]any{
+//			"request_id": c.Get("request_id"),
+//		})
+//	})
 func RequestID() web.Middleware {
 	return RequestIDWithConfig(DefaultRequestIDConfig)
 }
@@ -42,14 +40,12 @@ func RequestID() web.Middleware {
 // RequestIDWithConfig returns RequestID middleware with config.
 // @group Middleware - Request Lifecycle
 // Example:
-// mw := webmiddleware.RequestIDWithConfig(webmiddleware.RequestIDConfig{
-// 	Generator: func() string { return "fixed-id" },
-// })
-// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusOK) })
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("X-Request-ID"))
-//	// fixed-id
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.RequestIDWithConfig(webmiddleware.RequestIDConfig{
+//		TargetHeader: "X-Correlation-ID",
+//		ContextKey:   "correlation_id",
+//	}))
 func RequestIDWithConfig(config RequestIDConfig) web.Middleware {
 	if config.Generator == nil {
 		config.Generator = DefaultRequestIDConfig.Generator

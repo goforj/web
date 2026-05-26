@@ -29,50 +29,39 @@ var DefaultGzipConfig = GzipConfig{
 	MinLength: 0,
 }
 
-// Gzip compresses responses with gzip.
+// Gzip enables gzip response compression for clients that support it.
 // @group Middleware - Compression
 // Example:
-// req := httptest.NewRequest(http.MethodGet, "/", nil)
-// req.Header.Set("Accept-Encoding", "gzip")
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.Gzip()(func(c web.Context) error {
-// 	return c.Text(http.StatusOK, "hello")
-// })
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("Content-Encoding"))
-//	// gzip
+// router := echoweb.New().Router()
+//
+//	router.GET("/feed", func(c web.Context) error {
+//		return c.Text(200, "large feed response")
+//	}, webmiddleware.Gzip())
 func Gzip() web.Middleware {
 	return GzipWithConfig(DefaultGzipConfig)
 }
 
-// Compress is an alias for Gzip to match the checklist naming.
+// Compress enables gzip response compression for clients that support it.
 // @group Middleware - Compression
 // Example:
-// req := httptest.NewRequest(http.MethodGet, "/", nil)
-// req.Header.Set("Accept-Encoding", "gzip")
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.Compress()(func(c web.Context) error {
-// 	return c.Text(http.StatusOK, "hello")
-// })
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("Content-Encoding"))
-//	// gzip
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.Compress())
+//
+//	router.GET("/reports", func(c web.Context) error {
+//		return c.Text(200, "large report response")
+//	})
 func Compress() web.Middleware {
 	return Gzip()
 }
 
-// GzipWithConfig compresses responses with gzip and config.
+// GzipWithConfig enables gzip response compression with custom options.
 // @group Middleware - Compression
 // Example:
-// req := httptest.NewRequest(http.MethodGet, "/", nil)
-// req.Header.Set("Accept-Encoding", "gzip")
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{MinLength: 256})(func(c web.Context) error {
-// 	return c.Text(http.StatusOK, "short")
-// })
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("Content-Encoding") == "")
-//	// true
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{
+//		MinLength: 1024,
+//	}))
 func GzipWithConfig(config GzipConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultGzipConfig.Skipper

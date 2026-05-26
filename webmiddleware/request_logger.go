@@ -23,19 +23,18 @@ type RequestLoggerConfig struct {
 // RequestLoggerWithConfig returns request logger middleware with config.
 // @group Middleware - Request Lifecycle
 // Example:
-// var loggedURI string
-// mw := webmiddleware.RequestLoggerWithConfig(webmiddleware.RequestLoggerConfig{
-// 	LogValuesFunc: func(c web.Context, values webmiddleware.RequestLoggerValues) error {
-// 		loggedURI = values.URI
-// 		return nil
-// 	},
-// })
-// req := httptest.NewRequest(http.MethodGet, "/users/42", nil)
-// ctx := webtest.NewContext(req, nil, "/users/:id", webtest.PathParams{"id": "42"})
-// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusAccepted) })
-// _ = handler(ctx)
-// fmt.Println(loggedURI, ctx.StatusCode())
-//	// /users/42 202
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.RequestLoggerWithConfig(webmiddleware.RequestLoggerConfig{
+//		LogValuesFunc: func(c web.Context, values webmiddleware.RequestLoggerValues) error {
+//			log.Printf("%s %s %d %s", values.Method, values.URI, values.Status, values.Latency)
+//			return nil
+//		},
+//	}))
+//
+//	router.GET("/users/:id", func(c web.Context) error {
+//		return c.NoContent(204)
+//	})
 func RequestLoggerWithConfig(config RequestLoggerConfig) web.Middleware {
 	return func(next web.Handler) web.Handler {
 		return func(r web.Context) error {

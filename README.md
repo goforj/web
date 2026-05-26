@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="./docs/assets/logo.png" width="300" alt="goforj/collection logo">
+</p>
+
+<p align="center">
   Minimal app-facing HTTP abstractions, middleware, adapters, and route indexing for GoForj.
 </p>
 
@@ -360,16 +364,15 @@ fmt.Println(err == nil, manifest.Version != "")
 BasicAuth returns basic auth middleware.
 
 ```go
-mw := webmiddleware.BasicAuth(func(user, pass string, c web.Context) (bool, error) {
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.BasicAuth(func(user, pass string, c web.Context) (bool, error) {
 	return user == "demo" && pass == "secret", nil
+}))
+
+router.GET("/admin", func(c web.Context) error {
+	return c.Text(200, "welcome")
 })
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-req.Header.Set("Authorization", "basic ZGVtbzpzZWNyZXQ=")
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode())
-// 204
 ```
 
 #### <a id="webmiddleware-basicauthwithconfig"></a>webmiddleware.BasicAuthWithConfig
@@ -377,15 +380,18 @@ fmt.Println(ctx.StatusCode())
 BasicAuthWithConfig returns basic auth middleware with config.
 
 ```go
-mw := webmiddleware.BasicAuthWithConfig(webmiddleware.BasicAuthConfig{
-	Realm: "Example",
-	Validator: func(user, pass string, c web.Context) (bool, error) { return true, nil },
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.BasicAuthWithConfig(webmiddleware.BasicAuthConfig{
+	Realm: "Admin",
+	Validator: func(user, pass string, c web.Context) (bool, error) {
+		return user == "demo" && pass == "secret", nil
+	},
+}))
+
+router.GET("/admin", func(c web.Context) error {
+	return c.Text(200, "welcome")
 })
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("WWW-Authenticate"))
-// 401 basic realm=\"Example\"
 ```
 
 #### <a id="webmiddleware-csrf"></a>webmiddleware.CSRF
@@ -393,11 +399,12 @@ fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("WWW-Authenticate"))
 CSRF enables token-based CSRF protection.
 
 ```go
-ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
-handler := webmiddleware.CSRF()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("Set-Cookie") != "")
-// true
+router := echoweb.New().Router()
+router.Use(webmiddleware.CSRF())
+
+router.POST("/settings", func(c web.Context) error {
+	return c.NoContent(204)
+})
 ```
 
 #### <a id="webmiddleware-csrfwithconfig"></a>webmiddleware.CSRFWithConfig
@@ -405,12 +412,16 @@ fmt.Println(ctx.Response().Header().Get("Set-Cookie") != "")
 CSRFWithConfig enables token-based CSRF protection with config.
 
 ```go
-mw := webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{CookieName: "_csrf"})
-ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-_ = handler(ctx)
-fmt.Println(strings.Contains(ctx.Response().Header().Get("Set-Cookie"), "_csrf="))
-// true
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{
+	CookieName:  "_csrf",
+	TokenLookup: "header:X-CSRF-Token",
+}))
+
+router.POST("/settings", func(c web.Context) error {
+	return c.NoContent(204)
+})
 ```
 
 #### <a id="webmiddleware-createextractors"></a>webmiddleware.CreateExtractors
@@ -428,16 +439,15 @@ fmt.Println(err == nil, len(extractors))
 KeyAuth returns key auth middleware.
 
 ```go
-mw := webmiddleware.KeyAuth(func(key string, c web.Context) (bool, error) {
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.KeyAuth(func(key string, c web.Context) (bool, error) {
 	return key == "demo-key", nil
+}))
+
+router.GET("/api/reports", func(c web.Context) error {
+	return c.JSON(200, map[string]any{"ready": true})
 })
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-req.Header.Set("Authorization", "Bearer demo-key")
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode())
-// 204
 ```
 
 #### <a id="webmiddleware-keyauthwithconfig"></a>webmiddleware.KeyAuthWithConfig
@@ -445,103 +455,89 @@ fmt.Println(ctx.StatusCode())
 KeyAuthWithConfig returns key auth middleware with config.
 
 ```go
-mw := webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
-	Validator: func(key string, c web.Context) (bool, error) { return true, nil },
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
+	KeyLookup: "query:api_key",
+	Validator: func(key string, c web.Context) (bool, error) {
+		return key == "demo-key", nil
+	},
+}))
+
+router.GET("/api/reports", func(c web.Context) error {
+	return c.JSON(200, map[string]any{"ready": true})
 })
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode())
-// 400
 ```
 
 ### Compression Middleware
 
 #### <a id="webmiddleware-compress"></a>webmiddleware.Compress
 
-Compress is an alias for Gzip to match the checklist naming.
+Compress enables gzip response compression for clients that support it.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-req.Header.Set("Accept-Encoding", "gzip")
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.Compress()(func(c web.Context) error {
-	return c.Text(http.StatusOK, "hello")
+router := echoweb.New().Router()
+router.Use(webmiddleware.Compress())
+
+router.GET("/reports", func(c web.Context) error {
+	return c.Text(200, "large report response")
 })
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("Content-Encoding"))
-// gzip
 ```
 
 #### <a id="webmiddleware-decompress"></a>webmiddleware.Decompress
 
-Decompress decompresses gzip-encoded request bodies.
+Decompress inflates gzip-encoded request bodies before handlers read them.
 
 ```go
-var body string
-compressed := &bytes.Buffer{}
-gz := gzip.NewWriter(compressed)
-_, _ = gz.Write([]byte("hello"))
-_ = gz.Close()
-req := httptest.NewRequest(http.MethodPost, "/", compressed)
-req.Header.Set("Content-Encoding", webmiddleware.GZIPEncoding)
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.Decompress()(func(c web.Context) error {
+router := echoweb.New().Router()
+router.Use(webmiddleware.Decompress())
+
+router.POST("/ingest", func(c web.Context) error {
 	data, _ := io.ReadAll(c.Request().Body)
-	body = string(data)
-	return c.NoContent(http.StatusNoContent)
+	return c.JSON(200, map[string]int{"bytes": len(data)})
 })
-_ = handler(ctx)
-fmt.Println(body, ctx.Request().Header.Get("Content-Encoding"))
-// hello
 ```
 
 #### <a id="webmiddleware-decompresswithconfig"></a>webmiddleware.DecompressWithConfig
 
-DecompressWithConfig decompresses gzip-encoded request bodies with config.
+DecompressWithConfig inflates gzip-encoded request bodies with custom options.
 
 ```go
-req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("plain"))
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{})(func(c web.Context) error {
-	data, _ := io.ReadAll(c.Request().Body)
-	fmt.Println(string(data))
-	return nil
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{
+	Skipper: func(c web.Context) bool {
+		return c.Path() == "/webhooks/raw"
+	},
+}))
+
+router.POST("/ingest", func(c web.Context) error {
+	return c.NoContent(202)
 })
-_ = handler(ctx)
-// plain
 ```
 
 #### <a id="webmiddleware-gzip"></a>webmiddleware.Gzip
 
-Gzip compresses responses with gzip.
+Gzip enables gzip response compression for clients that support it.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-req.Header.Set("Accept-Encoding", "gzip")
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.Gzip()(func(c web.Context) error {
-	return c.Text(http.StatusOK, "hello")
-})
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("Content-Encoding"))
-// gzip
+router := echoweb.New().Router()
+
+router.GET("/feed", func(c web.Context) error {
+	return c.Text(200, "large feed response")
+}, webmiddleware.Gzip())
 ```
 
 #### <a id="webmiddleware-gzipwithconfig"></a>webmiddleware.GzipWithConfig
 
-GzipWithConfig compresses responses with gzip and config.
+GzipWithConfig enables gzip response compression with custom options.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-req.Header.Set("Accept-Encoding", "gzip")
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{MinLength: 256})(func(c web.Context) error {
-	return c.Text(http.StatusOK, "short")
-})
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("Content-Encoding") == "")
-// true
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.GzipWithConfig(webmiddleware.GzipConfig{
+	MinLength: 1024,
+}))
 ```
 
 ### Method Override Middleware
@@ -551,12 +547,11 @@ fmt.Println(ctx.Response().Header().Get("Content-Encoding") == "")
 MethodFromForm gets an override method from a form field.
 
 ```go
-getter := webmiddleware.MethodFromForm("_method")
-req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("_method=DELETE"))
-req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-ctx := webtest.NewContext(req, nil, "/", nil)
-fmt.Println(getter(ctx))
-// DELETE
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+	Getter: webmiddleware.MethodFromForm("_method"),
+}))
 ```
 
 #### <a id="webmiddleware-methodfromheader"></a>webmiddleware.MethodFromHeader
@@ -564,11 +559,11 @@ fmt.Println(getter(ctx))
 MethodFromHeader gets an override method from a request header.
 
 ```go
-getter := webmiddleware.MethodFromHeader("X-HTTP-Method-Override")
-ctx := webtest.NewContext(nil, nil, "/", nil)
-ctx.Request().Header.Set("X-HTTP-Method-Override", "PATCH")
-fmt.Println(getter(ctx))
-// PATCH
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+	Getter: webmiddleware.MethodFromHeader("X-HTTP-Method-Override"),
+}))
 ```
 
 #### <a id="webmiddleware-methodfromquery"></a>webmiddleware.MethodFromQuery
@@ -576,11 +571,11 @@ fmt.Println(getter(ctx))
 MethodFromQuery gets an override method from a query parameter.
 
 ```go
-getter := webmiddleware.MethodFromQuery("_method")
-req := httptest.NewRequest(http.MethodPost, "/?_method=PUT", nil)
-ctx := webtest.NewContext(req, nil, "/", nil)
-fmt.Println(getter(ctx))
-// PUT
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+	Getter: webmiddleware.MethodFromQuery("_method"),
+}))
 ```
 
 #### <a id="webmiddleware-methodoverride"></a>webmiddleware.MethodOverride
@@ -588,15 +583,12 @@ fmt.Println(getter(ctx))
 MethodOverride returns method override middleware.
 
 ```go
-req := httptest.NewRequest(http.MethodPost, "/", nil)
-req.Header.Set("X-HTTP-Method-Override", http.MethodPatch)
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.MethodOverride()(func(c web.Context) error {
-	fmt.Println(c.Method())
-	return nil
+router := echoweb.New().Router()
+router.Use(webmiddleware.MethodOverride())
+
+router.PATCH("/articles/:id", func(c web.Context) error {
+	return c.NoContent(204)
 })
-_ = handler(ctx)
-// PATCH
 ```
 
 #### <a id="webmiddleware-methodoverridewithconfig"></a>webmiddleware.MethodOverrideWithConfig
@@ -604,16 +596,15 @@ _ = handler(ctx)
 MethodOverrideWithConfig returns method override middleware with config.
 
 ```go
-req := httptest.NewRequest(http.MethodPost, "/?_method=DELETE", nil)
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
 	Getter: webmiddleware.MethodFromQuery("_method"),
-})(func(c web.Context) error {
-	fmt.Println(c.Method())
-	return nil
+}))
+
+router.DELETE("/articles/:id", func(c web.Context) error {
+	return c.NoContent(204)
 })
-_ = handler(ctx)
-// DELETE
 ```
 
 ### Path Rewriting Middleware
@@ -623,14 +614,12 @@ _ = handler(ctx)
 AddTrailingSlash adds a trailing slash to the request path.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-handler := webmiddleware.AddTrailingSlash()(func(c web.Context) error {
-	fmt.Println(c.Request().URL.Path)
-	return nil
+router := echoweb.New().Router()
+router.Use(webmiddleware.AddTrailingSlash())
+
+router.GET("/docs/", func(c web.Context) error {
+	return c.Text(200, "docs")
 })
-_ = handler(ctx)
-// /docs/
 ```
 
 #### <a id="webmiddleware-addtrailingslashwithconfig"></a>webmiddleware.AddTrailingSlashWithConfig
@@ -638,14 +627,15 @@ _ = handler(ctx)
 AddTrailingSlashWithConfig returns trailing-slash middleware with config.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-handler := webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})(func(c web.Context) error {
-	return c.NoContent(204)
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{
+	RedirectCode: 308,
+}))
+
+router.GET("/docs/", func(c web.Context) error {
+	return c.Text(200, "docs")
 })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
-// 308 /docs/
 ```
 
 #### <a id="webmiddleware-removetrailingslash"></a>webmiddleware.RemoveTrailingSlash
@@ -653,14 +643,12 @@ fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
 RemoveTrailingSlash removes the trailing slash from the request path.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
-ctx := webtest.NewContext(req, nil, "/docs/", nil)
-handler := webmiddleware.RemoveTrailingSlash()(func(c web.Context) error {
-	fmt.Println(c.Request().URL.Path)
-	return nil
+router := echoweb.New().Router()
+router.Use(webmiddleware.RemoveTrailingSlash())
+
+router.GET("/docs", func(c web.Context) error {
+	return c.Text(200, "docs")
 })
-_ = handler(ctx)
-// /docs
 ```
 
 #### <a id="webmiddleware-removetrailingslashwithconfig"></a>webmiddleware.RemoveTrailingSlashWithConfig
@@ -668,14 +656,15 @@ _ = handler(ctx)
 RemoveTrailingSlashWithConfig returns remove-trailing-slash middleware with config.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/docs/", nil)
-ctx := webtest.NewContext(req, nil, "/docs/", nil)
-handler := webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{RedirectCode: 308})(func(c web.Context) error {
-	return c.NoContent(204)
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{
+	RedirectCode: 308,
+}))
+
+router.GET("/docs", func(c web.Context) error {
+	return c.Text(200, "docs")
 })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
-// 308 /docs
 ```
 
 #### <a id="webmiddleware-rewrite"></a>webmiddleware.Rewrite
@@ -683,14 +672,15 @@ fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
 Rewrite rewrites the request path using wildcard rules.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
-ctx := webtest.NewContext(req, nil, "/old/*", nil)
-handler := webmiddleware.Rewrite(map[string]string{"/old/*": "/new/$1"})(func(c web.Context) error {
-	fmt.Println(c.Request().URL.Path)
-	return nil
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.Rewrite(map[string]string{
+	"/old/*": "/new/$1",
+}))
+
+router.GET("/new/:name", func(c web.Context) error {
+	return c.Text(200, c.Param("name"))
 })
-_ = handler(ctx)
-// /new/users
 ```
 
 #### <a id="webmiddleware-rewritewithconfig"></a>webmiddleware.RewriteWithConfig
@@ -698,16 +688,15 @@ _ = handler(ctx)
 RewriteWithConfig rewrites the request path using wildcard and regex rules.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
-ctx := webtest.NewContext(req, nil, "/old/*", nil)
-handler := webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
 	Rules: map[string]string{"/old/*": "/v2/$1"},
-})(func(c web.Context) error {
-	fmt.Println(c.Request().URL.Path)
-	return nil
+}))
+
+router.GET("/v2/:name", func(c web.Context) error {
+	return c.Text(200, c.Param("name"))
 })
-_ = handler(ctx)
-// /v2/users
 ```
 
 ### Payloads Middleware
@@ -717,16 +706,15 @@ _ = handler(ctx)
 BodyDump captures request and response payloads.
 
 ```go
-var captured string
-mw := webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {
-	captured = fmt.Sprintf("%s -> %s", string(reqBody), string(resBody))
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {
+	log.Printf("%s %s -> %d bytes", c.Method(), c.URI(), len(resBody))
+}))
+
+router.POST("/webhooks", func(c web.Context) error {
+	return c.JSON(202, map[string]any{"queued": true})
 })
-req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ping"))
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.Text(http.StatusOK, "pong") })
-_ = handler(ctx)
-fmt.Println(captured)
-// ping -> pong
 ```
 
 #### <a id="webmiddleware-bodydumpwithconfig"></a>webmiddleware.BodyDumpWithConfig
@@ -734,13 +722,16 @@ fmt.Println(captured)
 BodyDumpWithConfig captures request and response payloads with config.
 
 ```go
-mw := webmiddleware.BodyDumpWithConfig(webmiddleware.BodyDumpConfig{
-	Handler: func(c web.Context, reqBody, resBody []byte) { fmt.Println(string(resBody)) },
-})
-ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.Text(http.StatusOK, "ok") })
-_ = handler(ctx)
-// ok
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.BodyDumpWithConfig(webmiddleware.BodyDumpConfig{
+	Skipper: func(c web.Context) bool {
+		return c.Path() == "/healthz"
+	},
+	Handler: func(c web.Context, reqBody, resBody []byte) {
+		log.Printf("%s %s -> %d bytes", c.Method(), c.URI(), len(resBody))
+	},
+}))
 ```
 
 #### <a id="webmiddleware-bodylimit"></a>webmiddleware.BodyLimit
@@ -748,14 +739,12 @@ _ = handler(ctx)
 BodyLimit returns middleware that limits request body size.
 
 ```go
-req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("hello"))
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.BodyLimit("2B")(func(c web.Context) error {
-	return c.NoContent(http.StatusOK)
+router := echoweb.New().Router()
+router.Use(webmiddleware.BodyLimit("2MB"))
+
+router.POST("/uploads", func(c web.Context) error {
+	return c.NoContent(204)
 })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode())
-// 413
 ```
 
 #### <a id="webmiddleware-bodylimitwithconfig"></a>webmiddleware.BodyLimitWithConfig
@@ -763,14 +752,15 @@ fmt.Println(ctx.StatusCode())
 BodyLimitWithConfig returns body limit middleware with config.
 
 ```go
-req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ok"))
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.BodyLimitWithConfig(webmiddleware.BodyLimitConfig{Limit: "2KB"})(func(c web.Context) error {
-	return c.NoContent(http.StatusNoContent)
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.BodyLimitWithConfig(webmiddleware.BodyLimitConfig{
+	Limit: "10MB",
+}))
+
+router.POST("/imports", func(c web.Context) error {
+	return c.NoContent(202)
 })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode())
-// 204
 ```
 
 #### <a id="webmiddleware-errorbodydump"></a>webmiddleware.ErrorBodyDump
@@ -778,15 +768,15 @@ fmt.Println(ctx.StatusCode())
 ErrorBodyDump captures response bodies for non-2xx and non-3xx responses.
 
 ```go
-var captured string
-mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
-	captured = fmt.Sprintf("%d:%s", status, string(body))
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
+	log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+}))
+
+router.GET("/reports/:id", func(c web.Context) error {
+	return c.Text(404, "report not found")
 })
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.Text(http.StatusBadRequest, "nope") })
-_ = handler(ctx)
-fmt.Println(captured)
-// 400:nope
 ```
 
 #### <a id="webmiddleware-errorbodydumpwithconfig"></a>webmiddleware.ErrorBodyDumpWithConfig
@@ -794,13 +784,16 @@ fmt.Println(captured)
 ErrorBodyDumpWithConfig captures response bodies for non-success responses with config.
 
 ```go
-mw := webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
-	Handler: func(c web.Context, status int, body []byte) { fmt.Println(status) },
-})
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.Text(http.StatusInternalServerError, "boom") })
-_ = handler(ctx)
-// 500
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
+	Skipper: func(c web.Context) bool {
+		return c.Path() == "/healthz"
+	},
+	Handler: func(c web.Context, status int, body []byte) {
+		log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+	},
+}))
 ```
 
 ### Proxying Middleware
@@ -813,6 +806,7 @@ NewRandomBalancer creates a random proxy balancer.
 target, _ := url.Parse("http://localhost:8080")
 balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
 fmt.Println(balancer.Next(nil).URL.Host)
+
 // localhost:8080
 ```
 
@@ -824,6 +818,7 @@ NewRoundRobinBalancer creates a round-robin proxy balancer.
 target, _ := url.Parse("http://localhost:8080")
 balancer := webmiddleware.NewRoundRobinBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
 fmt.Println(balancer.Next(nil).URL.Host)
+
 // localhost:8080
 ```
 
@@ -834,11 +829,9 @@ Proxy creates a proxy middleware.
 ```go
 target, _ := url.Parse("http://localhost:8080")
 balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-ctx := webtest.NewContext(req, nil, "/", nil)
-_ = webmiddleware.Proxy(balancer)(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Get("target").(*webmiddleware.ProxyTarget).URL.Host)
-// localhost:8080
+
+router := echoweb.New().Router()
+router.Use(webmiddleware.Proxy(balancer))
 ```
 
 #### <a id="webmiddleware-proxywithconfig"></a>webmiddleware.ProxyWithConfig
@@ -847,14 +840,16 @@ ProxyWithConfig creates a proxy middleware with config.
 
 ```go
 target, _ := url.Parse("http://localhost:8080")
-mw := webmiddleware.ProxyWithConfig(webmiddleware.ProxyConfig{
-	Balancer: webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}}),
-})
-req := httptest.NewRequest(http.MethodGet, "/old/path", nil)
-ctx := webtest.NewContext(req, nil, "/", nil)
-_ = mw(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Get("target").(*webmiddleware.ProxyTarget).URL.Host)
-// localhost:8080
+balancer := webmiddleware.NewRoundRobinBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
+
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.ProxyWithConfig(webmiddleware.ProxyConfig{
+	Balancer: balancer,
+	Rewrite: map[string]string{
+		"/api/*": "/$1",
+	},
+}))
 ```
 
 ### Rate Limiting Middleware
@@ -868,6 +863,7 @@ store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 allowed1, _ := store.Allow("192.0.2.1")
 allowed2, _ := store.Allow("192.0.2.1")
 fmt.Println(allowed1, allowed2)
+
 // true false
 ```
 
@@ -879,6 +875,7 @@ NewRateLimiterMemoryStoreWithConfig creates an in-memory rate limiter store with
 store := webmiddleware.NewRateLimiterMemoryStoreWithConfig(webmiddleware.RateLimiterMemoryStoreConfig{Rate: rate.Every(time.Second)})
 allowed, _ := store.Allow("192.0.2.1")
 fmt.Println(allowed)
+
 // true
 ```
 
@@ -888,17 +885,13 @@ RateLimiter creates a rate limiting middleware.
 
 ```go
 store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
-handler := webmiddleware.RateLimiter(store)(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-req1 := httptest.NewRequest(http.MethodGet, "/", nil)
-req1.RemoteAddr = "192.0.2.10:1234"
-ctx1 := webtest.NewContext(req1, nil, "/", nil)
-_ = handler(ctx1)
-req2 := httptest.NewRequest(http.MethodGet, "/", nil)
-req2.RemoteAddr = "192.0.2.10:1234"
-ctx2 := webtest.NewContext(req2, nil, "/", nil)
-_ = handler(ctx2)
-fmt.Println(ctx1.StatusCode(), ctx2.StatusCode())
-// 204 429
+
+router := echoweb.New().Router()
+router.Use(webmiddleware.RateLimiter(store))
+
+router.POST("/api/messages", func(c web.Context) error {
+	return c.NoContent(202)
+})
 ```
 
 #### <a id="webmiddleware-ratelimitermemorystore-allow"></a>webmiddleware.RateLimiterMemoryStore.Allow
@@ -909,6 +902,7 @@ Allow checks whether the given identifier is allowed through.
 store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 allowed, err := store.Allow("127.0.0.1")
 fmt.Println(err == nil, allowed)
+
 // true true
 ```
 
@@ -918,12 +912,15 @@ RateLimiterWithConfig creates a rate limiting middleware with config.
 
 ```go
 store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
-mw := webmiddleware.RateLimiterWithConfig(webmiddleware.RateLimiterConfig{Store: store})
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.NoContent(http.StatusAccepted) })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode())
-// 202
+
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.RateLimiterWithConfig(webmiddleware.RateLimiterConfig{
+	Store: store,
+	IdentifierExtractor: func(c web.Context) (string, error) {
+		return c.Header("X-Account-ID"), nil
+	},
+}))
 ```
 
 ### Redirects Middleware
@@ -933,11 +930,8 @@ fmt.Println(ctx.StatusCode())
 HTTPSNonWWWRedirect redirects to https without www.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSNonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Response().Header().Get("Location"))
-// https://example.com/docs
+router := echoweb.New().Router()
+router.Use(webmiddleware.HTTPSNonWWWRedirect())
 ```
 
 #### <a id="webmiddleware-httpsnonwwwredirectwithconfig"></a>webmiddleware.HTTPSNonWWWRedirectWithConfig
@@ -945,11 +939,11 @@ fmt.Println(ctx.Response().Header().Get("Location"))
 HTTPSNonWWWRedirectWithConfig returns HTTPS non-WWW redirect middleware with config.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.HTTPSNonWWWRedirectWithConfig(webmiddleware.RedirectConfig{
+	Code: 307,
+}))
 ```
 
 #### <a id="webmiddleware-httpsredirect"></a>webmiddleware.HTTPSRedirect
@@ -957,11 +951,12 @@ fmt.Println(ctx.StatusCode())
 HTTPSRedirect redirects http requests to https.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
-// 301 https://example.com/docs
+router := echoweb.New().Router()
+router.Use(webmiddleware.HTTPSRedirect())
+
+router.GET("/docs", func(c web.Context) error {
+	return c.Text(200, "docs")
+})
 ```
 
 #### <a id="webmiddleware-httpsredirectwithconfig"></a>webmiddleware.HTTPSRedirectWithConfig
@@ -969,11 +964,11 @@ fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("Location"))
 HTTPSRedirectWithConfig returns HTTPS redirect middleware with config.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.HTTPSRedirectWithConfig(webmiddleware.RedirectConfig{
+	Code: 307,
+}))
 ```
 
 #### <a id="webmiddleware-httpswwwredirect"></a>webmiddleware.HTTPSWWWRedirect
@@ -981,11 +976,8 @@ fmt.Println(ctx.StatusCode())
 HTTPSWWWRedirect redirects to https + www.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSWWWRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Response().Header().Get("Location"))
-// https://www.example.com/docs
+router := echoweb.New().Router()
+router.Use(webmiddleware.HTTPSWWWRedirect())
 ```
 
 #### <a id="webmiddleware-httpswwwredirectwithconfig"></a>webmiddleware.HTTPSWWWRedirectWithConfig
@@ -993,11 +985,11 @@ fmt.Println(ctx.Response().Header().Get("Location"))
 HTTPSWWWRedirectWithConfig returns HTTPS+WWW redirect middleware with config.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.HTTPSWWWRedirectWithConfig(webmiddleware.RedirectConfig{
+	Code: 307,
+}))
 ```
 
 #### <a id="webmiddleware-nonwwwredirect"></a>webmiddleware.NonWWWRedirect
@@ -1005,11 +997,8 @@ fmt.Println(ctx.StatusCode())
 NonWWWRedirect redirects to the non-www host.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.NonWWWRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Response().Header().Get("Location"))
-// http://example.com/docs
+router := echoweb.New().Router()
+router.Use(webmiddleware.NonWWWRedirect())
 ```
 
 #### <a id="webmiddleware-nonwwwredirectwithconfig"></a>webmiddleware.NonWWWRedirectWithConfig
@@ -1017,11 +1006,11 @@ fmt.Println(ctx.Response().Header().Get("Location"))
 NonWWWRedirectWithConfig returns non-WWW redirect middleware with config.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://www.example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.NonWWWRedirectWithConfig(webmiddleware.RedirectConfig{
+	Code: 307,
+}))
 ```
 
 #### <a id="webmiddleware-wwwredirect"></a>webmiddleware.WWWRedirect
@@ -1029,11 +1018,8 @@ fmt.Println(ctx.StatusCode())
 WWWRedirect redirects to the www host.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.WWWRedirect()(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.Response().Header().Get("Location"))
-// http://www.example.com/docs
+router := echoweb.New().Router()
+router.Use(webmiddleware.WWWRedirect())
 ```
 
 #### <a id="webmiddleware-wwwredirectwithconfig"></a>webmiddleware.WWWRedirectWithConfig
@@ -1041,11 +1027,11 @@ fmt.Println(ctx.Response().Header().Get("Location"))
 WWWRedirectWithConfig returns WWW redirect middleware with config.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "http://example.com/docs", nil)
-ctx := webtest.NewContext(req, nil, "/docs", nil)
-_ = webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{Code: http.StatusTemporaryRedirect})(func(c web.Context) error { return nil })(ctx)
-fmt.Println(ctx.StatusCode())
-// 307
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.WWWRedirectWithConfig(webmiddleware.RedirectConfig{
+	Code: 307,
+}))
 ```
 
 ### Reliability Middleware
@@ -1055,12 +1041,12 @@ fmt.Println(ctx.StatusCode())
 Recover returns middleware that recovers panics from the handler chain.
 
 ```go
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := webmiddleware.Recover()(func(c web.Context) error {
+router := echoweb.New().Router()
+router.Use(webmiddleware.Recover())
+
+router.GET("/panic", func(c web.Context) error {
 	panic("boom")
 })
-fmt.Println(handler(ctx) != nil)
-// true
 ```
 
 #### <a id="webmiddleware-recoverwithconfig"></a>webmiddleware.RecoverWithConfig
@@ -1068,12 +1054,14 @@ fmt.Println(handler(ctx) != nil)
 RecoverWithConfig returns recover middleware with config.
 
 ```go
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{DisableErrorHandler: true})(func(c web.Context) error {
-	panic("boom")
-})
-fmt.Println(handler(ctx) != nil)
-// true
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{
+	DisableStack: true,
+	HandleError: func(c web.Context, err error, stack []byte) error {
+		return c.JSON(500, map[string]any{"error": "internal server error"})
+	},
+}))
 ```
 
 ### Request Lifecycle Middleware
@@ -1083,13 +1071,12 @@ fmt.Println(handler(ctx) != nil)
 ContextTimeout sets a timeout on the request context.
 
 ```go
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := webmiddleware.ContextTimeout(2 * time.Second)(func(c web.Context) error {
-	fmt.Println(c.Request().Context().Err() == nil)
-	return nil
+router := echoweb.New().Router()
+router.Use(webmiddleware.ContextTimeout(2 * time.Second))
+
+router.GET("/reports", func(c web.Context) error {
+	return c.JSON(200, map[string]any{"ready": true})
 })
-_ = handler(ctx)
-// true
 ```
 
 #### <a id="webmiddleware-contexttimeoutwithconfig"></a>webmiddleware.ContextTimeoutWithConfig
@@ -1097,13 +1084,11 @@ _ = handler(ctx)
 ContextTimeoutWithConfig sets a timeout on the request context with config.
 
 ```go
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{Timeout: time.Second})(func(c web.Context) error {
-	fmt.Println(c.Request().Context().Err() == nil)
-	return nil
-})
-_ = handler(ctx)
-// true
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.ContextTimeoutWithConfig(webmiddleware.ContextTimeoutConfig{
+	Timeout: time.Second,
+}))
 ```
 
 #### <a id="webmiddleware-defaultskipper"></a>webmiddleware.DefaultSkipper
@@ -1120,16 +1105,14 @@ fmt.Println(webmiddleware.DefaultSkipper(nil))
 RequestID returns middleware that sets a request id header and context value.
 
 ```go
-mw := webmiddleware.RequestID()
-handler := mw(func(c web.Context) error {
-	_ = c.Get("request_id")
-	return c.NoContent(http.StatusOK)
+router := echoweb.New().Router()
+router.Use(webmiddleware.RequestID())
+
+router.GET("/healthz", func(c web.Context) error {
+	return c.JSON(200, map[string]any{
+		"request_id": c.Get("request_id"),
+	})
 })
-ctx := webtest.NewContext(nil, nil, "/", nil)
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("X-Request-ID") != "")
-// true
-// true
 ```
 
 #### <a id="webmiddleware-requestidwithconfig"></a>webmiddleware.RequestIDWithConfig
@@ -1137,14 +1120,12 @@ fmt.Println(ctx.Response().Header().Get("X-Request-ID") != "")
 RequestIDWithConfig returns RequestID middleware with config.
 
 ```go
-mw := webmiddleware.RequestIDWithConfig(webmiddleware.RequestIDConfig{
-	Generator: func() string { return "fixed-id" },
-})
-handler := mw(func(c web.Context) error { return c.NoContent(http.StatusOK) })
-ctx := webtest.NewContext(nil, nil, "/", nil)
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("X-Request-ID"))
-// fixed-id
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.RequestIDWithConfig(webmiddleware.RequestIDConfig{
+	TargetHeader: "X-Correlation-ID",
+	ContextKey:   "correlation_id",
+}))
 ```
 
 #### <a id="webmiddleware-requestloggerwithconfig"></a>webmiddleware.RequestLoggerWithConfig
@@ -1152,19 +1133,18 @@ fmt.Println(ctx.Response().Header().Get("X-Request-ID"))
 RequestLoggerWithConfig returns request logger middleware with config.
 
 ```go
-var loggedURI string
-mw := webmiddleware.RequestLoggerWithConfig(webmiddleware.RequestLoggerConfig{
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.RequestLoggerWithConfig(webmiddleware.RequestLoggerConfig{
 	LogValuesFunc: func(c web.Context, values webmiddleware.RequestLoggerValues) error {
-		loggedURI = values.URI
+		log.Printf("%s %s %d %s", values.Method, values.URI, values.Status, values.Latency)
 		return nil
 	},
+}))
+
+router.GET("/users/:id", func(c web.Context) error {
+	return c.NoContent(204)
 })
-req := httptest.NewRequest(http.MethodGet, "/users/42", nil)
-ctx := webtest.NewContext(req, nil, "/users/:id", webtest.PathParams{"id": "42"})
-handler := mw(func(c web.Context) error { return c.NoContent(http.StatusAccepted) })
-_ = handler(ctx)
-fmt.Println(loggedURI, ctx.StatusCode())
-// /users/42 202
 ```
 
 #### <a id="webmiddleware-timeout"></a>webmiddleware.Timeout
@@ -1172,11 +1152,12 @@ fmt.Println(loggedURI, ctx.StatusCode())
 Timeout returns a response-timeout middleware.
 
 ```go
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := webmiddleware.Timeout()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode())
-// 204
+router := echoweb.New().Router()
+router.Use(webmiddleware.Timeout())
+
+router.GET("/healthz", func(c web.Context) error {
+	return c.NoContent(204)
+})
 ```
 
 #### <a id="webmiddleware-timeoutwithconfig"></a>webmiddleware.TimeoutWithConfig
@@ -1184,13 +1165,12 @@ fmt.Println(ctx.StatusCode())
 TimeoutWithConfig returns a response-timeout middleware with config.
 
 ```go
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{Timeout: time.Second})(func(c web.Context) error {
-	return c.NoContent(http.StatusAccepted)
-})
-_ = handler(ctx)
-fmt.Println(ctx.StatusCode())
-// 202
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{
+	Timeout:      time.Second,
+	ErrorMessage: "request timed out",
+}))
 ```
 
 ### Security Middleware
@@ -1200,13 +1180,12 @@ fmt.Println(ctx.StatusCode())
 CORS returns Cross-Origin Resource Sharing middleware.
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-req.Header.Set("Origin", "https://example.com")
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := webmiddleware.CORS()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
-// *
+router := echoweb.New().Router()
+router.Use(webmiddleware.CORS())
+
+router.GET("/api/healthz", func(c web.Context) error {
+	return c.JSON(200, map[string]any{"ok": true})
+})
 ```
 
 #### <a id="webmiddleware-corswithconfig"></a>webmiddleware.CORSWithConfig
@@ -1214,14 +1193,16 @@ fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
 CORSWithConfig returns CORS middleware with config.
 
 ```go
-mw := webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{AllowOrigins: []string{"https://example.com"}})
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-req.Header.Set("Origin", "https://example.com")
-ctx := webtest.NewContext(req, nil, "/", nil)
-handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
-// https://example.com
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{
+	AllowOrigins: []string{"https://app.example.com"},
+	AllowMethods: []string{"GET", "POST", "PATCH"},
+}))
+
+router.GET("/api/healthz", func(c web.Context) error {
+	return c.JSON(200, map[string]any{"ok": true})
+})
 ```
 
 #### <a id="webmiddleware-secure"></a>webmiddleware.Secure
@@ -1229,11 +1210,12 @@ fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
 Secure sets security-oriented response headers.
 
 ```go
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := webmiddleware.Secure()(func(c web.Context) error { return c.NoContent(http.StatusOK) })
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("X-Frame-Options"))
-// SAMEORIGIN
+router := echoweb.New().Router()
+router.Use(webmiddleware.Secure())
+
+router.GET("/", func(c web.Context) error {
+	return c.Text(200, "home")
+})
 ```
 
 #### <a id="webmiddleware-securewithconfig"></a>webmiddleware.SecureWithConfig
@@ -1241,13 +1223,12 @@ fmt.Println(ctx.Response().Header().Get("X-Frame-Options"))
 SecureWithConfig sets security-oriented response headers with config.
 
 ```go
-ctx := webtest.NewContext(nil, nil, "/", nil)
-handler := webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{ReferrerPolicy: "same-origin"})(func(c web.Context) error {
-	return c.NoContent(http.StatusOK)
-})
-_ = handler(ctx)
-fmt.Println(ctx.Response().Header().Get("Referrer-Policy"))
-// same-origin
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{
+	ReferrerPolicy:        "same-origin",
+	ContentSecurityPolicy: "default-src 'self'",
+}))
 ```
 
 ### Static Files Middleware
@@ -1257,14 +1238,12 @@ fmt.Println(ctx.Response().Header().Get("Referrer-Policy"))
 Static serves static content from the provided root.
 
 ```go
-dir, _ := os.MkdirTemp("", "web-static-*")
-defer os.RemoveAll(dir)
-_ = os.WriteFile(filepath.Join(dir, "hello.txt"), []byte("hello"), 0o644)
-req := httptest.NewRequest(http.MethodGet, "/hello.txt", nil)
-ctx := webtest.NewContext(req, nil, "/hello.txt", nil)
-_ = webmiddleware.Static(dir)(func(c web.Context) error { return c.NoContent(http.StatusNotFound) })(ctx)
-fmt.Println(strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String()))
-// hello
+router := echoweb.New().Router()
+router.Use(webmiddleware.Static("public"))
+
+router.GET("/healthz", func(c web.Context) error {
+	return c.NoContent(204)
+})
 ```
 
 #### <a id="webmiddleware-staticwithconfig"></a>webmiddleware.StaticWithConfig
@@ -1272,14 +1251,12 @@ fmt.Println(strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).
 StaticWithConfig serves static content using config.
 
 ```go
-dir, _ := os.MkdirTemp("", "web-static-*")
-defer os.RemoveAll(dir)
-_ = os.WriteFile(filepath.Join(dir, "index.html"), []byte("<h1>home</h1>"), 0o644)
-req := httptest.NewRequest(http.MethodGet, "/", nil)
-ctx := webtest.NewContext(req, nil, "/", nil)
-_ = webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{Root: dir})(func(c web.Context) error { return c.NoContent(http.StatusNotFound) })(ctx)
-fmt.Println(strings.TrimSpace(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String()))
-// <h1>home</h1>
+router := echoweb.New().Router()
+
+router.Use(webmiddleware.StaticWithConfig(webmiddleware.StaticConfig{
+	Root:  "public",
+	HTML5: true,
+}))
 ```
 
 ### Prometheus

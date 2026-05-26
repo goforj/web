@@ -32,16 +32,15 @@ var DefaultBasicAuthConfig = BasicAuthConfig{
 // BasicAuth returns basic auth middleware.
 // @group Middleware - Auth
 // Example:
-// mw := webmiddleware.BasicAuth(func(user, pass string, c web.Context) (bool, error) {
-// 	return user == "demo" && pass == "secret", nil
-// })
-// req := httptest.NewRequest(http.MethodGet, "/", nil)
-// req.Header.Set("Authorization", "basic ZGVtbzpzZWNyZXQ=")
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// _ = handler(ctx)
-// fmt.Println(ctx.StatusCode())
-//	// 204
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.BasicAuth(func(user, pass string, c web.Context) (bool, error) {
+//		return user == "demo" && pass == "secret", nil
+//	}))
+//
+//	router.GET("/admin", func(c web.Context) error {
+//		return c.Text(200, "welcome")
+//	})
 func BasicAuth(fn BasicAuthValidator) web.Middleware {
 	config := DefaultBasicAuthConfig
 	config.Validator = fn
@@ -51,15 +50,18 @@ func BasicAuth(fn BasicAuthValidator) web.Middleware {
 // BasicAuthWithConfig returns basic auth middleware with config.
 // @group Middleware - Auth
 // Example:
-// mw := webmiddleware.BasicAuthWithConfig(webmiddleware.BasicAuthConfig{
-// 	Realm: "Example",
-// 	Validator: func(user, pass string, c web.Context) (bool, error) { return true, nil },
-// })
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// _ = handler(ctx)
-// fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("WWW-Authenticate"))
-//	// 401 basic realm=\"Example\"
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.BasicAuthWithConfig(webmiddleware.BasicAuthConfig{
+//		Realm: "Admin",
+//		Validator: func(user, pass string, c web.Context) (bool, error) {
+//			return user == "demo" && pass == "secret", nil
+//		},
+//	}))
+//
+//	router.GET("/admin", func(c web.Context) error {
+//		return c.Text(200, "welcome")
+//	})
 func BasicAuthWithConfig(config BasicAuthConfig) web.Middleware {
 	if config.Validator == nil {
 		panic("web: basic-auth middleware requires a validator function")

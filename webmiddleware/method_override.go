@@ -22,15 +22,12 @@ var DefaultMethodOverrideConfig = MethodOverrideConfig{
 // MethodOverride returns method override middleware.
 // @group Middleware - Method Override
 // Example:
-// req := httptest.NewRequest(http.MethodPost, "/", nil)
-// req.Header.Set("X-HTTP-Method-Override", http.MethodPatch)
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.MethodOverride()(func(c web.Context) error {
-// 	fmt.Println(c.Method())
-// 	return nil
-// })
-// _ = handler(ctx)
-//	// PATCH
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.MethodOverride())
+//
+//	router.PATCH("/articles/:id", func(c web.Context) error {
+//		return c.NoContent(204)
+//	})
 func MethodOverride() web.Middleware {
 	return MethodOverrideWithConfig(DefaultMethodOverrideConfig)
 }
@@ -38,16 +35,15 @@ func MethodOverride() web.Middleware {
 // MethodOverrideWithConfig returns method override middleware with config.
 // @group Middleware - Method Override
 // Example:
-// req := httptest.NewRequest(http.MethodPost, "/?_method=DELETE", nil)
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
-// 	Getter: webmiddleware.MethodFromQuery("_method"),
-// })(func(c web.Context) error {
-// 	fmt.Println(c.Method())
-// 	return nil
-// })
-// _ = handler(ctx)
-//	// DELETE
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+//		Getter: webmiddleware.MethodFromQuery("_method"),
+//	}))
+//
+//	router.DELETE("/articles/:id", func(c web.Context) error {
+//		return c.NoContent(204)
+//	})
 func MethodOverrideWithConfig(config MethodOverrideConfig) web.Middleware {
 	if config.Getter == nil {
 		config.Getter = DefaultMethodOverrideConfig.Getter
@@ -70,11 +66,11 @@ func MethodOverrideWithConfig(config MethodOverrideConfig) web.Middleware {
 // MethodFromHeader gets an override method from a request header.
 // @group Middleware - Method Override
 // Example:
-// getter := webmiddleware.MethodFromHeader("X-HTTP-Method-Override")
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// ctx.Request().Header.Set("X-HTTP-Method-Override", "PATCH")
-// fmt.Println(getter(ctx))
-//	// PATCH
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+//		Getter: webmiddleware.MethodFromHeader("X-HTTP-Method-Override"),
+//	}))
 func MethodFromHeader(header string) MethodOverrideGetter {
 	return func(r web.Context) string {
 		return r.Header(header)
@@ -84,12 +80,11 @@ func MethodFromHeader(header string) MethodOverrideGetter {
 // MethodFromForm gets an override method from a form field.
 // @group Middleware - Method Override
 // Example:
-// getter := webmiddleware.MethodFromForm("_method")
-// req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("_method=DELETE"))
-// req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// fmt.Println(getter(ctx))
-//	// DELETE
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+//		Getter: webmiddleware.MethodFromForm("_method"),
+//	}))
 func MethodFromForm(param string) MethodOverrideGetter {
 	return func(r web.Context) string {
 		req := r.Request()
@@ -106,11 +101,11 @@ func MethodFromForm(param string) MethodOverrideGetter {
 // MethodFromQuery gets an override method from a query parameter.
 // @group Middleware - Method Override
 // Example:
-// getter := webmiddleware.MethodFromQuery("_method")
-// req := httptest.NewRequest(http.MethodPost, "/?_method=PUT", nil)
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// fmt.Println(getter(ctx))
-//	// PUT
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+//		Getter: webmiddleware.MethodFromQuery("_method"),
+//	}))
 func MethodFromQuery(param string) MethodOverrideGetter {
 	return func(r web.Context) string {
 		return r.Query(param)

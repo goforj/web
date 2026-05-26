@@ -9,16 +9,16 @@ import (
 
 // SecureConfig configures secure response headers.
 type SecureConfig struct {
-	Skipper                Skipper
-	XSSProtection          string
-	ContentTypeNosniff     string
-	XFrameOptions          string
-	HSTSMaxAge             int
-	HSTSExcludeSubdomains  bool
-	ContentSecurityPolicy  string
-	CSPReportOnly          bool
-	HSTSPreloadEnabled     bool
-	ReferrerPolicy         string
+	Skipper               Skipper
+	XSSProtection         string
+	ContentTypeNosniff    string
+	XFrameOptions         string
+	HSTSMaxAge            int
+	HSTSExcludeSubdomains bool
+	ContentSecurityPolicy string
+	CSPReportOnly         bool
+	HSTSPreloadEnabled    bool
+	ReferrerPolicy        string
 }
 
 // DefaultSecureConfig is the default secure middleware config.
@@ -32,11 +32,12 @@ var DefaultSecureConfig = SecureConfig{
 // Secure sets security-oriented response headers.
 // @group Middleware - Security
 // Example:
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := webmiddleware.Secure()(func(c web.Context) error { return c.NoContent(http.StatusOK) })
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("X-Frame-Options"))
-//	// SAMEORIGIN
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.Secure())
+//
+//	router.GET("/", func(c web.Context) error {
+//		return c.Text(200, "home")
+//	})
 func Secure() web.Middleware {
 	return SecureWithConfig(DefaultSecureConfig)
 }
@@ -44,13 +45,12 @@ func Secure() web.Middleware {
 // SecureWithConfig sets security-oriented response headers with config.
 // @group Middleware - Security
 // Example:
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{ReferrerPolicy: "same-origin"})(func(c web.Context) error {
-// 	return c.NoContent(http.StatusOK)
-// })
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("Referrer-Policy"))
-//	// same-origin
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.SecureWithConfig(webmiddleware.SecureConfig{
+//		ReferrerPolicy:        "same-origin",
+//		ContentSecurityPolicy: "default-src 'self'",
+//	}))
 func SecureWithConfig(config SecureConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultSecureConfig.Skipper

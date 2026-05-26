@@ -16,14 +16,12 @@ type BodyLimitConfig struct {
 // BodyLimit returns middleware that limits request body size.
 // @group Middleware - Payloads
 // Example:
-// req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("hello"))
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.BodyLimit("2B")(func(c web.Context) error {
-// 	return c.NoContent(http.StatusOK)
-// })
-// _ = handler(ctx)
-// fmt.Println(ctx.StatusCode())
-//	// 413
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.BodyLimit("2MB"))
+//
+//	router.POST("/uploads", func(c web.Context) error {
+//		return c.NoContent(204)
+//	})
 func BodyLimit(limit string) web.Middleware {
 	return BodyLimitWithConfig(BodyLimitConfig{Limit: limit})
 }
@@ -31,14 +29,15 @@ func BodyLimit(limit string) web.Middleware {
 // BodyLimitWithConfig returns body limit middleware with config.
 // @group Middleware - Payloads
 // Example:
-// req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("ok"))
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.BodyLimitWithConfig(webmiddleware.BodyLimitConfig{Limit: "2KB"})(func(c web.Context) error {
-// 	return c.NoContent(http.StatusNoContent)
-// })
-// _ = handler(ctx)
-// fmt.Println(ctx.StatusCode())
-//	// 204
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.BodyLimitWithConfig(webmiddleware.BodyLimitConfig{
+//		Limit: "10MB",
+//	}))
+//
+//	router.POST("/imports", func(c web.Context) error {
+//		return c.NoContent(202)
+//	})
 func BodyLimitWithConfig(config BodyLimitConfig) web.Middleware {
 	limit, err := parseBodyLimit(config.Limit)
 	if err != nil {

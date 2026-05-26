@@ -11,10 +11,10 @@ import (
 
 // TimeoutConfig configures response timeouts.
 type TimeoutConfig struct {
-	Skipper                   Skipper
-	ErrorMessage              string
+	Skipper                    Skipper
+	ErrorMessage               string
 	OnTimeoutRouteErrorHandler func(error, web.Context)
-	Timeout                   time.Duration
+	Timeout                    time.Duration
 }
 
 // DefaultTimeoutConfig is the default timeout config.
@@ -26,11 +26,12 @@ var DefaultTimeoutConfig = TimeoutConfig{
 // Timeout returns a response-timeout middleware.
 // @group Middleware - Request Lifecycle
 // Example:
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := webmiddleware.Timeout()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// _ = handler(ctx)
-// fmt.Println(ctx.StatusCode())
-//	// 204
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.Timeout())
+//
+//	router.GET("/healthz", func(c web.Context) error {
+//		return c.NoContent(204)
+//	})
 func Timeout() web.Middleware {
 	return TimeoutWithConfig(DefaultTimeoutConfig)
 }
@@ -38,13 +39,12 @@ func Timeout() web.Middleware {
 // TimeoutWithConfig returns a response-timeout middleware with config.
 // @group Middleware - Request Lifecycle
 // Example:
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{Timeout: time.Second})(func(c web.Context) error {
-// 	return c.NoContent(http.StatusAccepted)
-// })
-// _ = handler(ctx)
-// fmt.Println(ctx.StatusCode())
-//	// 202
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{
+//		Timeout:      time.Second,
+//		ErrorMessage: "request timed out",
+//	}))
 func TimeoutWithConfig(config TimeoutConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultTimeoutConfig.Skipper

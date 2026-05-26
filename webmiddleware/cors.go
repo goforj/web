@@ -36,13 +36,12 @@ var DefaultCORSConfig = CORSConfig{
 // CORS returns Cross-Origin Resource Sharing middleware.
 // @group Middleware - Security
 // Example:
-// req := httptest.NewRequest(http.MethodGet, "/", nil)
-// req.Header.Set("Origin", "https://example.com")
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.CORS()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
-//	// *
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.CORS())
+//
+//	router.GET("/api/healthz", func(c web.Context) error {
+//		return c.JSON(200, map[string]any{"ok": true})
+//	})
 func CORS() web.Middleware {
 	return CORSWithConfig(DefaultCORSConfig)
 }
@@ -50,14 +49,16 @@ func CORS() web.Middleware {
 // CORSWithConfig returns CORS middleware with config.
 // @group Middleware - Security
 // Example:
-// mw := webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{AllowOrigins: []string{"https://example.com"}})
-// req := httptest.NewRequest(http.MethodGet, "/", nil)
-// req.Header.Set("Origin", "https://example.com")
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("Access-Control-Allow-Origin"))
-//	// https://example.com
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.CORSWithConfig(webmiddleware.CORSConfig{
+//		AllowOrigins: []string{"https://app.example.com"},
+//		AllowMethods: []string{"GET", "POST", "PATCH"},
+//	}))
+//
+//	router.GET("/api/healthz", func(c web.Context) error {
+//		return c.JSON(200, map[string]any{"ok": true})
+//	})
 func CORSWithConfig(config CORSConfig) web.Middleware {
 	if len(config.AllowOrigins) == 0 {
 		config.AllowOrigins = DefaultCORSConfig.AllowOrigins

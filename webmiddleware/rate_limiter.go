@@ -56,17 +56,13 @@ var DefaultRateLimiterConfig = RateLimiterConfig{
 // @group Middleware - Rate Limiting
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
-// handler := webmiddleware.RateLimiter(store)(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// req1 := httptest.NewRequest(http.MethodGet, "/", nil)
-// req1.RemoteAddr = "192.0.2.10:1234"
-// ctx1 := webtest.NewContext(req1, nil, "/", nil)
-// _ = handler(ctx1)
-// req2 := httptest.NewRequest(http.MethodGet, "/", nil)
-// req2.RemoteAddr = "192.0.2.10:1234"
-// ctx2 := webtest.NewContext(req2, nil, "/", nil)
-// _ = handler(ctx2)
-// fmt.Println(ctx1.StatusCode(), ctx2.StatusCode())
-//	// 204 429
+//
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.RateLimiter(store))
+//
+//	router.POST("/api/messages", func(c web.Context) error {
+//		return c.NoContent(202)
+//	})
 func RateLimiter(store RateLimiterStore) web.Middleware {
 	config := DefaultRateLimiterConfig
 	config.Store = store
@@ -77,12 +73,15 @@ func RateLimiter(store RateLimiterStore) web.Middleware {
 // @group Middleware - Rate Limiting
 // Example:
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
-// mw := webmiddleware.RateLimiterWithConfig(webmiddleware.RateLimiterConfig{Store: store})
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusAccepted) })
-// _ = handler(ctx)
-// fmt.Println(ctx.StatusCode())
-//	// 202
+//
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.RateLimiterWithConfig(webmiddleware.RateLimiterConfig{
+//		Store: store,
+//		IdentifierExtractor: func(c web.Context) (string, error) {
+//			return c.Header("X-Account-ID"), nil
+//		},
+//	}))
 func RateLimiterWithConfig(config RateLimiterConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultRateLimiterConfig.Skipper
@@ -156,6 +155,7 @@ type visitor struct {
 // allowed1, _ := store.Allow("192.0.2.1")
 // allowed2, _ := store.Allow("192.0.2.1")
 // fmt.Println(allowed1, allowed2)
+//
 //	// true false
 func NewRateLimiterMemoryStore(limit rate.Limit) *RateLimiterMemoryStore {
 	return NewRateLimiterMemoryStoreWithConfig(RateLimiterMemoryStoreConfig{Rate: limit})
@@ -167,6 +167,7 @@ func NewRateLimiterMemoryStore(limit rate.Limit) *RateLimiterMemoryStore {
 // store := webmiddleware.NewRateLimiterMemoryStoreWithConfig(webmiddleware.RateLimiterMemoryStoreConfig{Rate: rate.Every(time.Second)})
 // allowed, _ := store.Allow("192.0.2.1")
 // fmt.Println(allowed)
+//
 //	// true
 func NewRateLimiterMemoryStoreWithConfig(config RateLimiterMemoryStoreConfig) *RateLimiterMemoryStore {
 	store := &RateLimiterMemoryStore{
@@ -192,6 +193,7 @@ func NewRateLimiterMemoryStoreWithConfig(config RateLimiterMemoryStoreConfig) *R
 // store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
 // allowed, err := store.Allow("127.0.0.1")
 // fmt.Println(err == nil, allowed)
+//
 //	// true true
 func (store *RateLimiterMemoryStore) Allow(identifier string) (bool, error) {
 	store.mutex.Lock()

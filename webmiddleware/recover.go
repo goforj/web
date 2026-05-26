@@ -24,12 +24,12 @@ var DefaultRecoverConfig = RecoverConfig{
 // Recover returns middleware that recovers panics from the handler chain.
 // @group Middleware - Reliability
 // Example:
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := webmiddleware.Recover()(func(c web.Context) error {
-// 	panic("boom")
-// })
-// fmt.Println(handler(ctx) != nil)
-//	// true
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.Recover())
+//
+//	router.GET("/panic", func(c web.Context) error {
+//		panic("boom")
+//	})
 func Recover() web.Middleware {
 	return RecoverWithConfig(DefaultRecoverConfig)
 }
@@ -37,12 +37,14 @@ func Recover() web.Middleware {
 // RecoverWithConfig returns recover middleware with config.
 // @group Middleware - Reliability
 // Example:
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{DisableErrorHandler: true})(func(c web.Context) error {
-// 	panic("boom")
-// })
-// fmt.Println(handler(ctx) != nil)
-//	// true
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.RecoverWithConfig(webmiddleware.RecoverConfig{
+//		DisableStack: true,
+//		HandleError: func(c web.Context, err error, stack []byte) error {
+//			return c.JSON(500, map[string]any{"error": "internal server error"})
+//		},
+//	}))
 func RecoverWithConfig(config RecoverConfig) web.Middleware {
 	if config.StackSize == 0 {
 		config.StackSize = DefaultRecoverConfig.StackSize

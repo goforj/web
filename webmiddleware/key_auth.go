@@ -46,16 +46,15 @@ func (e *ErrKeyAuthMissing) Unwrap() error {
 // KeyAuth returns key auth middleware.
 // @group Middleware - Auth
 // Example:
-// mw := webmiddleware.KeyAuth(func(key string, c web.Context) (bool, error) {
-// 	return key == "demo-key", nil
-// })
-// req := httptest.NewRequest(http.MethodGet, "/", nil)
-// req.Header.Set("Authorization", "Bearer demo-key")
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// _ = handler(ctx)
-// fmt.Println(ctx.StatusCode())
-//	// 204
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.KeyAuth(func(key string, c web.Context) (bool, error) {
+//		return key == "demo-key", nil
+//	}))
+//
+//	router.GET("/api/reports", func(c web.Context) error {
+//		return c.JSON(200, map[string]any{"ready": true})
+//	})
 func KeyAuth(fn KeyAuthValidator) web.Middleware {
 	config := DefaultKeyAuthConfig
 	config.Validator = fn
@@ -65,14 +64,18 @@ func KeyAuth(fn KeyAuthValidator) web.Middleware {
 // KeyAuthWithConfig returns key auth middleware with config.
 // @group Middleware - Auth
 // Example:
-// mw := webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
-// 	Validator: func(key string, c web.Context) (bool, error) { return true, nil },
-// })
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// _ = handler(ctx)
-// fmt.Println(ctx.StatusCode())
-//	// 400
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
+//		KeyLookup: "query:api_key",
+//		Validator: func(key string, c web.Context) (bool, error) {
+//			return key == "demo-key", nil
+//		},
+//	}))
+//
+//	router.GET("/api/reports", func(c web.Context) error {
+//		return c.JSON(200, map[string]any{"ready": true})
+//	})
 func KeyAuthWithConfig(config KeyAuthConfig) web.Middleware {
 	if config.AuthScheme == "" {
 		config.AuthScheme = DefaultKeyAuthConfig.AuthScheme

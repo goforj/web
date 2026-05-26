@@ -48,6 +48,7 @@ type roundRobinBalancer struct {
 // target, _ := url.Parse("http://localhost:8080")
 // balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
 // fmt.Println(balancer.Next(nil).URL.Host)
+//
 //	// localhost:8080
 func NewRandomBalancer(targets []*ProxyTarget) ProxyBalancer {
 	return &randomBalancer{
@@ -62,6 +63,7 @@ func NewRandomBalancer(targets []*ProxyTarget) ProxyBalancer {
 // target, _ := url.Parse("http://localhost:8080")
 // balancer := webmiddleware.NewRoundRobinBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
 // fmt.Println(balancer.Next(nil).URL.Host)
+//
 //	// localhost:8080
 func NewRoundRobinBalancer(targets []*ProxyTarget) ProxyBalancer {
 	return &roundRobinBalancer{commonBalancer: commonBalancer{targets: targets}}
@@ -144,11 +146,9 @@ var DefaultProxyConfig = ProxyConfig{
 // Example:
 // target, _ := url.Parse("http://localhost:8080")
 // balancer := webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
-// req := httptest.NewRequest(http.MethodGet, "/", nil)
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// _ = webmiddleware.Proxy(balancer)(func(c web.Context) error { return nil })(ctx)
-// fmt.Println(ctx.Get("target").(*webmiddleware.ProxyTarget).URL.Host)
-//	// localhost:8080
+//
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.Proxy(balancer))
 func Proxy(balancer ProxyBalancer) web.Middleware {
 	config := DefaultProxyConfig
 	config.Balancer = balancer
@@ -159,14 +159,16 @@ func Proxy(balancer ProxyBalancer) web.Middleware {
 // @group Middleware - Proxying
 // Example:
 // target, _ := url.Parse("http://localhost:8080")
-// mw := webmiddleware.ProxyWithConfig(webmiddleware.ProxyConfig{
-// 	Balancer: webmiddleware.NewRandomBalancer([]*webmiddleware.ProxyTarget{{URL: target}}),
-// })
-// req := httptest.NewRequest(http.MethodGet, "/old/path", nil)
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// _ = mw(func(c web.Context) error { return nil })(ctx)
-// fmt.Println(ctx.Get("target").(*webmiddleware.ProxyTarget).URL.Host)
-//	// localhost:8080
+// balancer := webmiddleware.NewRoundRobinBalancer([]*webmiddleware.ProxyTarget{{URL: target}})
+//
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.ProxyWithConfig(webmiddleware.ProxyConfig{
+//		Balancer: balancer,
+//		Rewrite: map[string]string{
+//			"/api/*": "/$1",
+//		},
+//	}))
 func ProxyWithConfig(config ProxyConfig) web.Middleware {
 	if config.Balancer == nil {
 		panic("web: proxy middleware requires a balancer")

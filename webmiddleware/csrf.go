@@ -45,11 +45,12 @@ var DefaultCSRFConfig = CSRFConfig{
 // CSRF enables token-based CSRF protection.
 // @group Middleware - Auth
 // Example:
-// ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
-// handler := webmiddleware.CSRF()(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// _ = handler(ctx)
-// fmt.Println(ctx.Response().Header().Get("Set-Cookie") != "")
-//	// true
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.CSRF())
+//
+//	router.POST("/settings", func(c web.Context) error {
+//		return c.NoContent(204)
+//	})
 func CSRF() web.Middleware {
 	return CSRFWithConfig(DefaultCSRFConfig)
 }
@@ -57,12 +58,16 @@ func CSRF() web.Middleware {
 // CSRFWithConfig enables token-based CSRF protection with config.
 // @group Middleware - Auth
 // Example:
-// mw := webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{CookieName: "_csrf"})
-// ctx := webtest.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), nil, "/", nil)
-// handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-// _ = handler(ctx)
-// fmt.Println(strings.Contains(ctx.Response().Header().Get("Set-Cookie"), "_csrf="))
-//	// true
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.CSRFWithConfig(webmiddleware.CSRFConfig{
+//		CookieName:  "_csrf",
+//		TokenLookup: "header:X-CSRF-Token",
+//	}))
+//
+//	router.POST("/settings", func(c web.Context) error {
+//		return c.NoContent(204)
+//	})
 func CSRFWithConfig(config CSRFConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultCSRFConfig.Skipper

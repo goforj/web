@@ -25,15 +25,15 @@ var DefaultErrorBodyDumpConfig = ErrorBodyDumpConfig{
 // ErrorBodyDump captures response bodies for non-2xx and non-3xx responses.
 // @group Middleware - Payloads
 // Example:
-// var captured string
-// mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
-// 	captured = fmt.Sprintf("%d:%s", status, string(body))
-// })
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := mw(func(c web.Context) error { return c.Text(http.StatusBadRequest, "nope") })
-// _ = handler(ctx)
-// fmt.Println(captured)
-//	// 400:nope
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
+//		log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+//	}))
+//
+//	router.GET("/reports/:id", func(c web.Context) error {
+//		return c.Text(404, "report not found")
+//	})
 func ErrorBodyDump(handler ErrorBodyDumpHandler) web.Middleware {
 	config := DefaultErrorBodyDumpConfig
 	config.Handler = handler
@@ -43,13 +43,16 @@ func ErrorBodyDump(handler ErrorBodyDumpHandler) web.Middleware {
 // ErrorBodyDumpWithConfig captures response bodies for non-success responses with config.
 // @group Middleware - Payloads
 // Example:
-// mw := webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
-// 	Handler: func(c web.Context, status int, body []byte) { fmt.Println(status) },
-// })
-// ctx := webtest.NewContext(nil, nil, "/", nil)
-// handler := mw(func(c web.Context) error { return c.Text(http.StatusInternalServerError, "boom") })
-// _ = handler(ctx)
-//	// 500
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
+//		Skipper: func(c web.Context) bool {
+//			return c.Path() == "/healthz"
+//		},
+//		Handler: func(c web.Context, status int, body []byte) {
+//			log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+//		},
+//	}))
 func ErrorBodyDumpWithConfig(config ErrorBodyDumpConfig) web.Middleware {
 	if config.Handler == nil {
 		panic("web: error body dump middleware requires a handler")

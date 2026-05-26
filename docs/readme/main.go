@@ -240,10 +240,10 @@ func extractExamples(fset *token.FileSet, group *ast.CommentGroup) []Example {
 				if len(block) == 0 {
 					continue
 				}
-				break
 			}
 			block = append(block, next.text)
 		}
+		block = trimBlankLines(block)
 		if len(block) == 0 {
 			continue
 		}
@@ -254,6 +254,16 @@ func extractExamples(fset *token.FileSet, group *ast.CommentGroup) []Example {
 		})
 	}
 	return examples
+}
+
+func trimBlankLines(lines []string) []string {
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return lines
 }
 
 type docLine struct {

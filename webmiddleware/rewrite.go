@@ -21,14 +21,15 @@ var DefaultRewriteConfig = RewriteConfig{}
 // Rewrite rewrites the request path using wildcard rules.
 // @group Middleware - Path Rewriting
 // Example:
-// req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
-// ctx := webtest.NewContext(req, nil, "/old/*", nil)
-// handler := webmiddleware.Rewrite(map[string]string{"/old/*": "/new/$1"})(func(c web.Context) error {
-// 	fmt.Println(c.Request().URL.Path)
-// 	return nil
-// })
-// _ = handler(ctx)
-//	// /new/users
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.Rewrite(map[string]string{
+//		"/old/*": "/new/$1",
+//	}))
+//
+//	router.GET("/new/:name", func(c web.Context) error {
+//		return c.Text(200, c.Param("name"))
+//	})
 func Rewrite(rules map[string]string) web.Middleware {
 	config := DefaultRewriteConfig
 	config.Rules = rules
@@ -38,16 +39,15 @@ func Rewrite(rules map[string]string) web.Middleware {
 // RewriteWithConfig rewrites the request path using wildcard and regex rules.
 // @group Middleware - Path Rewriting
 // Example:
-// req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
-// ctx := webtest.NewContext(req, nil, "/old/*", nil)
-// handler := webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
-// 	Rules: map[string]string{"/old/*": "/v2/$1"},
-// })(func(c web.Context) error {
-// 	fmt.Println(c.Request().URL.Path)
-// 	return nil
-// })
-// _ = handler(ctx)
-//	// /v2/users
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
+//		Rules: map[string]string{"/old/*": "/v2/$1"},
+//	}))
+//
+//	router.GET("/v2/:name", func(c web.Context) error {
+//		return c.Text(200, c.Param("name"))
+//	})
 func RewriteWithConfig(config RewriteConfig) web.Middleware {
 	if config.Rules == nil && config.RegexRules == nil {
 		panic("web: rewrite middleware requires rewrite rules")

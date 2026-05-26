@@ -39,41 +39,34 @@ var DefaultDecompressConfig = DecompressConfig{
 	GzipDecompressPool: &DefaultGzipDecompressPool{},
 }
 
-// Decompress decompresses gzip-encoded request bodies.
+// Decompress inflates gzip-encoded request bodies before handlers read them.
 // @group Middleware - Compression
 // Example:
-// var body string
-// compressed := &bytes.Buffer{}
-// gz := gzip.NewWriter(compressed)
-// _, _ = gz.Write([]byte("hello"))
-// _ = gz.Close()
-// req := httptest.NewRequest(http.MethodPost, "/", compressed)
-// req.Header.Set("Content-Encoding", webmiddleware.GZIPEncoding)
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.Decompress()(func(c web.Context) error {
-// 	data, _ := io.ReadAll(c.Request().Body)
-// 	body = string(data)
-// 	return c.NoContent(http.StatusNoContent)
-// })
-// _ = handler(ctx)
-// fmt.Println(body, ctx.Request().Header.Get("Content-Encoding"))
-//	// hello
+// router := echoweb.New().Router()
+// router.Use(webmiddleware.Decompress())
+//
+//	router.POST("/ingest", func(c web.Context) error {
+//		data, _ := io.ReadAll(c.Request().Body)
+//		return c.JSON(200, map[string]int{"bytes": len(data)})
+//	})
 func Decompress() web.Middleware {
 	return DecompressWithConfig(DefaultDecompressConfig)
 }
 
-// DecompressWithConfig decompresses gzip-encoded request bodies with config.
+// DecompressWithConfig inflates gzip-encoded request bodies with custom options.
 // @group Middleware - Compression
 // Example:
-// req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("plain"))
-// ctx := webtest.NewContext(req, nil, "/", nil)
-// handler := webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{})(func(c web.Context) error {
-// 	data, _ := io.ReadAll(c.Request().Body)
-// 	fmt.Println(string(data))
-// 	return nil
-// })
-// _ = handler(ctx)
-//	// plain
+// router := echoweb.New().Router()
+//
+//	router.Use(webmiddleware.DecompressWithConfig(webmiddleware.DecompressConfig{
+//		Skipper: func(c web.Context) bool {
+//			return c.Path() == "/webhooks/raw"
+//		},
+//	}))
+//
+//	router.POST("/ingest", func(c web.Context) error {
+//		return c.NoContent(202)
+//	})
 func DecompressWithConfig(config DecompressConfig) web.Middleware {
 	if config.Skipper == nil {
 		config.Skipper = DefaultSkipper
