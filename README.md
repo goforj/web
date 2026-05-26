@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/assets/logo.png" width="300" alt="goforj/collection logo">
+  <img src="./docs/assets/logo.png" width="300" alt="goforj/web logo">
 </p>
 
 <p align="center">
@@ -52,24 +52,22 @@ import (
 )
 
 func main() {
-	// Pick an adapter that satisfies the app-facing web.Router contract.
 	adapter := echoweb.New()
 	router := adapter.Router()
 
-	// Attach common app middleware once near the top of the stack.
 	router.Use(
 		webmiddleware.Recover(),
 		webmiddleware.RequestID(),
 	)
 
-	// Register a basic health route for uptime checks and local smoke tests.
 	router.GET("/healthz", func(c web.Context) error {
-		return c.Text(http.StatusOK, "ok")
+		// GET /healthz -> 200 ok
+		return c.Text(200, "ok")
 	})
 
-	// Register an actual application route that returns JSON.
 	router.GET("/users/:id", func(c web.Context) error {
-		return c.JSON(http.StatusOK, map[string]any{
+		// GET /users/42 -> 200 {"id":"42","name":"user-42"}
+		return c.JSON(200, map[string]any{
 			"id":   c.Param("id"),
 			"name": fmt.Sprintf("user-%s", c.Param("id")),
 		})
@@ -85,81 +83,106 @@ func main() {
 ### Route Groups
 
 ```go
+adapter := echoweb.New()
+router := adapter.Router()
+
 routes := []web.Route{
 	web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error {
+		// GET /api/healthz -> 204
 		return c.NoContent(http.StatusOK)
 	}),
 	web.NewRoute(http.MethodGet, "/users", func(c web.Context) error {
+		// GET /api/users -> 200 [{"id":1}]
 		return c.JSON(http.StatusOK, []map[string]any{{"id": 1}})
 	}),
 }
 
 group := web.NewRouteGroup("/api", routes)
 
-adapter := echoweb.New()
-_ = web.RegisterRoutes(adapter.Router(), []web.RouteGroup{group})
+if err := web.RegisterRoutes(router, []web.RouteGroup{group}); err != nil {
+	panic(err)
+}
 ```
 
-### Compose Middleware Around A Handler
+### Use Middleware
 
 ```go
-requestID := webmiddleware.RequestID()
-recoverer := webmiddleware.Recover()
-limiter := webmiddleware.RateLimiter(
-	webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second)),
+adapter := echoweb.New()
+router := adapter.Router()
+
+store := webmiddleware.NewRateLimiterMemoryStore(rate.Every(time.Second))
+
+router.Use(
+	webmiddleware.Recover(),
+	webmiddleware.RequestID(),
+	webmiddleware.RateLimiter(store),
 )
 
-handler := web.Handler(func(c web.Context) error {
-	return c.Text(http.StatusOK, "ok")
+router.GET("/api/messages", func(c web.Context) error {
+	// GET /api/messages -> 200 [{"id":1,"subject":"Welcome"}]
+	// Requests over the configured rate limit return 429.
+	return c.JSON(200, []map[string]any{
+		{"id": 1, "subject": "Welcome"},
+	})
 })
-
-wrapped := requestID(recoverer(limiter(handler)))
-_ = wrapped
 ```
 
-### Test A Handler End To End
+### Test A Route
 
 ```go
-req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
-ctx := webtest.NewContext(req, nil, "/healthz", nil)
+func TestHealthRoute(t *testing.T) {
+	adapter := echoweb.New()
+	router := adapter.Router()
 
-handler := webmiddleware.RequestID()(func(c web.Context) error {
-	return c.Text(http.StatusOK, "ok")
-})
+	router.GET("/healthz", func(c web.Context) error {
+		return c.Text(200, "ok")
+	})
 
-_ = handler(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
 
-fmt.Println(ctx.StatusCode())
-fmt.Println(ctx.Response().Header().Get("X-Request-ID") != "")
-fmt.Println(ctx.ResponseWriter().(*httptest.ResponseRecorder).Body.String())
-// 200
-// true
-// ok
+	adapter.ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if strings.TrimSpace(rec.Body.String()) != "ok" {
+		t.Fatalf("expected ok, got %q", rec.Body.String())
+	}
+	// rec.Code -> 200
+	// rec.Body -> ok
+}
 ```
 
 ### Expose Prometheus Metrics
 
 ```go
 adapter := echoweb.New()
-metrics, _ := webprometheus.New(webprometheus.Config{Namespace: "app"})
+router := adapter.Router()
 
-adapter.Router().Use(metrics.Middleware())
-adapter.Router().GET("/users", func(c web.Context) error {
+metrics := webprometheus.MustNew(webprometheus.Config{Namespace: "app"})
+
+router.Use(metrics.Middleware())
+
+router.GET("/users", func(c web.Context) error {
+	// GET /users -> 204
 	return c.NoContent(http.StatusOK)
 })
-adapter.Router().GET("/metrics", metrics.Handler())
+router.GET("/metrics", metrics.Handler())
+// GET /metrics -> Prometheus text exposition
 ```
 
 ### Generate A Route Index
 
 ```go
-manifest, err := webindex.Run(context.Background(), webindex.IndexOptions{
+_, err := webindex.Run(context.Background(), webindex.IndexOptions{
 	Root:    ".",
 	OutPath: "webindex.json",
 })
-
-fmt.Println(err == nil, manifest.Version != "")
-// true true
+if err != nil {
+	panic(err)
+}
+// Writes webindex.json.
 ```
 
 ## Packages
