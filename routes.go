@@ -12,10 +12,13 @@ import (
 // NewRoute creates a new route using the app-facing web handler contract directly.
 // @group Routing
 // Example:
-// route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error {
-// 	return c.NoContent(http.StatusOK)
-// })
+//
+//	route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error {
+//		return c.NoContent(http.StatusOK)
+//	})
+//
 // fmt.Println(route.Method(), route.Path())
+//
 //	// GET /healthz
 func NewRoute(
 	method string,
@@ -35,10 +38,13 @@ func NewRoute(
 // NewWebSocketRoute creates a websocket route using the app-facing websocket handler contract.
 // @group Routing
 // Example:
-// route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error {
-// 	return nil
-// })
+//
+//	route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error {
+//		return nil
+//	})
+//
 // fmt.Println(route.IsWebSocket())
+//
 //	// true
 func NewWebSocketRoute(
 	route string,
@@ -70,6 +76,7 @@ type Route struct {
 // Example:
 // route := web.NewRoute(http.MethodPost, "/users", func(c web.Context) error { return nil })
 // fmt.Println(route.Method())
+//
 //	// POST
 func (r *Route) Method() string {
 	return r.method
@@ -80,6 +87,7 @@ func (r *Route) Method() string {
 // Example:
 // route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil })
 // fmt.Println(route.Path())
+//
 //	// /healthz
 func (r *Route) Path() string {
 	return r.route
@@ -88,12 +96,15 @@ func (r *Route) Path() string {
 // Handler returns the route handler.
 // @group Routing
 // Example:
-// route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error {
-// 	return c.NoContent(http.StatusCreated)
-// })
+//
+//	route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error {
+//		return c.NoContent(http.StatusCreated)
+//	})
+//
 // ctx := webtest.NewContext(nil, nil, "/healthz", nil)
 // _ = route.Handler()(ctx)
 // fmt.Println(ctx.StatusCode())
+//
 //	// 201
 func (r *Route) Handler() Handler {
 	return r.handler
@@ -102,13 +113,16 @@ func (r *Route) Handler() Handler {
 // WebSocketHandler returns the websocket route handler.
 // @group Routing
 // Example:
-// route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error {
-// 	c.Set("ready", true)
-// 	return nil
-// })
+//
+//	route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error {
+//		c.Set("ready", true)
+//		return nil
+//	})
+//
 // ctx := webtest.NewContext(nil, nil, "/ws", nil)
 // err := route.WebSocketHandler()(ctx, nil)
 // fmt.Println(err == nil, ctx.Get("ready"))
+//
 //	// true true
 func (r *Route) WebSocketHandler() WebSocketHandler {
 	return r.wsHandler
@@ -119,6 +133,7 @@ func (r *Route) WebSocketHandler() WebSocketHandler {
 // Example:
 // route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil })
 // fmt.Println(route.HandlerName() != "")
+//
 //	// true
 func (r *Route) HandlerName() string {
 	return r.handlerName
@@ -128,12 +143,15 @@ func (r *Route) HandlerName() string {
 // @group Routing
 // Example:
 // route := web.NewRoute(
-// 	http.MethodGet,
-// 	"/healthz",
-// 	func(c web.Context) error { return nil },
-// 	func(next web.Handler) web.Handler { return next },
+//
+//	http.MethodGet,
+//	"/healthz",
+//	func(c web.Context) error { return nil },
+//	func(next web.Handler) web.Handler { return next },
+//
 // )
 // fmt.Println(len(route.Middlewares()))
+//
 //	// 1
 func (r *Route) Middlewares() []Middleware {
 	if len(r.middlewares) > 0 {
@@ -147,9 +165,13 @@ func (r *Route) Middlewares() []Middleware {
 // Example:
 // route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }).WithMiddlewareNames("auth")
 // fmt.Println(route.MiddlewareNames()[0])
+//
 //	// auth
 func (r *Route) MiddlewareNames() []string {
-	return r.middlewareNames
+	if len(r.middlewareNames) > 0 {
+		return append([]string(nil), r.middlewareNames...)
+	}
+	return middlewareNames(r.middlewares)
 }
 
 // WithMiddlewareNames attaches reporting-only middleware names to the route.
@@ -157,6 +179,7 @@ func (r *Route) MiddlewareNames() []string {
 // Example:
 // route := web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }).WithMiddlewareNames("auth", "trace")
 // fmt.Println(len(route.MiddlewareNames()))
+//
 //	// 2
 func (r Route) WithMiddlewareNames(names ...string) Route {
 	r.middlewareNames = append([]string(nil), names...)
@@ -168,6 +191,7 @@ func (r Route) WithMiddlewareNames(names ...string) Route {
 // Example:
 // route := web.NewWebSocketRoute("/ws", func(c web.Context, conn web.WebSocketConn) error { return nil })
 // fmt.Println(route.IsWebSocket())
+//
 //	// true
 func (r *Route) IsWebSocket() bool {
 	return r != nil && r.wsHandler != nil
@@ -176,10 +200,13 @@ func (r *Route) IsWebSocket() bool {
 // NewRouteGroup wraps routes and their accompanied web middleware.
 // @group Routing
 // Example:
-// group := web.NewRouteGroup("/api", []web.Route{
-// 	web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
-// })
+//
+//	group := web.NewRouteGroup("/api", []web.Route{
+//		web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
+//	})
+//
 // fmt.Println(group.RoutePrefix(), len(group.Routes()))
+//
 //	// /api 1
 func NewRouteGroup(
 	prefix string,
@@ -206,6 +233,7 @@ type RouteGroup struct {
 // Example:
 // group := web.NewRouteGroup("/api", nil)
 // fmt.Println(group.RoutePrefix())
+//
 //	// /api
 func (g *RouteGroup) RoutePrefix() string {
 	return g.routePrefix
@@ -214,10 +242,13 @@ func (g *RouteGroup) RoutePrefix() string {
 // Routes returns the routes in the group.
 // @group Routing
 // Example:
-// group := web.NewRouteGroup("/api", []web.Route{
-// 	web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
-// })
+//
+//	group := web.NewRouteGroup("/api", []web.Route{
+//		web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
+//	})
+//
 // fmt.Println(len(group.Routes()))
+//
 //	// 1
 func (g *RouteGroup) Routes() []Route {
 	return g.routes
@@ -228,6 +259,7 @@ func (g *RouteGroup) Routes() []Route {
 // Example:
 // group := web.NewRouteGroup("/api", nil, func(next web.Handler) web.Handler { return next })
 // fmt.Println(len(group.Middlewares()))
+//
 //	// 1
 func (g *RouteGroup) Middlewares() []Middleware {
 	return g.middlewares
@@ -238,9 +270,13 @@ func (g *RouteGroup) Middlewares() []Middleware {
 // Example:
 // group := web.NewRouteGroup("/api", nil).WithMiddlewareNames("auth")
 // fmt.Println(group.MiddlewareNames()[0])
+//
 //	// auth
 func (g *RouteGroup) MiddlewareNames() []string {
-	return g.middlewareNames
+	if len(g.middlewareNames) > 0 {
+		return append([]string(nil), g.middlewareNames...)
+	}
+	return middlewareNames(g.middlewares)
 }
 
 // WithMiddlewareNames attaches reporting-only middleware names to the group.
@@ -248,6 +284,7 @@ func (g *RouteGroup) MiddlewareNames() []string {
 // Example:
 // group := web.NewRouteGroup("/api", nil).WithMiddlewareNames("auth", "trace")
 // fmt.Println(len(group.MiddlewareNames()))
+//
 //	// 2
 func (g RouteGroup) WithMiddlewareNames(names ...string) RouteGroup {
 	g.middlewareNames = append([]string(nil), names...)
@@ -258,13 +295,16 @@ func (g RouteGroup) WithMiddlewareNames(names ...string) RouteGroup {
 // @group Routing
 // Example:
 // adapter := echoweb.New()
-// groups := []web.RouteGroup{
-// 	web.NewRouteGroup("/api", []web.Route{
-// 		web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
-// 	}),
-// }
+//
+//	groups := []web.RouteGroup{
+//		web.NewRouteGroup("/api", []web.Route{
+//			web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return nil }),
+//		}),
+//	}
+//
 // err := web.RegisterRoutes(adapter.Router(), groups)
 // fmt.Println(err == nil)
+//
 //	// true
 func RegisterRoutes(router Router, groups []RouteGroup) error {
 	for _, group := range groups {
@@ -286,13 +326,16 @@ func RegisterRoutes(router Router, groups []RouteGroup) error {
 // @group Routing
 // Example:
 // adapter := echoweb.New()
-// err := web.MountRouter(adapter.Router(), []web.RouterMount{
-// 	func(r web.Router) error {
-// 		r.GET("/healthz", func(c web.Context) error { return nil })
-// 		return nil
-// 	},
-// })
+//
+//	err := web.MountRouter(adapter.Router(), []web.RouterMount{
+//		func(r web.Router) error {
+//			r.GET("/healthz", func(c web.Context) error { return nil })
+//			return nil
+//		},
+//	})
+//
 // fmt.Println(err == nil)
+//
 //	// true
 func MountRouter(router Router, mounts []RouterMount) error {
 	for _, mount := range mounts {
@@ -304,6 +347,30 @@ func MountRouter(router Router, mounts []RouterMount) error {
 		}
 	}
 	return nil
+}
+
+func middlewareNames(middlewares []Middleware) []string {
+	names := make([]string, 0, len(middlewares))
+	for _, middleware := range middlewares {
+		name := middlewareName(middleware)
+		if name == "" {
+			continue
+		}
+		names = append(names, name)
+	}
+	return names
+}
+
+func middlewareName(middleware Middleware) string {
+	value := reflect.ValueOf(middleware)
+	if !value.IsValid() || value.IsNil() {
+		return ""
+	}
+	fn := runtime.FuncForPC(value.Pointer())
+	if fn == nil {
+		return ""
+	}
+	return qualifyHandler(fn.Name())
 }
 
 // qualifyHandler normalizes a runtime function name into a compact,
@@ -334,6 +401,12 @@ func qualifyHandler(name string) string {
 	parts := strings.Split(beforeMethod, "/")
 	for i := len(parts) - 1; i >= 0; i-- {
 		pkg := strings.Trim(parts[i], ".")
+		if nested := strings.Index(pkg, "."); nested > 0 {
+			// Middleware factories are often invoked from provider functions, and
+			// the runtime symbol can include that provider name in the final path
+			// segment. Keep the package identity without widening the route table.
+			pkg = pkg[:nested]
+		}
 		// Skip generic path segments so we surface the app/domain package name
 		// instead of broad framework buckets like "internal" or "http".
 		if !isGenericPackage(pkg) && pkg != "" {

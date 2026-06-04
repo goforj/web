@@ -32,6 +32,78 @@ func TestBuildRouteEntriesMergesMethodsAndMiddlewares(t *testing.T) {
 	}
 }
 
+func TestBuildRouteEntriesInfersMiddlewareNames(t *testing.T) {
+	entries := BuildRouteEntries([]RouteGroup{
+		NewRouteGroup(
+			"/api",
+			[]Route{
+				NewRoute("GET", "/users", testRouteHandler, testRouteMiddleware),
+			},
+			testGroupMiddleware,
+		),
+	})
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	got := strings.Join(entries[0].Middlewares, ",")
+	want := "web.testGroupMiddleware,web.testRouteMiddleware"
+	if got != want {
+		t.Fatalf("middlewares = %q, want %q", got, want)
+	}
+}
+
+func TestBuildRouteEntriesInfersMiddlewareMethodNames(t *testing.T) {
+	service := &testMiddlewareService{}
+	entries := BuildRouteEntries([]RouteGroup{
+		NewRouteGroup(
+			"/api",
+			[]Route{
+				NewRoute("GET", "/users", testRouteHandler),
+			},
+			service.RequireAuth,
+		),
+	})
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	got := strings.Join(entries[0].Middlewares, ",")
+	want := "web.RequireAuth"
+	if got != want {
+		t.Fatalf("middlewares = %q, want %q", got, want)
+	}
+}
+
+func TestBuildRouteEntriesPrefersExplicitMiddlewareNames(t *testing.T) {
+	entries := BuildRouteEntries([]RouteGroup{
+		NewRouteGroup(
+			"/api",
+			[]Route{
+				NewRoute("GET", "/users", testRouteHandler, testRouteMiddleware).WithMiddlewareNames("route.override"),
+			},
+			testGroupMiddleware,
+		).WithMiddlewareNames("group.override"),
+	})
+
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	got := strings.Join(entries[0].Middlewares, ",")
+	want := "group.override,route.override"
+	if got != want {
+		t.Fatalf("middlewares = %q, want %q", got, want)
+	}
+}
+
+func TestQualifyHandlerDropsProviderCallsiteNesting(t *testing.T) {
+	got := qualifyHandler("test/app.ProvideRoutes.(*Service).RequireAuth.func1")
+	want := "app.RequireAuth"
+	if got != want {
+		t.Fatalf("handler name = %q, want %q", got, want)
+	}
+}
+
 func TestBuildRouteEntriesIncludesExtraRoutes(t *testing.T) {
 	entries := BuildRouteEntries(nil, RouteEntry{
 		Path:    "/-/health",
@@ -218,6 +290,12 @@ func testGroupMiddleware(next Handler) Handler {
 }
 
 func testRouteMiddleware(next Handler) Handler {
+	return func(r Context) error { return next(r) }
+}
+
+type testMiddlewareService struct{}
+
+func (s *testMiddlewareService) RequireAuth(next Handler) Handler {
 	return func(r Context) error { return next(r) }
 }
 
