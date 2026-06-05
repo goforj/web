@@ -36,11 +36,11 @@ type routerMapping struct {
 	DefaultMiddlewares []string
 }
 
-func discoverRoutesAndHandlers(fset *token.FileSet, parsed []*parsedFile) ([]discoveredRoute, []discoveredHandler, []string, routerMapping) {
+func discoverRoutesAndHandlers(fset *token.FileSet, parsed []*parsedFile, scope routeScope) ([]discoveredRoute, []discoveredHandler, []string, routerMapping) {
 	var routes []discoveredRoute
 	var handlers []discoveredHandler
 	groupPrefixes := map[string]struct{}{}
-	mapping := buildRouterMapping(parsed)
+	mapping := buildRouterMapping(parsed, scope)
 
 	for _, pf := range parsed {
 		for _, decl := range pf.File.Decls {
@@ -92,7 +92,7 @@ func discoverRoutesAndHandlers(fset *token.FileSet, parsed []*parsedFile) ([]dis
 					handlerFn := methodNameFromHandlerExpr(handlerExpr)
 					hintPkg, hintRecv := inferHandlerHints(call.Args[2], fn, localTypes, pf.PackageName)
 					pos := fset.Position(call.Pos())
-					routes = append(routes, discoveredRoute{
+					route := discoveredRoute{
 						MethodExpr:          exprString(call.Args[0]),
 						Path:                path,
 						HandlerExpr:         handlerExpr,
@@ -102,7 +102,10 @@ func discoverRoutesAndHandlers(fset *token.FileSet, parsed []*parsedFile) ([]dis
 						MiddlewareExprs:     middlewareExprs(call.Args[3:]),
 						File:                filepath.ToSlash(pos.Filename),
 						Line:                pos.Line,
-					})
+					}
+					if scope.includesRoute(route) {
+						routes = append(routes, route)
+					}
 				case "NewWebSocketRoute":
 					if len(call.Args) < 2 {
 						return true
@@ -115,7 +118,7 @@ func discoverRoutesAndHandlers(fset *token.FileSet, parsed []*parsedFile) ([]dis
 					handlerFn := methodNameFromHandlerExpr(handlerExpr)
 					hintPkg, hintRecv := inferHandlerHints(call.Args[1], fn, localTypes, pf.PackageName)
 					pos := fset.Position(call.Pos())
-					routes = append(routes, discoveredRoute{
+					route := discoveredRoute{
 						MethodExpr:          `"GETWS"`,
 						Path:                path,
 						HandlerExpr:         handlerExpr,
@@ -125,9 +128,12 @@ func discoverRoutesAndHandlers(fset *token.FileSet, parsed []*parsedFile) ([]dis
 						MiddlewareExprs:     middlewareExprs(call.Args[2:]),
 						File:                filepath.ToSlash(pos.Filename),
 						Line:                pos.Line,
-					})
+					}
+					if scope.includesRoute(route) {
+						routes = append(routes, route)
+					}
 				case "NewRouteGroup":
-					if len(call.Args) > 0 {
+					if scope.includesGroupFile(pf.Path) && len(call.Args) > 0 {
 						if prefix := extractStringLiteral(call.Args[0]); prefix != "" {
 							groupPrefixes[prefix] = struct{}{}
 						}

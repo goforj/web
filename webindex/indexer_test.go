@@ -189,6 +189,63 @@ func ProvideRoutes(r *AppRoutes) []any {
 	}
 }
 
+func TestRunScopesRoutesToCompositionFile(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"go.mod": "module example.com/test\n\ngo 1.25\n",
+		"internal/hello/controller.go": `package hello
+import "net/http"
+type Controller struct{}
+func (c *Controller) Routes() []any {
+	return []any{
+		web.NewRoute(http.MethodGet, "/hello", c.Index),
+	}
+}
+func (c *Controller) Index(ctx any) error { return nil }`,
+		"internal/reports/controller.go": `package reports
+import "net/http"
+type Controller struct{}
+func (c *Controller) Routes() []any {
+	return []any{
+		web.NewRoute(http.MethodGet, "/reports", c.Index),
+	}
+}
+func (c *Controller) Index(ctx any) error { return nil }`,
+		"app/routes.go": `package app
+func ProvideRoutes(helloController *hello.Controller) []web.RouteGroup {
+	return []web.RouteGroup{
+		web.NewRouteGroup("/api/v1", helloController.Routes()),
+	}
+}`,
+		"app/customer-portal/routes.go": `package customerportal
+func ProvideRoutes(reportsController *reports.Controller, authService *auth.Service) []web.RouteGroup {
+	reportRoutes := slices.Concat(reportsController.Routes())
+	return []web.RouteGroup{
+		web.NewRouteGroup("/api/customer", reportRoutes, authService.RequireAuth),
+	}
+}`,
+	}
+	writeFixtureFiles(t, root, files)
+
+	manifest, err := Run(context.Background(), IndexOptions{
+		Root:                 root,
+		RouteCompositionPath: "app/customer-portal/routes.go",
+	})
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if len(manifest.Operations) != 1 {
+		t.Fatalf("expected one operation, got %d", len(manifest.Operations))
+	}
+	op := manifest.Operations[0]
+	if op.Path != "/api/customer/reports" {
+		t.Fatalf("expected customer route only, got %s", op.Path)
+	}
+	if len(op.Middleware) != 1 || op.Middleware[0] != "authService.RequireAuth" {
+		t.Fatalf("expected scoped middleware, got %#v", op.Middleware)
+	}
+}
+
 func TestRunFallsBackToUnprefixedPathWhenGroupMappingMissing(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{

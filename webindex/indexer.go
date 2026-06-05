@@ -18,10 +18,11 @@ import (
 
 // IndexOptions controls API index generation behavior.
 type IndexOptions struct {
-	Root            string
-	OutPath         string
-	DiagnosticsPath string
-	OpenAPIPath     string
+	Root                 string
+	OutPath              string
+	DiagnosticsPath      string
+	OpenAPIPath          string
+	RouteCompositionPath string
 }
 
 type parsedFile struct {
@@ -33,11 +34,14 @@ type parsedFile struct {
 // Run indexes API metadata from source and writes artifacts.
 // @group Indexing
 // Example:
-// manifest, err := webindex.Run(context.Background(), webindex.IndexOptions{
-// 	Root:    ".",
-// 	OutPath: "webindex.json",
-// })
+//
+//	manifest, err := webindex.Run(context.Background(), webindex.IndexOptions{
+//		Root:    ".",
+//		OutPath: "webindex.json",
+//	})
+//
 // fmt.Println(err == nil, manifest.Version != "")
+//
 //	// true true
 func Run(_ context.Context, opts IndexOptions) (Manifest, error) {
 	root := opts.Root
@@ -54,7 +58,11 @@ func Run(_ context.Context, opts IndexOptions) (Manifest, error) {
 		return Manifest{}, err
 	}
 
-	routes, handlers, prefixes, mapping := discoverRoutesAndHandlers(fset, parsed)
+	scope, err := newRouteScope(root, opts.RouteCompositionPath, parsed)
+	if err != nil {
+		return Manifest{}, err
+	}
+	routes, handlers, prefixes, mapping := discoverRoutesAndHandlers(fset, parsed, scope)
 	typeSchemas := buildTypeSchemaIndex(parsed)
 	ops, diagnostics := normalize(routes, handlers, prefixes, mapping, typeSchemas)
 	manifest := Manifest{

@@ -1,14 +1,22 @@
 package webindex
 
-import "go/ast"
+import (
+	"go/ast"
+	"path/filepath"
+)
 
-func buildRouterMapping(parsed []*parsedFile) routerMapping {
+func buildRouterMapping(parsed []*parsedFile, scope routeScope) routerMapping {
 	fieldToPrefix := map[string]string{}
 	fieldToMiddlewares := map[string][]string{}
 	ownerToField := map[string]string{}
+	directOwnerToPrefix := map[string]string{}
+	directOwnerToMiddlewares := map[string][]string{}
 
 	for _, pf := range parsed {
-		if pf.PackageName != "router" {
+		if scope.active && filepath.ToSlash(filepath.Clean(pf.Path)) != scope.compositionFile {
+			continue
+		}
+		if !scope.active && pf.PackageName != "router" {
 			continue
 		}
 		for _, decl := range pf.File.Decls {
@@ -19,6 +27,9 @@ func buildRouterMapping(parsed []*parsedFile) routerMapping {
 			switch fn.Name.Name {
 			case "ProvideRoutes":
 				parseProvideRoutes(fieldToPrefix, fieldToMiddlewares, fn)
+				if scope.active {
+					parseScopedProvideRoutes(directOwnerToPrefix, directOwnerToMiddlewares, fn)
+				}
 			case "ProvideAppRoutes":
 				parseProvideAppRoutes(ownerToField, fn)
 			}
@@ -37,12 +48,58 @@ func buildRouterMapping(parsed []*parsedFile) routerMapping {
 			out.MiddlewareByOwner[owner] = append([]string(nil), middlewares...)
 		}
 	}
+	for owner, prefix := range directOwnerToPrefix {
+		out.PrefixByOwner[owner] = prefix
+	}
+	for owner, middlewares := range directOwnerToMiddlewares {
+		if len(middlewares) > 0 {
+			out.MiddlewareByOwner[owner] = append([]string(nil), middlewares...)
+		}
+	}
 	if len(fieldToMiddlewares) == 1 {
 		for _, middlewares := range fieldToMiddlewares {
 			out.DefaultMiddlewares = append([]string(nil), middlewares...)
 		}
 	}
 	return out
+}
+
+func parseScopedProvideRoutes(ownerToPrefix map[string]string, ownerToMiddlewares map[string][]string, fn *ast.FuncDecl) {
+	paramOwner := routeParamOwners(fn)
+	varOwners := map[string]map[string]struct{}{}
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.AssignStmt:
+			for i, lhs := range node.Lhs {
+				ident, ok := lhs.(*ast.Ident)
+				if !ok || ident.Name == "_" || i >= len(node.Rhs) {
+					continue
+				}
+				mergeOwnerSet(varOwners, ident.Name, routeOwnersFromNode(node.Rhs[i], paramOwner))
+			}
+		case *ast.CallExpr:
+			sel, ok := node.Fun.(*ast.SelectorExpr)
+			if !ok || len(node.Args) < 2 {
+				return true
+			}
+			xid, ok := sel.X.(*ast.Ident)
+			if !ok || (xid.Name != "http" && xid.Name != "web") || sel.Sel.Name != "NewRouteGroup" {
+				return true
+			}
+			prefix := extractStringLiteral(node.Args[0])
+			if prefix == "" {
+				return true
+			}
+			owners := routeOwnersForGroupArg(node.Args[1], paramOwner, varOwners)
+			for _, owner := range owners {
+				ownerToPrefix[owner] = prefix
+				if middlewares := middlewareExprs(node.Args[2:]); len(middlewares) > 0 {
+					ownerToMiddlewares[owner] = middlewares
+				}
+			}
+		}
+		return true
+	})
 }
 
 func parseProvideRoutes(fieldToPrefix map[string]string, fieldToMiddlewares map[string][]string, fn *ast.FuncDecl) {
