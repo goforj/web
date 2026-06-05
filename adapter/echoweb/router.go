@@ -39,8 +39,7 @@ type routerAdapter struct {
 type rootAdapterReuseHandler func(*echo.Context, *contextAdapter) error
 
 type handlerIdentity struct {
-	code uintptr
-	data uintptr
+	pointer uintptr
 }
 
 var rootAdapterReuseHandlers sync.Map
@@ -73,11 +72,7 @@ func lookupRootAdapterReuseHandler(handler echo.HandlerFunc) (rootAdapterReuseHa
 func handlerIdentityFor(handler echo.HandlerFunc) handlerIdentity {
 	// Echo handlers are closures, so pointer equality on the function value is
 	// the cheapest stable key we have for the root-middleware reuse registry.
-	words := *(*[2]uintptr)(unsafe.Pointer(&handler))
-	return handlerIdentity{
-		code: words[0],
-		data: words[1],
-	}
+	return handlerIdentity{pointer: *(*uintptr)(unsafe.Pointer(&handler))}
 }
 
 var _ web.Router = (*routerAdapter)(nil)

@@ -154,6 +154,71 @@ func TestRouterUseAppliesMiddleware(t *testing.T) {
 	}
 }
 
+func TestRouterUsePropagatesBoundContextToRouteHandler(t *testing.T) {
+	type contextKey struct{}
+
+	adapter := New()
+	router := adapter.Router()
+	router.Use(func(next web.Handler) web.Handler {
+		return func(r web.Context) error {
+			web.BindContext(r, context.WithValue(r.Context(), contextKey{}, "root"))
+			return next(r)
+		}
+	})
+
+	router.GET("/mw-context", func(r web.Context) error {
+		if got := r.Context().Value(contextKey{}); got != "root" {
+			t.Fatalf("context value = %#v, want root", got)
+		}
+		if got := r.Request().Context().Value(contextKey{}); got != "root" {
+			t.Fatalf("request context value = %#v, want root", got)
+		}
+		return r.NoContent(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/mw-context", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestRouterUsePropagatesAppSourceNameToRouteHandler(t *testing.T) {
+	adapter := New()
+	router := adapter.Router()
+	router.Use(func(next web.Handler) web.Handler {
+		return func(r web.Context) error {
+			carrier, ok := r.(interface{ SetAppSourceName(string) })
+			if !ok {
+				t.Fatal("context does not support app source names")
+			}
+			carrier.SetAppSourceName("http")
+			return next(r)
+		}
+	})
+
+	router.GET("/mw-source", func(r web.Context) error {
+		provider, ok := r.Context().(interface{ AppSourceName() string })
+		if !ok {
+			t.Fatal("request context does not expose app source name")
+		}
+		if got := provider.AppSourceName(); got != "http" {
+			t.Fatalf("app source name = %q, want http", got)
+		}
+		return r.NoContent(http.StatusNoContent)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/mw-source", nil)
+	rec := httptest.NewRecorder()
+	adapter.Echo().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
 func TestRouterPreRunsBeforeRouting(t *testing.T) {
 	adapter := New()
 	router := adapter.Router()
