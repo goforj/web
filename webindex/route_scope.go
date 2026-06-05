@@ -12,6 +12,12 @@ type routeScope struct {
 	owners          map[string]struct{}
 }
 
+type scopedRouteGroup struct {
+	Owners      []string
+	Prefix      string
+	Middlewares []string
+}
+
 func newRouteScope(root string, compositionPath string, parsed []*parsedFile) (routeScope, error) {
 	if compositionPath == "" {
 		return routeScope{}, nil
@@ -66,13 +72,93 @@ func collectCompositionRouteOwners(pf *parsedFile) map[string]struct{} {
 		}
 		switch fn.Name.Name {
 		case "ProvideRoutes", "ProvideAppRoutes":
-			paramOwner := routeParamOwners(fn)
-			for _, owner := range routeOwnersFromNode(fn.Body, paramOwner) {
-				owners[owner] = struct{}{}
+			for _, group := range returnedScopedRouteGroups(fn) {
+				for _, owner := range group.Owners {
+					owners[owner] = struct{}{}
+				}
 			}
 		}
 	}
 	return owners
+}
+
+func returnedScopedRouteGroups(fn *ast.FuncDecl) []scopedRouteGroup {
+	paramOwner := routeParamOwners(fn)
+	routeVarOwners := map[string]map[string]struct{}{}
+	groupVarGroups := map[string][]scopedRouteGroup{}
+	returned := make([]scopedRouteGroup, 0)
+
+	ast.Inspect(fn.Body, func(n ast.Node) bool {
+		switch node := n.(type) {
+		case *ast.AssignStmt:
+			for i, lhs := range node.Lhs {
+				ident, ok := lhs.(*ast.Ident)
+				if !ok || ident.Name == "_" || i >= len(node.Rhs) {
+					continue
+				}
+				mergeOwnerSet(routeVarOwners, ident.Name, routeOwnersFromNode(node.Rhs[i], paramOwner))
+				if groups := routeGroupsFromExpr(node.Rhs[i], paramOwner, routeVarOwners, groupVarGroups); len(groups) > 0 {
+					groupVarGroups[ident.Name] = append(groupVarGroups[ident.Name], groups...)
+				}
+			}
+		case *ast.ReturnStmt:
+			for _, result := range node.Results {
+				returned = append(returned, routeGroupsFromExpr(result, paramOwner, routeVarOwners, groupVarGroups)...)
+			}
+		}
+		return true
+	})
+
+	return returned
+}
+
+func routeGroupsFromExpr(expr ast.Expr, paramOwner map[string]string, routeVarOwners map[string]map[string]struct{}, groupVarGroups map[string][]scopedRouteGroup) []scopedRouteGroup {
+	switch e := expr.(type) {
+	case *ast.CallExpr:
+		if group, ok := routeGroupFromCall(e, paramOwner, routeVarOwners); ok {
+			return []scopedRouteGroup{group}
+		}
+		if fun, ok := e.Fun.(*ast.Ident); ok && fun.Name == "append" && len(e.Args) > 1 {
+			groups := make([]scopedRouteGroup, 0, len(e.Args)-1)
+			for _, arg := range e.Args[1:] {
+				groups = append(groups, routeGroupsFromExpr(arg, paramOwner, routeVarOwners, groupVarGroups)...)
+			}
+			return groups
+		}
+	case *ast.CompositeLit:
+		groups := make([]scopedRouteGroup, 0, len(e.Elts))
+		for _, elt := range e.Elts {
+			expr, ok := elt.(ast.Expr)
+			if !ok {
+				continue
+			}
+			groups = append(groups, routeGroupsFromExpr(expr, paramOwner, routeVarOwners, groupVarGroups)...)
+		}
+		return groups
+	case *ast.Ident:
+		return append([]scopedRouteGroup(nil), groupVarGroups[e.Name]...)
+	}
+	return nil
+}
+
+func routeGroupFromCall(call *ast.CallExpr, paramOwner map[string]string, routeVarOwners map[string]map[string]struct{}) (scopedRouteGroup, bool) {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || len(call.Args) < 2 {
+		return scopedRouteGroup{}, false
+	}
+	xid, ok := sel.X.(*ast.Ident)
+	if !ok || (xid.Name != "http" && xid.Name != "web") || sel.Sel.Name != "NewRouteGroup" {
+		return scopedRouteGroup{}, false
+	}
+	prefix := extractStringLiteral(call.Args[0])
+	if prefix == "" {
+		return scopedRouteGroup{}, false
+	}
+	return scopedRouteGroup{
+		Owners:      routeOwnersForGroupArg(call.Args[1], paramOwner, routeVarOwners),
+		Prefix:      prefix,
+		Middlewares: middlewareExprs(call.Args[2:]),
+	}, true
 }
 
 func routeParamOwners(fn *ast.FuncDecl) map[string]string {

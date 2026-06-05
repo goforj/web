@@ -211,6 +211,15 @@ func (c *Controller) Routes() []any {
 	}
 }
 func (c *Controller) Index(ctx any) error { return nil }`,
+		"internal/leak/controller.go": `package leak
+import "net/http"
+type Controller struct{}
+func (c *Controller) Routes() []any {
+	return []any{
+		web.NewRoute(http.MethodGet, "/leak", c.Index),
+	}
+}
+func (c *Controller) Index(ctx any) error { return nil }`,
 		"app/routes.go": `package app
 func ProvideRoutes(helloController *hello.Controller) []web.RouteGroup {
 	return []web.RouteGroup{
@@ -218,7 +227,9 @@ func ProvideRoutes(helloController *hello.Controller) []web.RouteGroup {
 	}
 }`,
 		"app/customer-portal/routes.go": `package customerportal
-func ProvideRoutes(reportsController *reports.Controller, authService *auth.Service) []web.RouteGroup {
+func ProvideRoutes(reportsController *reports.Controller, leakController *leak.Controller, authService *auth.Service) []web.RouteGroup {
+	deadRoutes := slices.Concat(leakController.Routes())
+	_ = deadRoutes
 	reportRoutes := slices.Concat(reportsController.Routes())
 	return []web.RouteGroup{
 		web.NewRouteGroup("/api/customer", reportRoutes, authService.RequireAuth),

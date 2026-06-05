@@ -65,41 +65,14 @@ func buildRouterMapping(parsed []*parsedFile, scope routeScope) routerMapping {
 }
 
 func parseScopedProvideRoutes(ownerToPrefix map[string]string, ownerToMiddlewares map[string][]string, fn *ast.FuncDecl) {
-	paramOwner := routeParamOwners(fn)
-	varOwners := map[string]map[string]struct{}{}
-	ast.Inspect(fn.Body, func(n ast.Node) bool {
-		switch node := n.(type) {
-		case *ast.AssignStmt:
-			for i, lhs := range node.Lhs {
-				ident, ok := lhs.(*ast.Ident)
-				if !ok || ident.Name == "_" || i >= len(node.Rhs) {
-					continue
-				}
-				mergeOwnerSet(varOwners, ident.Name, routeOwnersFromNode(node.Rhs[i], paramOwner))
-			}
-		case *ast.CallExpr:
-			sel, ok := node.Fun.(*ast.SelectorExpr)
-			if !ok || len(node.Args) < 2 {
-				return true
-			}
-			xid, ok := sel.X.(*ast.Ident)
-			if !ok || (xid.Name != "http" && xid.Name != "web") || sel.Sel.Name != "NewRouteGroup" {
-				return true
-			}
-			prefix := extractStringLiteral(node.Args[0])
-			if prefix == "" {
-				return true
-			}
-			owners := routeOwnersForGroupArg(node.Args[1], paramOwner, varOwners)
-			for _, owner := range owners {
-				ownerToPrefix[owner] = prefix
-				if middlewares := middlewareExprs(node.Args[2:]); len(middlewares) > 0 {
-					ownerToMiddlewares[owner] = middlewares
-				}
+	for _, group := range returnedScopedRouteGroups(fn) {
+		for _, owner := range group.Owners {
+			ownerToPrefix[owner] = group.Prefix
+			if len(group.Middlewares) > 0 {
+				ownerToMiddlewares[owner] = group.Middlewares
 			}
 		}
-		return true
-	})
+	}
 }
 
 func parseProvideRoutes(fieldToPrefix map[string]string, fieldToMiddlewares map[string][]string, fn *ast.FuncDecl) {
