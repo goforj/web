@@ -111,6 +111,44 @@ func ProvideRoutes() []any {
 	}
 }
 
+func TestRunSkipsCustomDirs(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"go.mod": "module example.com/test\n\ngo 1.25\n",
+		"internal/hello/controller.go": `package hello
+import "net/http"
+type Controller struct{}
+func (c *Controller) Routes() []any {
+	return []any{
+		http.NewRoute(http.MethodGet, "/hello", c.Hello),
+	}
+}
+func (c *Controller) Hello(ctx any) error { return nil }`,
+		"_data/private/ignored.go": `package private
+func broken(`,
+	}
+	writeFixtureFiles(t, root, files)
+
+	privateDir := filepath.Join(root, "_data", "private")
+	if err := os.Chmod(privateDir, 0); err != nil {
+		t.Fatalf("chmod private dir: %v", err)
+	}
+	defer func() { _ = os.Chmod(privateDir, 0o755) }()
+
+	manifest, err := Run(context.Background(), IndexOptions{
+		Root: root,
+		SkipDir: func(_ string, name string) bool {
+			return name == "_data"
+		},
+	})
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if len(manifest.Operations) != 1 {
+		t.Fatalf("expected one operation, got %d", len(manifest.Operations))
+	}
+}
+
 func TestRunMapsRoutesToSpecificGroupsByControllerOwner(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{

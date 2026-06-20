@@ -23,6 +23,7 @@ type IndexOptions struct {
 	DiagnosticsPath      string
 	OpenAPIPath          string
 	RouteCompositionPath string
+	SkipDir              func(path string, name string) bool
 }
 
 type parsedFile struct {
@@ -53,7 +54,7 @@ func Run(_ context.Context, opts IndexOptions) (Manifest, error) {
 		return Manifest{}, err
 	}
 
-	parsed, fset, err := parseGoFilesWithSet(root)
+	parsed, fset, err := parseGoFilesWithSet(root, opts.SkipDir)
 	if err != nil {
 		return Manifest{}, err
 	}
@@ -88,7 +89,11 @@ func Run(_ context.Context, opts IndexOptions) (Manifest, error) {
 	return manifest, nil
 }
 
-func parseGoFilesWithSet(root string) ([]*parsedFile, *token.FileSet, error) {
+func parseGoFilesWithSet(root string, skipDirs ...func(path string, name string) bool) ([]*parsedFile, *token.FileSet, error) {
+	var skipDir func(path string, name string) bool
+	if len(skipDirs) > 0 {
+		skipDir = skipDirs[0]
+	}
 	fset := token.NewFileSet()
 	parsed := make([]*parsedFile, 0, 128)
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -99,6 +104,9 @@ func parseGoFilesWithSet(root string) ([]*parsedFile, *token.FileSet, error) {
 		if d.IsDir() {
 			switch base {
 			case ".git", "vendor", "node_modules", ".cache", "tmp":
+				return filepath.SkipDir
+			}
+			if skipDir != nil && skipDir(path, base) {
 				return filepath.SkipDir
 			}
 			return nil
