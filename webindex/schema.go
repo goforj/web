@@ -1,36 +1,21 @@
 package webindex
 
-import "sort"
-
-func collectSchemas(ops []Operation) []Schema {
-	seen := map[string]struct{}{}
-	for _, op := range ops {
-		if op.Inputs.Body != nil && op.Inputs.Body.TypeName != "" {
-			seen[op.Inputs.Body.TypeName] = struct{}{}
-		}
-		for _, resp := range op.Outputs.Responses {
-			if resp.TypeName != "" {
-				seen[resp.TypeName] = struct{}{}
-			}
-		}
+// collectSchemas projects the registry graph into the versioned manifest without shape-merging distinct Go identities.
+func collectSchemas(registry *typedSchemaRegistry) []Schema {
+	components := registry.componentSnapshot()
+	if len(components) == 0 {
+		return nil
 	}
-	out := make([]Schema, 0, len(seen))
-	for name := range seen {
-		confidence := "medium"
-		kind := "unknown"
-		if name != "" {
-			if name == "map[string]string" || name == "map[string]any" || name == "map[string]interface{}" {
-				kind = "map"
-				confidence = "high"
-			} else if name[0] == '[' {
-				kind = "array"
-			} else {
-				kind = "object"
-				confidence = "high"
-			}
-		}
-		out = append(out, Schema{Name: name, Kind: kind, Confidence: confidence})
+	out := make([]Schema, 0, len(components))
+	for _, component := range components {
+		out = append(out, Schema{
+			Identity:   component.Identity,
+			Name:       component.Name,
+			Package:    component.Package,
+			TypeName:   component.TypeName,
+			Definition: component.Schema,
+			Confidence: component.Confidence,
+		})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }

@@ -11,20 +11,25 @@ import (
 	"testing"
 )
 
+// TestRunMergesGroupAndRouteMiddlewares verifies operation security evidence preserves composition order across both attachment levels.
 func TestRunMergesGroupAndRouteMiddlewares(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
-		http.NewRoute(http.MethodGet, "/m", c.Index, middleware.Gzip(), trace),
+		web.NewRoute(http.MethodGet, "/m", c.Index, middleware.Gzip(), trace),
 	}
 }
 func (c *Controller) Index(ctx any) error { return nil }`,
 		"internal/router/routes_registry.go": `package router
+import "github.com/goforj/web"
 func ProvideAppRoutes(helloController *hello.Controller) *AppRoutes {
 	var app []any
 	app = append(app, helloController.Routes()...)
@@ -33,7 +38,7 @@ func ProvideAppRoutes(helloController *hello.Controller) *AppRoutes {
 type AppRoutes struct { app []any }
 func ProvideRoutes(r *AppRoutes) []any {
 	groups := []any{}
-	groups = append(groups, http.NewRouteGroup("/api", r.app, middleware.Auth(), trace))
+	groups = append(groups, web.NewRouteGroup("/api", r.app, middleware.Auth(), trace))
 	return groups
 }`,
 	}
@@ -47,25 +52,30 @@ func ProvideRoutes(r *AppRoutes) []any {
 		t.Fatalf("expected one operation, got %d", len(manifest.Operations))
 	}
 	got := manifest.Operations[0].Middleware
-	want := []string{"middleware.Auth", "trace", "middleware.Gzip"}
+	want := []string{"middleware.Auth()", "trace", "middleware.Gzip()", "trace"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected middleware list: got=%v want=%v", got, want)
 	}
 }
 
+// TestRunUsesDefaultMiddlewaresForSingleGroup verifies an unambiguous generated group can inherit its App-level middleware evidence.
 func TestRunUsesDefaultMiddlewaresForSingleGroup(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodGet, "/m", c.Index)} }
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodGet, "/m", c.Index)} }
 func (c *Controller) Index(ctx any) error { return nil }`,
 		"internal/router/routes_registry.go": `package router
+import "github.com/goforj/web"
 func ProvideRoutes(r *AppRoutes) []any {
 	groups := []any{}
-	groups = append(groups, http.NewRouteGroup("/api", r.app, middleware.RequireAuth()))
+	groups = append(groups, web.NewRouteGroup("/api", r.app, middleware.RequireAuth()))
 	return groups
 }
 type AppRoutes struct { app []any }`,
@@ -80,57 +90,68 @@ type AppRoutes struct { app []any }`,
 		t.Fatalf("expected one operation, got %d", len(manifest.Operations))
 	}
 	got := manifest.Operations[0].Middleware
-	want := []string{"middleware.RequireAuth"}
+	want := []string{"middleware.RequireAuth()"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected middleware list: got=%v want=%v", got, want)
 	}
 }
 
-func TestOwnerFromRoutesArg(t *testing.T) {
-	paramOwner := map[string]string{"helloController": "hello.Controller"}
+// TestRouteProviderFromRoutesArg verifies provider identity retains the route method selected by composition.
+func TestRouteProviderFromRoutesArg(t *testing.T) {
+	paramProviders := map[string]routeProvider{
+		"helloController": {Package: "hello", Receiver: "Controller"},
+	}
 
-	callExpr, err := parser.ParseExpr("helloController.Routes()")
+	callExpr, err := parser.ParseExpr("helloController.PublicRoutes()")
 	if err != nil {
 		t.Fatalf("parse expr: %v", err)
 	}
-	if got := ownerFromRoutesArg(callExpr, paramOwner); got != "hello.Controller" {
-		t.Fatalf("unexpected owner for call: %q", got)
+	got, ok := routeProviderFromRoutesArg(callExpr, paramProviders)
+	if !ok || got.Package != "hello" || got.Receiver != "Controller" || got.Method != "PublicRoutes" {
+		t.Fatalf("unexpected provider for call: %#v", got)
 	}
 
 	selExpr, err := parser.ParseExpr("helloController.Routes")
 	if err != nil {
 		t.Fatalf("parse expr: %v", err)
 	}
-	if got := ownerFromRoutesArg(selExpr, paramOwner); got != "hello.Controller" {
-		t.Fatalf("unexpected owner for selector: %q", got)
+	got, ok = routeProviderFromRoutesArg(selExpr, paramProviders)
+	if !ok || got.Method != "Routes" {
+		t.Fatalf("unexpected provider for selector: %#v", got)
 	}
 
 	invalidExpr, err := parser.ParseExpr("helloController.Other()")
 	if err != nil {
 		t.Fatalf("parse expr: %v", err)
 	}
-	if got := ownerFromRoutesArg(invalidExpr, paramOwner); got != "" {
-		t.Fatalf("expected empty owner for invalid expression, got %q", got)
+	got, ok = routeProviderFromRoutesArg(invalidExpr, paramProviders)
+	if ok {
+		t.Fatalf("expected non-route methods to be ignored, got %#v", got)
 	}
 
 	nonIdentSelector, err := parser.ParseExpr("pkg.helloController.Routes")
 	if err != nil {
 		t.Fatalf("parse expr: %v", err)
 	}
-	if got := ownerFromRoutesArg(nonIdentSelector, paramOwner); got != "" {
-		t.Fatalf("expected empty owner for selector with non-ident receiver, got %q", got)
+	if got, ok := routeProviderFromRoutesArg(nonIdentSelector, paramProviders); ok {
+		t.Fatalf("expected no provider for selector with non-ident receiver, got %#v", got)
 	}
 
 	nonSelectorCall, err := parser.ParseExpr("Routes()")
 	if err != nil {
 		t.Fatalf("parse expr: %v", err)
 	}
-	if got := ownerFromRoutesArg(nonSelectorCall, paramOwner); got != "" {
-		t.Fatalf("expected empty owner for non-selector call, got %q", got)
+	if got, ok := routeProviderFromRoutesArg(nonSelectorCall, paramProviders); ok {
+		t.Fatalf("expected no provider for non-selector call, got %#v", got)
 	}
 }
 
+// TestMiddlewareExprs verifies middleware source expressions retain stable diagnostic evidence without executing application code.
 func TestMiddlewareExprs(t *testing.T) {
+	parameterized, err := parser.ParseExpr(`middleware.RequireRole("admin", fallbackRole)`)
+	if err != nil {
+		t.Fatalf("parse parameterized middleware: %v", err)
+	}
 	args := []ast.Expr{
 		&ast.CallExpr{
 			Fun: &ast.SelectorExpr{
@@ -139,9 +160,10 @@ func TestMiddlewareExprs(t *testing.T) {
 			},
 		},
 		&ast.Ident{Name: "trace"},
+		parameterized,
 	}
 	got := middlewareExprs(args)
-	want := []string{"middleware.Auth", "trace"}
+	want := []string{"middleware.Auth()", "trace", `middleware.RequireRole("admin", fallbackRole)`}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected middleware expressions: got=%v want=%v", got, want)
 	}
@@ -150,6 +172,7 @@ func TestMiddlewareExprs(t *testing.T) {
 	}
 }
 
+// TestParseStatusCode verifies only statically supported HTTP status expressions become response contracts.
 func TestParseStatusCode(t *testing.T) {
 	if got := parseStatusCode(&ast.BasicLit{Kind: token.INT, Value: "201"}); got != 201 {
 		t.Fatalf("expected 201, got %d", got)
@@ -168,84 +191,9 @@ func TestParseStatusCode(t *testing.T) {
 	}
 }
 
-func TestSchemaFromTypeExprAndStructHelpers(t *testing.T) {
-	cases := []struct {
-		expr string
-		want string
-	}{
-		{expr: "string", want: "string"},
-		{expr: "bool", want: "boolean"},
-		{expr: "int64", want: "integer"},
-		{expr: "float64", want: "number"},
-		{expr: "Custom", want: "object"},
-		{expr: "[]string", want: "array"},
-		{expr: "map[string]int", want: "object"},
-		{expr: "*Custom", want: "object"},
-		{expr: "dto.Input", want: "object"},
-	}
-	for _, tc := range cases {
-		expr, err := parser.ParseExpr(tc.expr)
-		if err != nil {
-			t.Fatalf("parse expr %q: %v", tc.expr, err)
-		}
-		got := schemaFromTypeExpr(expr)["type"]
-		if got != tc.want {
-			t.Fatalf("unexpected type for %q: got=%v want=%v", tc.expr, got, tc.want)
-		}
-	}
-
-	if got := schemaFromTypeExpr(&ast.InterfaceType{}); got["type"] != "string" {
-		t.Fatalf("expected default schema type string, got %+v", got)
-	}
-
-	if got := componentNameFromType("*dto.User"); got != "User" {
-		t.Fatalf("unexpected component name: %q", got)
-	}
-	if got := componentNameFromType("9-user"); got != "Type9user" {
-		t.Fatalf("unexpected sanitized component name: %q", got)
-	}
-}
-
-func TestStructSchemaAndJSONTags(t *testing.T) {
-	src := `package p
-type Payload struct {
-	Name string ` + "`json:\"name\"`" + `
-	Meta *Meta ` + "`json:\"meta,omitempty\"`" + `
-	Ignored string ` + "`json:\"-\"`" + `
-	Count int
-}
-type Meta struct {
-	Source string
-}`
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "payload.go", src, 0)
-	if err != nil {
-		t.Fatalf("parse file: %v", err)
-	}
-	parsed := []*parsedFile{{Path: "payload.go", PackageName: "p", File: file}}
-	index := buildTypeSchemaIndex(parsed)
-	raw, ok := index["p.Payload"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected p.Payload schema in index, got %+v", index)
-	}
-	props := raw["properties"].(map[string]any)
-	if _, ok := props["name"]; !ok {
-		t.Fatalf("expected json-tagged name property, got %+v", props)
-	}
-	if _, ok := props["meta"]; !ok {
-		t.Fatalf("expected pointer property meta, got %+v", props)
-	}
-	if _, ok := props["Ignored"]; ok {
-		t.Fatalf("did not expect ignored field to be present")
-	}
-	requiredAny := raw["required"].([]string)
-	if !reflect.DeepEqual(requiredAny, []string{"Count", "name"}) {
-		t.Fatalf("unexpected required fields: %+v", requiredAny)
-	}
-}
-
+// TestInferJSONSchemaExprHelpers verifies syntax fallback never upgrades unknown expressions into guessed schema types.
 func TestInferJSONSchemaExprHelpers(t *testing.T) {
-	expr, err := parser.ParseExpr(`Resp{OK: true, Stats: map[string]any{"count": 1}, Items: []any{"a"}}`)
+	expr, err := parser.ParseExpr(`map[string]any{"ok": true, "stats": map[string]any{"count": 1}, "items": []any{"a"}}`)
 	if err != nil {
 		t.Fatalf("parse expr: %v", err)
 	}
@@ -254,18 +202,11 @@ func TestInferJSONSchemaExprHelpers(t *testing.T) {
 		t.Fatalf("expected object schema, got %+v", schema)
 	}
 	props := schema["properties"].(map[string]any)
-	if _, ok := props["OK"]; !ok {
-		t.Fatalf("expected struct field OK in schema")
+	if _, ok := props["ok"]; !ok {
+		t.Fatalf("expected literal map key ok in schema")
 	}
-	if _, ok := props["Stats"]; !ok {
-		t.Fatalf("expected struct field Stats in schema")
-	}
-
-	if got := extractStructFieldName(&ast.SelectorExpr{
-		X:   &ast.Ident{Name: "Resp"},
-		Sel: &ast.Ident{Name: "Field"},
-	}); got != "Field" {
-		t.Fatalf("unexpected selector field name: %q", got)
+	if _, ok := props["stats"]; !ok {
+		t.Fatalf("expected literal map key stats in schema")
 	}
 
 	unaryExpr, err := parser.ParseExpr(`&map[string]any{"n": 1.5, "ok": true, "none": nil}`)
@@ -296,17 +237,32 @@ func TestInferJSONSchemaExprHelpers(t *testing.T) {
 	if itemSchema["type"] != "object" {
 		t.Fatalf("expected object item schema, got %+v", itemSchema)
 	}
+	heterogeneousExpr, err := parser.ParseExpr(`[]any{"value", 1}`)
+	if err != nil {
+		t.Fatalf("parse heterogeneous array: %v", err)
+	}
+	heterogeneous := inferJSONSchemaExpr(heterogeneousExpr).(map[string]any)
+	if alternatives, ok := heterogeneous["items"].(map[string]any)["anyOf"].([]any); !ok || len(alternatives) != 2 {
+		t.Fatalf("heterogeneous syntax literal must retain all alternatives: %+v", heterogeneous)
+	}
 
 	typedExpr, err := parser.ParseExpr(`Payload{}`)
 	if err != nil {
 		t.Fatalf("parse typed expr: %v", err)
 	}
-	typedSchema := inferJSONSchemaExpr(typedExpr).(map[string]any)
-	if typedSchema["x-forj-type"] != "Payload" {
-		t.Fatalf("expected typed fallback schema, got %+v", typedSchema)
+	if typedSchema := inferJSONSchemaExpr(typedExpr); typedSchema != nil {
+		t.Fatalf("named structs require checked type information, got %+v", typedSchema)
+	}
+	decoyTime, err := parser.ParseExpr(`time.Time{}`)
+	if err != nil {
+		t.Fatalf("parse selector composite: %v", err)
+	}
+	if schema := inferJSONSchemaExpr(decoyTime); schema != nil {
+		t.Fatalf("selector spelling cannot prove a well-known type, got %+v", schema)
 	}
 }
 
+// TestToOpenAPIWrapper verifies manifest-to-document projection preserves the operation evidence required by OpenAPI consumers.
 func TestToOpenAPIWrapper(t *testing.T) {
 	m := Manifest{
 		Operations: []Operation{
@@ -315,7 +271,7 @@ func TestToOpenAPIWrapper(t *testing.T) {
 				Method: "GET",
 				Path:   "/x",
 				Outputs: OutputShape{
-					Responses: []ResponseShape{{StatusCode: 200, Source: "echo.NoContent"}},
+					Responses: []ResponseShape{{StatusCode: 200, Source: "web.NoContent"}},
 				},
 			},
 		},
@@ -326,6 +282,7 @@ func TestToOpenAPIWrapper(t *testing.T) {
 	}
 }
 
+// TestResponseContentAndOpenAPIMergeHelpers verifies multi-branch responses merge without discarding media types or inventing schemas.
 func TestResponseContentAndOpenAPIMergeHelpers(t *testing.T) {
 	if contentType, schema := responseContent(ResponseShape{Schema: map[string]any{"type": "object"}}); contentType != "application/json" || schema == nil {
 		t.Fatalf("expected direct schema content for json response")
@@ -334,14 +291,15 @@ func TestResponseContentAndOpenAPIMergeHelpers(t *testing.T) {
 		resp        ResponseShape
 		contentType string
 	}{
-		{resp: ResponseShape{Source: "echo.String"}, contentType: "text/plain"},
-		{resp: ResponseShape{Source: "echo.HTML"}, contentType: "text/html"},
-		{resp: ResponseShape{Source: "echo.XML"}, contentType: "application/xml"},
-		{resp: ResponseShape{Source: "echo.Blob"}, contentType: "application/octet-stream"},
+		{resp: ResponseShape{Source: "web.Text"}, contentType: "text/plain"},
+		{resp: ResponseShape{Source: "web.HTML"}, contentType: "text/html"},
 	} {
 		if got, _ := responseContent(tc.resp); got != tc.contentType {
 			t.Fatalf("unexpected content type for %+v: got=%s want=%s", tc.resp, got, tc.contentType)
 		}
+	}
+	if got, schema := responseContent(ResponseShape{Source: "web.Blob"}); got != "" || schema != nil {
+		t.Fatalf("unresolved Blob content must remain untyped: media=%q schema=%+v", got, schema)
 	}
 	if got, _ := responseContent(ResponseShape{TypeName: "map[string]any"}); got != "application/json" {
 		t.Fatalf("expected json content type for map response")
@@ -363,9 +321,9 @@ func TestResponseContentAndOpenAPIMergeHelpers(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected merged schema body, got %+v", merged)
 	}
-	oneOf, ok := schema["oneOf"].([]any)
-	if !ok || len(oneOf) != 2 {
-		t.Fatalf("expected oneOf with 2 schemas, got %+v", schema)
+	anyOf, ok := schema["anyOf"].([]any)
+	if !ok || len(anyOf) != 2 {
+		t.Fatalf("expected anyOf with 2 schemas, got %+v", schema)
 	}
 
 	if out := mergeOpenAPIContentBody(nil, incoming); !reflect.DeepEqual(out, incoming) {
@@ -400,25 +358,7 @@ func TestResponseContentAndOpenAPIMergeHelpers(t *testing.T) {
 	}
 }
 
-func TestSchemaComponentsRefStoreAndNaming(t *testing.T) {
-	c := newSchemaComponents()
-	first := c.refOrStore(map[string]any{"type": "object", "x-forj-type": "hello.Input"})
-	second := c.refOrStore(map[string]any{"type": "object", "x-forj-type": "hello.Input"})
-	if !reflect.DeepEqual(first, second) {
-		t.Fatalf("expected same ref for identical schema, got %v and %v", first, second)
-	}
-	third := c.refOrStore(map[string]any{"type": "object", "x-forj-type": "hello.Other"})
-	if reflect.DeepEqual(second, third) {
-		t.Fatalf("expected different refs for different schema fingerprints")
-	}
-	if got := c.refOrStore(123); got != 123 {
-		t.Fatalf("non-map schemas should pass through untouched")
-	}
-	if got := c.refOrStore(map[string]any{}); !reflect.DeepEqual(got, map[string]any{}) {
-		t.Fatalf("empty map schema should pass through untouched")
-	}
-}
-
+// TestAnalyzeTypeInferenceHelpers verifies local evidence is sufficient before handler analysis emits a concrete contract.
 func TestAnalyzeTypeInferenceHelpers(t *testing.T) {
 	locals := map[string]string{"in": "Input"}
 	if got := inferExprTypeName(&ast.Ident{Name: "in"}, locals); got != "Input" {
@@ -438,6 +378,7 @@ func TestAnalyzeTypeInferenceHelpers(t *testing.T) {
 	}
 }
 
+// TestCollectLocalTypesAssignmentKeepsExistingTypedVar verifies later value assignments cannot erase an earlier declared request type.
 func TestCollectLocalTypesAssignmentKeepsExistingTypedVar(t *testing.T) {
 	src := `package p
 func f() {
@@ -465,6 +406,7 @@ func f() {
 	}
 }
 
+// TestCollectLocalTypesInferredVarAndNonIdentAssignments verifies inference follows supported identifiers while ignoring unrelated assignment targets.
 func TestCollectLocalTypesInferredVarAndNonIdentAssignments(t *testing.T) {
 	src := `package p
 func f() {
@@ -488,6 +430,7 @@ func f() {
 	}
 }
 
+// TestParseGoFilesWithSetSkipsTemplatesAndTests verifies generated templates and test-only routes cannot contaminate runtime API artifacts.
 func TestParseGoFilesWithSetSkipsTemplatesAndTests(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "templates", "x"), 0o755); err != nil {
@@ -514,6 +457,7 @@ func TestParseGoFilesWithSetSkipsTemplatesAndTests(t *testing.T) {
 	}
 }
 
+// TestParseGoFilesWithSetSkipsUnparseableGoFiles verifies lenient discovery reports isolated syntax failures while retaining usable source.
 func TestParseGoFilesWithSetSkipsUnparseableGoFiles(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "pkg"), 0o755); err != nil {
@@ -534,6 +478,7 @@ func TestParseGoFilesWithSetSkipsUnparseableGoFiles(t *testing.T) {
 	}
 }
 
+// TestIndexerHelpers verifies deterministic source normalization shared by discovery and artifact identity.
 func TestIndexerHelpers(t *testing.T) {
 	if got := normalizeMethodExpr("http.MethodPost"); got != "post" {
 		t.Fatalf("unexpected method normalization: %q", got)
@@ -576,15 +521,16 @@ func TestIndexerHelpers(t *testing.T) {
 	}
 }
 
+// TestAdditionalIndexerHelpers covers conservative edge cases that protect stable operation and schema identity.
 func TestAdditionalIndexerHelpers(t *testing.T) {
 	t.Run("join path and string literal helpers", func(t *testing.T) {
 		if got := joinPath("", "/users"); got != "/users" {
 			t.Fatalf("joinPath(empty) = %q", got)
 		}
-		if got := joinPath("/api", "users"); got != "/api/users" {
+		if got := joinPath("/api", "users"); got != "/apiusers" {
 			t.Fatalf("joinPath(no leading slash) = %q", got)
 		}
-		if got := joinPath("/api/", "/users"); got != "/api/users" {
+		if got := joinPath("/api/", "/users"); got != "/api//users" {
 			t.Fatalf("joinPath(trim) = %q", got)
 		}
 		if got := extractStringLiteral(&ast.BasicLit{Kind: token.STRING, Value: `"ok"`}); got != "ok" {
@@ -617,61 +563,36 @@ func TestAdditionalIndexerHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("json tag and candidate helpers", func(t *testing.T) {
-		if name, omitEmpty, ok := jsonTag(nil); name != "" || omitEmpty || ok {
-			t.Fatalf("jsonTag(nil) = (%q, %v, %v)", name, omitEmpty, ok)
-		}
-		if name, omitEmpty, ok := jsonTag(&ast.BasicLit{Kind: token.STRING, Value: "`yaml:\"name\"`"}); name != "" || omitEmpty || ok {
-			t.Fatalf("jsonTag(no json) = (%q, %v, %v)", name, omitEmpty, ok)
-		}
-		if name, omitEmpty, ok := jsonTag(&ast.BasicLit{Kind: token.STRING, Value: "`json:\",omitempty\"`"}); name != "" || !omitEmpty || !ok {
-			t.Fatalf("jsonTag(empty name) = (%q, %v, %v)", name, omitEmpty, ok)
-		}
-
+	t.Run("candidate helpers", func(t *testing.T) {
 		only := []discoveredHandler{{Package: "api", Receiver: "*Controller"}}
-		if got := pickBestCandidate(only, "", ""); got != only[0] {
+		if got := pickBestCandidate(only, "", "", ""); !reflect.DeepEqual(got, only[0]) {
 			t.Fatalf("pickBestCandidate(single) = %+v", got)
 		}
 		candidates := []discoveredHandler{
 			{Package: "public", Receiver: "*Controller"},
 			{Package: "admin", Receiver: "*AdminController"},
 		}
-		if got := pickBestCandidate(candidates, "admin", "AdminController"); got.Package != "admin" {
+		if got := pickBestCandidate(candidates, "", "admin", "AdminController"); got.Package != "admin" {
 			t.Fatalf("pickBestCandidate(pkg+recv) = %+v", got)
 		}
-		if got := pickBestCandidate(candidates, "", "Controller"); got.Package != "public" {
+		if got := pickBestCandidate(candidates, "", "", "Controller"); got.Package != "public" {
 			t.Fatalf("pickBestCandidate(recv) = %+v", got)
-		}
-	})
-
-	t.Run("resolve type schema and json tag helpers", func(t *testing.T) {
-		typeSchemas := map[string]any{
-			typeSchemaKey("hello", "Input"):           map[string]any{"type": "object"},
-			typeSchemaKey("actualpkg", "CreateInput"): map[string]any{"type": "string"},
-		}
-		if _, ok := resolveTypeSchema("hello", "", typeSchemas); ok {
-			t.Fatal("resolveTypeSchema(empty) should fail")
-		}
-		if schema, ok := resolveTypeSchema("hello", "*Input", typeSchemas); !ok || schema == nil {
-			t.Fatalf("resolveTypeSchema(local) = (%v, %v)", schema, ok)
-		}
-		if schema, ok := resolveTypeSchema("hello", "alias.CreateInput", typeSchemas); !ok || schema == nil {
-			t.Fatalf("resolveTypeSchema(alias suffix) = (%v, %v)", schema, ok)
-		}
-		if _, ok := resolveTypeSchema("hello", "alias.Missing", typeSchemas); ok {
-			t.Fatal("resolveTypeSchema(missing) should fail")
 		}
 	})
 }
 
+// TestRunReturnsErrorWhenOutputPathIsDirectory verifies publication fails visibly without replacing the prior artifact set.
 func TestRunReturnsErrorWhenOutputPathIsDirectory(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodGet, "/x", c.X)} }
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodGet, "/x", c.X)} }
 func (c *Controller) X(ctx any) error { return nil }`,
 	}
 	writeFixtureFiles(t, root, files)

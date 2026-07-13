@@ -1,7 +1,7 @@
 package webindex
 
 // ManifestVersion is the schema version for the API index output.
-const ManifestVersion = "1"
+const ManifestVersion = "2"
 
 // Manifest is the canonical API index artifact.
 type Manifest struct {
@@ -13,19 +13,30 @@ type Manifest struct {
 
 // Operation describes one HTTP operation discovered in source.
 type Operation struct {
-	ID         string      `json:"id"`
-	Method     string      `json:"method"`
-	Path       string      `json:"path"`
-	Handler    HandlerRef  `json:"handler"`
-	Middleware []string    `json:"middleware,omitempty"`
-	Inputs     InputShape  `json:"inputs"`
-	Outputs    OutputShape `json:"outputs"`
+	ID                   string             `json:"id"`
+	Method               string             `json:"method"`
+	Path                 string             `json:"path"`
+	Handler              HandlerRef         `json:"handler"`
+	Metadata             *OperationMetadata `json:"metadata,omitempty"`
+	Middleware           []string           `json:"middleware,omitempty"`
+	Inputs               InputShape         `json:"inputs"`
+	Outputs              OutputShape        `json:"outputs"`
+	middlewareProvenance []middlewareProvenance
+}
+
+// middlewareProvenance identifies the source declaration that attaches one runtime middleware occurrence without exposing checkout details in manifest JSON.
+type middlewareProvenance struct {
+	Expression string
+	File       string
+	Function   string
+	Receiver   string
 }
 
 // HandlerRef points to the handler function/method.
 type HandlerRef struct {
 	Expression string `json:"expression"`
 	Package    string `json:"package,omitempty"`
+	ImportPath string `json:"import_path,omitempty"`
 	Receiver   string `json:"receiver,omitempty"`
 	Function   string `json:"function,omitempty"`
 	File       string `json:"file,omitempty"`
@@ -37,6 +48,7 @@ type InputShape struct {
 	PathParams  []Parameter `json:"path_params,omitempty"`
 	QueryParams []Parameter `json:"query_params,omitempty"`
 	Headers     []Parameter `json:"headers,omitempty"`
+	Cookies     []Parameter `json:"cookies,omitempty"`
 	Body        *BodyShape  `json:"body,omitempty"`
 }
 
@@ -63,16 +75,20 @@ type OutputShape struct {
 
 // ResponseShape describes one possible response.
 type ResponseShape struct {
-	StatusCode int    `json:"status_code"`
-	TypeName   string `json:"type_name,omitempty"`
-	Schema     any    `json:"schema,omitempty"`
-	Source     string `json:"source,omitempty"`
-	Confidence string `json:"confidence,omitempty"`
+	StatusCode  int    `json:"status_code"`
+	TypeName    string `json:"type_name,omitempty"`
+	Schema      any    `json:"schema,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
+	Source      string `json:"source,omitempty"`
+	Confidence  string `json:"confidence,omitempty"`
 }
 
-// Schema is a placeholder for future expanded schema modeling.
+// Schema records one canonical named Go contract and its deterministic projection.
 type Schema struct {
+	Identity   string `json:"identity"`
 	Name       string `json:"name"`
-	Kind       string `json:"kind,omitempty"`
+	Package    string `json:"package,omitempty"`
+	TypeName   string `json:"type_name,omitempty"`
+	Definition any    `json:"definition"`
 	Confidence string `json:"confidence,omitempty"`
 }

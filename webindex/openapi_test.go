@@ -10,6 +10,7 @@ import (
 	"testing"
 )
 
+// TestRunOpenAPIIncludesParameters verifies native context reads become correctly located OpenAPI parameters.
 func TestRunOpenAPIIncludesParameters(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -17,14 +18,14 @@ func TestRunOpenAPIIncludesParameters(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/monitoring/monitors/:id/check-now", c.CheckNow)} }
-func (c *Controller) CheckNow(ctx *echo.Context) error {
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodPost, "/monitoring/monitors/:id/check-now", c.CheckNow)} }
+func (c *Controller) CheckNow(ctx web.Context) error {
 	_ = ctx.Param("id")
-	_ = ctx.QueryParam("sync")
-	_ = ctx.Request().Header.Get("X-Request-ID")
+	_ = ctx.Query("sync")
+	_ = ctx.Header("X-Request-ID")
 	return ctx.NoContent(http.StatusAccepted)
 }`,
 	}
@@ -46,6 +47,7 @@ func (c *Controller) CheckNow(ctx *echo.Context) error {
 	}
 }
 
+// TestRunOpenAPIIncludesJSONResponseSchema verifies concrete JSON return values project into reusable response schemas.
 func TestRunOpenAPIIncludesJSONResponseSchema(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -53,11 +55,11 @@ func TestRunOpenAPIIncludesJSONResponseSchema(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/monitors/:id/check-now", c.CheckNow)} }
-func (c *Controller) CheckNow(ctx *echo.Context) error {
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodPost, "/monitors/:id/check-now", c.CheckNow)} }
+func (c *Controller) CheckNow(ctx web.Context) error {
 	id := ctx.Param("id")
 	if id == "" { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false, "error": "missing id"}) }
 	return ctx.JSON(http.StatusAccepted, map[string]any{"ok": true, "mode": "queued", "monitor_id": id})
@@ -96,6 +98,7 @@ func (c *Controller) CheckNow(ctx *echo.Context) error {
 	}
 }
 
+// TestRunOpenAPIIncludesRequestBodyFromBind verifies a native Bind target defines the operation request body.
 func TestRunOpenAPIIncludesRequestBodyFromBind(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -103,12 +106,12 @@ func TestRunOpenAPIIncludesRequestBodyFromBind(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type monitorInput struct { Name string }
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/monitors", c.Create)} }
-func (c *Controller) Create(ctx *echo.Context) error {
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodPost, "/monitors", c.Create)} }
+func (c *Controller) Create(ctx web.Context) error {
 	var in monitorInput
 	if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false}) }
 	return ctx.JSON(http.StatusCreated, map[string]any{"ok": true})
@@ -121,6 +124,7 @@ func (c *Controller) Create(ctx *echo.Context) error {
 	assertBodyHasProperties(t, doc, post, []string{"Name"})
 }
 
+// TestRunOpenAPIRequestBodyIgnoresPostBindReassignmentFunction verifies later transformations cannot replace the type bound from the request.
 func TestRunOpenAPIRequestBodyIgnoresPostBindReassignmentFunction(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -128,13 +132,13 @@ func TestRunOpenAPIRequestBodyIgnoresPostBindReassignmentFunction(t *testing.T) 
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type monitorInput struct { Name string; Type string }
 func normalizeMonitorInput(in monitorInput) monitorInput { return in }
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/monitors", c.Create)} }
-func (c *Controller) Create(ctx *echo.Context) error {
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodPost, "/monitors", c.Create)} }
+func (c *Controller) Create(ctx web.Context) error {
 	var in monitorInput
 	if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false}) }
 	in = normalizeMonitorInput(in)
@@ -148,6 +152,7 @@ func (c *Controller) Create(ctx *echo.Context) error {
 	assertBodyHasProperties(t, doc, post, []string{"Name", "Type"})
 }
 
+// TestRunOpenAPIRequestBodyUsesJSONTagsAndRequired verifies wire names and validation policy drive request-schema requiredness.
 func TestRunOpenAPIRequestBodyUsesJSONTagsAndRequired(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -155,15 +160,15 @@ func TestRunOpenAPIRequestBodyUsesJSONTagsAndRequired(t *testing.T) {
 		"internal/hello/controller.go": "package hello\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v5\"\n" +
+			"\t\"github.com/goforj/web\"\n" +
 			")\n" +
 			"type createInput struct {\n" +
-			"\tName string `json:\"name\"`\n" +
+			"\tName string `json:\"name\" validate:\"required\"`\n" +
 			"\tEmail *string `json:\"email,omitempty\"`\n" +
 			"}\n" +
 			"type Controller struct{}\n" +
-			"func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, \"/users\", c.Create)} }\n" +
-			"func (c *Controller) Create(ctx *echo.Context) error {\n" +
+			"func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodPost, \"/users\", c.Create)} }\n" +
+			"func (c *Controller) Create(ctx web.Context) error {\n" +
 			"\tvar in createInput\n" +
 			"\tif err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false}) }\n" +
 			"\treturn ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true})\n" +
@@ -200,36 +205,35 @@ func TestRunOpenAPIRequestBodyUsesJSONTagsAndRequired(t *testing.T) {
 	}
 }
 
-func TestRunOpenAPINonJSONResponseContentTypes(t *testing.T) {
+// TestRunOpenAPINativeNonJSONResponseContentTypes verifies native text, HTML, and binary responses preserve their media contracts.
+func TestRunOpenAPINativeNonJSONResponseContentTypes(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{
-	http.NewRoute(http.MethodGet, "/s", c.S),
-	http.NewRoute(http.MethodGet, "/h", c.H),
-	http.NewRoute(http.MethodGet, "/x", c.X),
-	http.NewRoute(http.MethodGet, "/b", c.B),
+	web.NewRoute(http.MethodGet, "/s", c.S),
+	web.NewRoute(http.MethodGet, "/h", c.H),
+	web.NewRoute(http.MethodGet, "/b", c.B),
 } }
-func (c *Controller) S(ctx *echo.Context) error { return ctx.String(http.StatusOK, "ok") }
-func (c *Controller) H(ctx *echo.Context) error { return ctx.HTML(http.StatusOK, "<p>ok</p>") }
-func (c *Controller) X(ctx *echo.Context) error { return ctx.XML(http.StatusOK, map[string]any{"ok": true}) }
-func (c *Controller) B(ctx *echo.Context) error { return ctx.Blob(http.StatusOK, "application/octet-stream", []byte{1,2,3}) }`,
+func (c *Controller) S(ctx web.Context) error { return ctx.Text(http.StatusOK, "ok") }
+func (c *Controller) H(ctx web.Context) error { return ctx.HTML(http.StatusOK, "<p>ok</p>") }
+func (c *Controller) B(ctx web.Context) error { return ctx.Blob(http.StatusOK, "application/octet-stream", []byte{1,2,3}) }`,
 	}
 	writeFixtureFiles(t, root, files)
 
 	doc := buildOpenAPI(t, root)
 	assertResponseContentType(t, doc, "/s", "get", "200", "text/plain")
 	assertResponseContentType(t, doc, "/h", "get", "200", "text/html")
-	assertResponseContentType(t, doc, "/x", "get", "200", "application/xml")
 	assertResponseContentType(t, doc, "/b", "get", "200", "application/octet-stream")
 }
 
+// TestRunOpenAPIGoldenSnapshot protects the human-facing quality and deterministic shape of a representative API document.
 func TestRunOpenAPIGoldenSnapshot(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -237,15 +241,15 @@ func TestRunOpenAPIGoldenSnapshot(t *testing.T) {
 		"internal/hello/controller.go": "package hello\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v5\"\n" +
+			"\t\"github.com/goforj/web\"\n" +
 			")\n" +
 			"type createInput struct {\n" +
 			"\tName string `json:\"name\"`\n" +
 			"\tEnabled bool `json:\"enabled,omitempty\"`\n" +
 			"}\n" +
 			"type Controller struct{}\n" +
-			"func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, \"/users\", c.Create)} }\n" +
-			"func (c *Controller) Create(ctx *echo.Context) error {\n" +
+			"func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodPost, \"/users\", c.Create)} }\n" +
+			"func (c *Controller) Create(ctx web.Context) error {\n" +
 			"\tvar in createInput\n" +
 			"\tif err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false, \"error\": \"bad\"}) }\n" +
 			"\treturn ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true, \"id\": \"u_1\"})\n" +
@@ -269,6 +273,7 @@ func TestRunOpenAPIGoldenSnapshot(t *testing.T) {
 	}
 }
 
+// TestRunOpenAPIUsesAppNameAsTitle verifies App-scoped metadata replaces generic generator branding.
 func TestRunOpenAPIUsesAppNameAsTitle(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -277,11 +282,11 @@ func TestRunOpenAPIUsesAppNameAsTitle(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodGet, "/health", c.Health)} }
-func (c *Controller) Health(ctx *echo.Context) error { return ctx.NoContent(http.StatusOK) }`,
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodGet, "/health", c.Health)} }
+func (c *Controller) Health(ctx web.Context) error { return ctx.NoContent(http.StatusOK) }`,
 	}
 	writeFixtureFiles(t, root, files)
 
@@ -291,6 +296,7 @@ func (c *Controller) Health(ctx *echo.Context) error { return ctx.NoContent(http
 	}
 }
 
+// TestRunOpenAPIUsesComponentRefs verifies named models remain stable and reusable across operation roles.
 func TestRunOpenAPIUsesComponentRefs(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -298,14 +304,14 @@ func TestRunOpenAPIUsesComponentRefs(t *testing.T) {
 		"internal/hello/controller.go": "package hello\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v5\"\n" +
+			"\t\"github.com/goforj/web\"\n" +
 			")\n" +
 			"type createInput struct {\n" +
 			"\tName string `json:\"name\"`\n" +
 			"}\n" +
 			"type Controller struct{}\n" +
-			"func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, \"/users\", c.Create)} }\n" +
-			"func (c *Controller) Create(ctx *echo.Context) error {\n" +
+			"func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodPost, \"/users\", c.Create)} }\n" +
+			"func (c *Controller) Create(ctx web.Context) error {\n" +
 			"\tvar in createInput\n" +
 			"\tif err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false}) }\n" +
 			"\treturn ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true, \"id\": \"u_1\"})\n" +
@@ -327,19 +333,20 @@ func TestRunOpenAPIUsesComponentRefs(t *testing.T) {
 	}
 }
 
-func TestRunOpenAPIMergesResponseSchemasWithOneOf(t *testing.T) {
+// TestRunOpenAPIMergesResponseSchemasWithAnyOf verifies overlapping inferred response shapes accept every observed payload.
+func TestRunOpenAPIMergesResponseSchemasWithAnyOf(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodGet, "/items/:id", c.Get)} }
-func (c *Controller) Get(ctx *echo.Context) error {
-	if ctx.QueryParam("verbose") == "1" {
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodGet, "/items/:id", c.Get)} }
+func (c *Controller) Get(ctx web.Context) error {
+	if ctx.Query("verbose") == "1" {
 		return ctx.JSON(http.StatusOK, map[string]any{"ok": true, "id": "x", "details": "full"})
 	}
 	return ctx.JSON(http.StatusOK, map[string]any{"ok": true, "id": "x"})
@@ -353,12 +360,13 @@ func (c *Controller) Get(ctx *echo.Context) error {
 	content := resp["content"].(map[string]any)
 	appJSON := content["application/json"].(map[string]any)
 	schema := derefSchema(t, doc, appJSON["schema"].(map[string]any))
-	oneOf, ok := schema["oneOf"].([]any)
-	if !ok || len(oneOf) < 2 {
-		t.Fatalf("expected oneOf with >=2 schemas, got %+v", schema)
+	anyOf, ok := schema["anyOf"].([]any)
+	if !ok || len(anyOf) < 2 {
+		t.Fatalf("expected anyOf with >=2 schemas, got %+v", schema)
 	}
 }
 
+// TestRunOpenAPICrossPackageAliasBindSchema verifies checked import identity survives source aliases during request mapping.
 func TestRunOpenAPICrossPackageAliasBindSchema(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -371,11 +379,11 @@ func TestRunOpenAPICrossPackageAliasBindSchema(t *testing.T) {
 import (
 	"net/http"
 	mdt "example.com/test/internal/dto"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodPost, "/users", c.Create)} }
-func (c *Controller) Create(ctx *echo.Context) error {
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodPost, "/users", c.Create)} }
+func (c *Controller) Create(ctx web.Context) error {
 	var in mdt.CreateInput
 	if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false}) }
 	return ctx.JSON(http.StatusCreated, map[string]any{"ok": true})
@@ -402,6 +410,7 @@ func (c *Controller) Create(ctx *echo.Context) error {
 	}
 }
 
+// TestRunOpenAPIStructuralValidation verifies emitted references, path parameters, and responses satisfy core document invariants.
 func TestRunOpenAPIStructuralValidation(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -410,16 +419,16 @@ func TestRunOpenAPIStructuralValidation(t *testing.T) {
 		"internal/users/controller.go": "package users\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v5\"\n" +
+			"\t\"github.com/goforj/web\"\n" +
 			")\n" +
 			"type createUser struct { Name string `json:\"name\"` }\n" +
 			"type Controller struct{}\n" +
 			"func (c *Controller) Routes() []any { return []any{\n" +
-			"\thttp.NewRoute(http.MethodGet, \"/users/:id\", c.Get),\n" +
-			"\thttp.NewRoute(http.MethodPost, \"/users\", c.Create),\n" +
+			"\tweb.NewRoute(http.MethodGet, \"/users/:id\", c.Get),\n" +
+			"\tweb.NewRoute(http.MethodPost, \"/users\", c.Create),\n" +
 			"} }\n" +
-			"func (c *Controller) Get(ctx *echo.Context) error { return ctx.JSON(http.StatusOK, map[string]any{\"ok\": true, \"id\": ctx.Param(\"id\")}) }\n" +
-			"func (c *Controller) Create(ctx *echo.Context) error { var in createUser; if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false}) }; return ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true}) }\n",
+			"func (c *Controller) Get(ctx web.Context) error { return ctx.JSON(http.StatusOK, map[string]any{\"ok\": true, \"id\": ctx.Param(\"id\")}) }\n" +
+			"func (c *Controller) Create(ctx web.Context) error { var in createUser; if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false}) }; return ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true}) }\n",
 	}
 	writeFixtureFiles(t, root, files)
 	doc := buildOpenAPI(t, root)
@@ -428,6 +437,7 @@ func TestRunOpenAPIStructuralValidation(t *testing.T) {
 	}
 }
 
+// TestRunOpenAPIMultiControllerGoldenSnapshot protects semantic naming when several providers contribute colliding model names.
 func TestRunOpenAPIMultiControllerGoldenSnapshot(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -436,26 +446,26 @@ func TestRunOpenAPIMultiControllerGoldenSnapshot(t *testing.T) {
 		"internal/users/controller.go": "package users\n" +
 			"import (\n" +
 			"\t\"net/http\"\n" +
-			"\t\"github.com/labstack/echo/v5\"\n" +
+			"\t\"github.com/goforj/web\"\n" +
 			")\n" +
 			"type createUser struct { Name string `json:\"name\"`; Email *string `json:\"email,omitempty\"` }\n" +
 			"type Controller struct{}\n" +
 			"func (c *Controller) Routes() []any { return []any{\n" +
-			"\thttp.NewRoute(http.MethodGet, \"/users/:id\", c.Get),\n" +
-			"\thttp.NewRoute(http.MethodPost, \"/users\", c.Create),\n" +
+			"\tweb.NewRoute(http.MethodGet, \"/users/:id\", c.Get),\n" +
+			"\tweb.NewRoute(http.MethodPost, \"/users\", c.Create),\n" +
 			"} }\n" +
-			"func (c *Controller) Get(ctx *echo.Context) error { return ctx.JSON(http.StatusOK, map[string]any{\"ok\": true, \"id\": ctx.Param(\"id\")}) }\n" +
-			"func (c *Controller) Create(ctx *echo.Context) error { var in createUser; if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false, \"error\": \"bad\"}) }; return ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true, \"id\": \"u_1\"}) }\n",
+			"func (c *Controller) Get(ctx web.Context) error { return ctx.JSON(http.StatusOK, map[string]any{\"ok\": true, \"id\": ctx.Param(\"id\")}) }\n" +
+			"func (c *Controller) Create(ctx web.Context) error { var in createUser; if err := ctx.Bind(&in); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{\"ok\": false, \"error\": \"bad\"}) }; return ctx.JSON(http.StatusCreated, map[string]any{\"ok\": true, \"id\": \"u_1\"}) }\n",
 		"internal/files/controller.go": `package files
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
-func (c *Controller) Routes() []any { return []any{http.NewRoute(http.MethodGet, "/files/:id/download", c.Download)} }
-func (c *Controller) Download(ctx *echo.Context) error {
-	if ctx.QueryParam("raw") == "1" { return ctx.Blob(http.StatusOK, "application/octet-stream", []byte{1,2}) }
-	return ctx.String(http.StatusOK, "ok")
+func (c *Controller) Routes() []any { return []any{web.NewRoute(http.MethodGet, "/files/:id/download", c.Download)} }
+func (c *Controller) Download(ctx web.Context) error {
+	if ctx.Query("raw") == "1" { return ctx.Blob(http.StatusOK, "application/octet-stream", []byte{1,2}) }
+	return ctx.Text(http.StatusOK, "ok")
 }`,
 	}
 	writeFixtureFiles(t, root, files)
@@ -475,6 +485,7 @@ func (c *Controller) Download(ctx *echo.Context) error {
 	}
 }
 
+// TestRunOpenAPIDeterministicAcrossRuns verifies repeated indexing cannot perturb generated client inputs.
 func TestRunOpenAPIDeterministicAcrossRuns(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -483,19 +494,19 @@ func TestRunOpenAPIDeterministicAcrossRuns(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type in struct { Name string ` + "`json:\"name\"`" + ` }
 type Controller struct{}
 func (c *Controller) Routes() []any { return []any{
-	http.NewRoute(http.MethodGet, "/items/:id", c.Get),
-	http.NewRoute(http.MethodPost, "/items", c.Create),
+	web.NewRoute(http.MethodGet, "/items/:id", c.Get),
+	web.NewRoute(http.MethodPost, "/items", c.Create),
 } }
-func (c *Controller) Get(ctx *echo.Context) error {
-	if ctx.QueryParam("full") == "1" { return ctx.JSON(http.StatusOK, map[string]any{"id": ctx.Param("id"), "ok": true, "mode": "full"}) }
+func (c *Controller) Get(ctx web.Context) error {
+	if ctx.Query("full") == "1" { return ctx.JSON(http.StatusOK, map[string]any{"id": ctx.Param("id"), "ok": true, "mode": "full"}) }
 	return ctx.JSON(http.StatusOK, map[string]any{"id": ctx.Param("id"), "ok": true})
 }
-func (c *Controller) Create(ctx *echo.Context) error {
+func (c *Controller) Create(ctx web.Context) error {
 	var payload in
 	if err := ctx.Bind(&payload); err != nil { return ctx.JSON(http.StatusBadRequest, map[string]any{"ok": false}) }
 	return ctx.JSON(http.StatusCreated, map[string]any{"ok": true})
@@ -518,6 +529,7 @@ func (c *Controller) Create(ctx *echo.Context) error {
 	}
 }
 
+// writeFixtureFiles materializes isolated repositories so integration tests exercise real parsing without touching the source checkout.
 func writeFixtureFiles(t *testing.T, root string, files map[string]string) {
 	t.Helper()
 	for rel, contents := range files {
@@ -531,6 +543,7 @@ func writeFixtureFiles(t *testing.T, root string, files map[string]string) {
 	}
 }
 
+// buildOpenAPI runs the public indexer and decodes its artifact so assertions cover the published representation.
 func buildOpenAPI(t *testing.T, root string) OpenAPIDocument {
 	t.Helper()
 	openapi := filepath.Join(root, "build", "openapi.json")
@@ -549,6 +562,7 @@ func buildOpenAPI(t *testing.T, root string) OpenAPIDocument {
 	return doc
 }
 
+// assertBodyHasProperties resolves component references so request assertions remain stable as schemas move between inline and named forms.
 func assertBodyHasProperties(t *testing.T, doc OpenAPIDocument, post OpenAPIOp, fields []string) {
 	t.Helper()
 	if post.RequestBody == nil {
@@ -578,6 +592,7 @@ func assertBodyHasProperties(t *testing.T, doc OpenAPIDocument, post OpenAPIOp, 
 	}
 }
 
+// assertResponseContentType verifies response projection preserves the framework method's actual media type.
 func assertResponseContentType(t *testing.T, doc OpenAPIDocument, path, method, code, want string) {
 	t.Helper()
 	op := doc.Paths[path][method]
@@ -591,6 +606,7 @@ func assertResponseContentType(t *testing.T, doc OpenAPIDocument, path, method, 
 	}
 }
 
+// normalizeJSON compares semantic JSON formatting independently from incidental encoder whitespace.
 func normalizeJSON(t *testing.T, in []byte) string {
 	t.Helper()
 	var v any
@@ -604,6 +620,7 @@ func normalizeJSON(t *testing.T, in []byte) string {
 	return strings.TrimSpace(string(out))
 }
 
+// validateOpenAPIDocument performs focused structural checks that make golden failures actionable without duplicating the production validator.
 func validateOpenAPIDocument(doc OpenAPIDocument) []string {
 	errs := make([]string, 0)
 	if strings.TrimSpace(doc.OpenAPI) == "" {
@@ -656,6 +673,7 @@ func validateOpenAPIDocument(doc OpenAPIDocument) []string {
 	return errs
 }
 
+// extractPathParamNames derives the parameters every OpenAPI path operation is required to declare.
 func extractPathParamNames(path string) []string {
 	parts := strings.Split(path, "/")
 	out := make([]string, 0)
@@ -667,6 +685,7 @@ func extractPathParamNames(path string) []string {
 	return out
 }
 
+// hasPathParameter confirms a templated segment is represented with the required path location.
 func hasPathParameter(op OpenAPIOp, name string) bool {
 	for _, p := range op.Parameters {
 		if p.In == "path" && p.Name == name {
@@ -676,6 +695,7 @@ func hasPathParameter(op OpenAPIOp, name string) bool {
 	return false
 }
 
+// derefSchema lets tests assert schema meaning without depending on whether component reuse was selected.
 func derefSchema(t *testing.T, doc OpenAPIDocument, schema map[string]any) map[string]any {
 	t.Helper()
 	ref, ok := schema["$ref"].(string)

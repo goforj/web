@@ -1,44 +1,4 @@
 {
-  "components": {
-    "schemas": {
-      "Schema": {
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "Schema2": {
-        "properties": {
-          "error": {
-            "type": "string"
-          },
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "type": "object"
-      },
-      "Schema3": {
-        "properties": {
-          "enabled": {
-            "type": "boolean"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "type": "object"
-      }
-    }
-  },
   "openapi": "3.0.3",
   "info": {
     "title": "Forj Generated API",
@@ -47,39 +7,85 @@
   "paths": {
     "/users": {
       "post": {
-        "operationId": "POST:/users",
+        "operationId": "helloControllerCreate",
+        "tags": [
+          "Hello"
+        ],
         "requestBody": {
           "content": {
+            "*/*": {
+              "schema": {}
+            },
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Schema3"
+                "$ref": "#/components/schemas/HelloCreateInput"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Schema"
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "ok"
+                  ],
+                  "type": "object"
                 }
               }
             },
-            "description": "response"
+            "description": "Created"
           },
           "400": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Schema2"
+                  "additionalProperties": false,
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "ok"
+                  ],
+                  "type": "object"
                 }
               }
             },
-            "description": "response"
+            "description": "Bad Request"
           }
         }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HelloCreateInput": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     }
   }

@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
+// TestRunIndexesRoutesAndHandlerMetadata exercises the native route, request, and response indexing path end to end.
 func TestRunIndexesRoutesAndHandlerMetadata(t *testing.T) {
 	root := t.TempDir()
 
@@ -17,23 +19,23 @@ func TestRunIndexesRoutesAndHandlerMetadata(t *testing.T) {
 
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 
 type Controller struct {}
 
-func (c *Controller) Routes() []any {
-	return []any{
-		http.NewRoute(http.MethodGet, "/hello/:name", c.Hello),
+func (c *Controller) Routes() []web.Route {
+	return []web.Route{
+		web.NewRoute(http.MethodGet, "/hello/:name", c.Hello),
 	}
 }
 
 type requestPayload struct { Name string ` + "`json:\"name\"`" + ` }
 type responsePayload struct { Message string ` + "`json:\"message\"`" + ` }
 
-func (c *Controller) Hello(ctx *echo.Context) error {
+func (c *Controller) Hello(ctx web.Context) error {
 	name := ctx.Param("name")
-	filter := ctx.QueryParam("filter")
+	filter := ctx.Query("filter")
 	var req requestPayload
 	if err := ctx.Bind(&req); err != nil {
 		return ctx.JSON(http.StatusBadRequest, map[string]string{"error":"bad request"})
@@ -44,10 +46,11 @@ func (c *Controller) Hello(ctx *echo.Context) error {
 }
 `,
 		"internal/router/routes_registry.go": `package router
+import "github.com/goforj/web"
 
 func ProvideRoutes() []any {
 	groups := []any{}
-	groups = append(groups, http.NewRouteGroup("/api/v1", nil))
+	groups = append(groups, web.NewRouteGroup("/api/v1", nil))
 	return groups
 }
 `,
@@ -111,16 +114,20 @@ func ProvideRoutes() []any {
 	}
 }
 
+// TestRunSkipsCustomDirs verifies caller-owned source exclusions cannot leak ignored routes into published contracts.
 func TestRunSkipsCustomDirs(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.25\n",
 		"internal/hello/controller.go": `package hello
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
-		http.NewRoute(http.MethodGet, "/hello", c.Hello),
+		web.NewRoute(http.MethodGet, "/hello", c.Hello),
 	}
 }
 func (c *Controller) Hello(ctx any) error { return nil }`,
@@ -149,29 +156,37 @@ func broken(`,
 	}
 }
 
+// TestRunMapsRoutesToSpecificGroupsByControllerOwner verifies composition prefixes follow exact providers instead of receiver-name guesses.
 func TestRunMapsRoutesToSpecificGroupsByControllerOwner(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
-		http.NewRoute(http.MethodGet, "/things", c.Index),
+		web.NewRoute(http.MethodGet, "/things", c.Index),
 	}
 }
 func (c *Controller) Index(ctx any) error { return nil }`,
 		"internal/admin/controller.go": `package admin
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
-		http.NewRoute(http.MethodGet, "/things", c.Index),
+		web.NewRoute(http.MethodGet, "/things", c.Index),
 	}
 }
 func (c *Controller) Index(ctx any) error { return nil }`,
 		"internal/router/routes_registry.go": `package router
+import "github.com/goforj/web"
 func ProvideAppRoutes(
 	helloController *hello.Controller,
 	adminController *admin.Controller,
@@ -191,8 +206,8 @@ type AppRoutes struct {
 }
 func ProvideRoutes(r *AppRoutes) []any {
 	groups := []any{}
-	groups = append(groups, http.NewRouteGroup("/api/v1", r.app))
-	groups = append(groups, http.NewRouteGroup("/api/admin", r.admin))
+	groups = append(groups, web.NewRouteGroup("/api/v1", r.app))
+	groups = append(groups, web.NewRouteGroup("/api/admin", r.admin))
 	return groups
 }
 `,
@@ -227,12 +242,204 @@ func ProvideRoutes(r *AppRoutes) []any {
 	}
 }
 
+// TestRunKeepsGeneratedPublicAndProtectedRouteProvidersDistinct verifies the generated app composition shape without collapsing policy to the controller owner.
+func TestRunKeepsGeneratedPublicAndProtectedRouteProvidersDistinct(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"go.mod": "module example.com/test\n\ngo 1.25\n",
+		"internal/monitoring/controller.go": `package monitoring
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
+type Controller struct{}
+func (c *Controller) PublicRoutes() []web.Route {
+	return []web.Route{web.NewRoute(http.MethodGet, "/status", c.Status)}
+}
+func (c *Controller) ProtectedRoutes() []web.Route {
+	return []web.Route{web.NewRoute(http.MethodGet, "/monitors", c.Index)}
+}
+func (c *Controller) InternalRoutes() []web.Route {
+	return []web.Route{web.NewRoute(http.MethodGet, "/internal", c.Internal)}
+}
+func (c *Controller) Status(ctx any) error { return nil }
+func (c *Controller) Index(ctx any) error { return nil }
+func (c *Controller) Internal(ctx any) error { return nil }`,
+		"internal/archive/monitoring/controller.go": `package monitoring
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
+type Controller struct{}
+func (c *Controller) PublicRoutes() []web.Route {
+	return []web.Route{web.NewRoute(http.MethodGet, "/archive-leak", c.Status)}
+}
+func (c *Controller) Status(ctx any) error { return nil }`,
+		"internal/auth/service.go": `package auth
+type Service struct{}
+func (s *Service) RequireAuth(next any) any { return next }`,
+		"internal/starterui/controller.go": `package starterui
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
+type Controller struct{}
+func (c *Controller) Routes() []web.Route {
+	return []web.Route{web.NewRoute(http.MethodGet, "/home", c.Home)}
+}
+func (c *Controller) Home(ctx any) error { return nil }`,
+		"app/routes.go": `package app
+import "github.com/goforj/web"
+import (
+	"slices"
+	"github.com/goforj/web"
+	"example.com/test/internal/auth"
+	"example.com/test/internal/monitoring"
+	"example.com/test/internal/starterui"
+)
+func ProvideRoutes(
+	monitoringController *monitoring.Controller,
+	starterUIController *starterui.Controller,
+	authService *auth.Service,
+) []web.RouteGroup {
+	var pageRoutes = starterUIController.Routes()
+	groups := []web.RouteGroup{
+		web.NewRouteGroup("", pageRoutes),
+	}
+	publicRoutes := slices.Concat(monitoringController.PublicRoutes())
+	groups = append(groups, web.NewRouteGroup("/api/v1", publicRoutes))
+	protectedRoutes := slices.Concat(monitoringController.ProtectedRoutes())
+	groups = append(groups, web.NewRouteGroup("/api/v1", protectedRoutes, authService.RequireAuth))
+	unusedRoutes := slices.Concat(monitoringController.InternalRoutes())
+	_ = unusedRoutes
+	return groups
+}`,
+	}
+	writeFixtureFiles(t, root, files)
+
+	manifest, err := Run(context.Background(), IndexOptions{
+		Root:                 root,
+		RouteCompositionPath: "app/routes.go",
+	})
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	if len(manifest.Operations) != 3 {
+		t.Fatalf("expected only the three returned provider methods, got %d operations: %#v", len(manifest.Operations), manifest.Operations)
+	}
+
+	operations := map[string]Operation{}
+	for _, operation := range manifest.Operations {
+		operations[operation.Path] = operation
+	}
+	publicOperation, ok := operations["/api/v1/status"]
+	if !ok {
+		t.Fatalf("expected returned public route, got %#v", operations)
+	}
+	if len(publicOperation.Middleware) != 0 {
+		t.Fatalf("expected public route without group middleware, got %#v", publicOperation.Middleware)
+	}
+	if !strings.HasSuffix(filepath.ToSlash(publicOperation.Handler.File), "internal/monitoring/controller.go") {
+		t.Fatalf("expected handler metadata from the selected import path, got %q", publicOperation.Handler.File)
+	}
+	pageOperation, ok := operations["/home"]
+	if !ok {
+		t.Fatalf("expected root-prefix page route from the initial group composite, got %#v", operations)
+	}
+	if len(pageOperation.Middleware) != 0 {
+		t.Fatalf("expected page route without group middleware, got %#v", pageOperation.Middleware)
+	}
+	protectedOperation, ok := operations["/api/v1/monitors"]
+	if !ok {
+		t.Fatalf("expected returned protected route, got %#v", operations)
+	}
+	if len(protectedOperation.Middleware) != 1 || protectedOperation.Middleware[0] != "authService.RequireAuth" {
+		t.Fatalf("expected protected middleware only on protected route, got %#v", protectedOperation.Middleware)
+	}
+	if _, ok := operations["/api/v1/internal"]; ok {
+		t.Fatalf("unused route variables must not enter the selected app index")
+	}
+	if _, ok := operations["/api/v1/archive-leak"]; ok {
+		t.Fatalf("same-named packages outside the selected import must not enter the app index")
+	}
+	for _, diagnostic := range manifest.Diagnostics {
+		if diagnostic.Code == "handler_ambiguous" && diagnostic.Operation == publicOperation.ID {
+			t.Fatalf("exact handler import identity should prevent ambiguity: %#v", diagnostic)
+		}
+	}
+}
+
+// TestRunDiagnosesUnsupportedRouteComposition ensures an opaque returned expression reports the outer flow boundary without treating its arguments as returned groups.
+func TestRunDiagnosesUnsupportedRouteComposition(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"go.mod": "module example.com/test\n\ngo 1.25\n",
+		"internal/hello/controller.go": `package hello
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
+type Controller struct{}
+func (c *Controller) Routes() []web.Route {
+	return []web.Route{web.NewRoute(http.MethodGet, "/hello", c.Index)}
+}
+func (c *Controller) Index(ctx any) error { return nil }`,
+		"app/routes.go": `package app
+import "github.com/goforj/web"
+import (
+	"github.com/goforj/web"
+	"example.com/test/internal/hello"
+)
+const routePrefix = "/api"
+func decorate(routes []web.Route) []web.Route { return routes }
+func finish(groups []web.RouteGroup) []web.RouteGroup { return groups }
+func ProvideRoutes(helloController *hello.Controller) []web.RouteGroup {
+	var wrappedRoutes = decorate(helloController.Routes())
+	groups := []web.RouteGroup{
+		web.NewRouteGroup(routePrefix, helloController.Routes()),
+		web.NewRouteGroup("/api", wrappedRoutes),
+	}
+	return finish(groups)
+}`,
+	}
+	writeFixtureFiles(t, root, files)
+
+	manifest, err := Run(context.Background(), IndexOptions{
+		Root:                 root,
+		RouteCompositionPath: "app/routes.go",
+	})
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
+	wantedCodes := map[string]bool{
+		"route_composition_unsupported_return_expression": false,
+		"route_composition_no_returned_groups":            false,
+	}
+	for _, diagnostic := range manifest.Diagnostics {
+		if _, ok := wantedCodes[diagnostic.Code]; ok {
+			wantedCodes[diagnostic.Code] = true
+		}
+		if diagnostic.Code == "route_composition_dynamic_prefix" || diagnostic.Code == "route_composition_unsupported_routes_expression" {
+			t.Fatalf("opaque return flow must not activate nested group diagnostics, got %#v", manifest.Diagnostics)
+		}
+	}
+	for code, found := range wantedCodes {
+		if !found {
+			t.Fatalf("expected %s diagnostic, got %#v", code, manifest.Diagnostics)
+		}
+	}
+}
+
+// TestRunScopesRoutesToCompositionFile verifies selecting one App excludes providers reachable only from another App entrypoint.
 func TestRunScopesRoutesToCompositionFile(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.25\n",
 		"internal/hello/controller.go": `package hello
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
@@ -241,7 +448,10 @@ func (c *Controller) Routes() []any {
 }
 func (c *Controller) Index(ctx any) error { return nil }`,
 		"internal/reports/controller.go": `package reports
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
@@ -250,7 +460,10 @@ func (c *Controller) Routes() []any {
 }
 func (c *Controller) Index(ctx any) error { return nil }`,
 		"internal/leak/controller.go": `package leak
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
@@ -259,12 +472,15 @@ func (c *Controller) Routes() []any {
 }
 func (c *Controller) Index(ctx any) error { return nil }`,
 		"app/routes.go": `package app
+import "github.com/goforj/web"
 func ProvideRoutes(helloController *hello.Controller) []web.RouteGroup {
 	return []web.RouteGroup{
 		web.NewRouteGroup("/api/v1", helloController.Routes()),
 	}
 }`,
 		"app/customer-portal/routes.go": `package customerportal
+import "github.com/goforj/web"
+import "slices"
 func ProvideRoutes(reportsController *reports.Controller, leakController *leak.Controller, authService *auth.Service) []web.RouteGroup {
 	deadRoutes := slices.Concat(leakController.Routes())
 	_ = deadRoutes
@@ -295,24 +511,29 @@ func ProvideRoutes(reportsController *reports.Controller, leakController *leak.C
 	}
 }
 
+// TestRunFallsBackToUnprefixedPathWhenGroupMappingMissing verifies syntax-only indexing remains useful when no composition boundary is requested.
 func TestRunFallsBackToUnprefixedPathWhenGroupMappingMissing(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
-		http.NewRoute(http.MethodGet, "/raw", c.Raw),
+		web.NewRoute(http.MethodGet, "/raw", c.Raw),
 	}
 }
 func (c *Controller) Raw(ctx any) error { return nil }`,
 		"internal/router/routes_registry.go": `package router
+import "github.com/goforj/web"
 func ProvideRoutes() []any {
 	groups := []any{}
-	groups = append(groups, http.NewRouteGroup("/api/v1", nil))
-	groups = append(groups, http.NewRouteGroup("/api/admin", nil))
+	groups = append(groups, web.NewRouteGroup("/api/v1", nil))
+	groups = append(groups, web.NewRouteGroup("/api/admin", nil))
 	return groups
 }
 `,
@@ -339,6 +560,7 @@ func ProvideRoutes() []any {
 	}
 }
 
+// TestRunEmitsAmbiguousHandlerDiagnostic verifies duplicate handler names fail closed instead of attaching a guessed contract.
 func TestRunEmitsAmbiguousHandlerDiagnostic(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -348,10 +570,14 @@ func Ping(ctx any) error { return nil }`,
 		"internal/b/handler.go": `package b
 func Ping(ctx any) error { return nil }`,
 		"internal/router/routes.go": `package router
-import "net/http"
+import "github.com/goforj/web"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 func Routes() []any {
 	return []any{
-		http.NewRoute(http.MethodGet, "/ping", Ping),
+		web.NewRoute(http.MethodGet, "/ping", Ping),
 	}
 }
 `,
@@ -382,6 +608,7 @@ func Routes() []any {
 	}
 }
 
+// TestRunExtractsStringAndNoContentResponses verifies native text and bodyless response methods retain their statuses.
 func TestRunExtractsStringAndNoContentResponses(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -389,17 +616,17 @@ func TestRunExtractsStringAndNoContentResponses(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
-func (c *Controller) Routes() []any {
-	return []any{
-		http.NewRoute(http.MethodGet, "/status", c.Status),
+func (c *Controller) Routes() []web.Route {
+	return []web.Route{
+		web.NewRoute(http.MethodGet, "/status", c.Status),
 	}
 }
-func (c *Controller) Status(ctx *echo.Context) error {
-	if ctx.QueryParam("fmt") == "text" {
-		return ctx.String(http.StatusOK, "ok")
+func (c *Controller) Status(ctx web.Context) error {
+	if ctx.Query("fmt") == "text" {
+		return ctx.Text(http.StatusOK, "ok")
 	}
 	return ctx.NoContent(http.StatusNoContent)
 }`,
@@ -437,16 +664,20 @@ func (c *Controller) Status(ctx *echo.Context) error {
 	}
 }
 
+// TestRunWritesExpectedJSONShape protects the manifest contract consumed by downstream artifact tooling.
 func TestRunWritesExpectedJSONShape(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
-		http.NewRoute(http.MethodGet, "/shape", c.Shape),
+		web.NewRoute(http.MethodGet, "/shape", c.Shape),
 	}
 }
 func (c *Controller) Shape(ctx any) error { return nil }`,
@@ -478,16 +709,20 @@ func (c *Controller) Shape(ctx any) error { return nil }`,
 	}
 }
 
+// TestRunExtractsPathParamsFromRouteTemplate verifies declared route segments remain authoritative even when a handler never reads them.
 func TestRunExtractsPathParamsFromRouteTemplate(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
-import "net/http"
+import (
+	"net/http"
+	"github.com/goforj/web"
+)
 type Controller struct{}
 func (c *Controller) Routes() []any {
 	return []any{
-		http.NewRoute(http.MethodGet, "/teams/:teamID/users/:userID", c.Show),
+		web.NewRoute(http.MethodGet, "/teams/:teamID/users/:userID", c.Show),
 	}
 }
 func (c *Controller) Show(ctx any) error { return nil }`,
@@ -518,23 +753,24 @@ func (c *Controller) Show(ctx any) error { return nil }`,
 	}
 }
 
-func TestRunExtractsQueryParamsFromQueryParamsGetPattern(t *testing.T) {
+// TestRunExtractsQueryParamsFromNativeQuery verifies the app-facing context API is the primary query evidence.
+func TestRunExtractsQueryParamsFromNativeQuery(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
 		"go.mod": "module example.com/test\n\ngo 1.24\n",
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
-func (c *Controller) Routes() []any {
-	return []any{
-		http.NewRoute(http.MethodGet, "/search", c.Search),
+func (c *Controller) Routes() []web.Route {
+	return []web.Route{
+		web.NewRoute(http.MethodGet, "/search", c.Search),
 	}
 }
-func (c *Controller) Search(ctx *echo.Context) error {
-	_ = ctx.QueryParams().Get("page")
+func (c *Controller) Search(ctx web.Context) error {
+	_ = ctx.Query("page")
 	return ctx.NoContent(http.StatusNoContent)
 }`,
 	}
@@ -561,6 +797,7 @@ func (c *Controller) Search(ctx *echo.Context) error {
 	}
 }
 
+// TestRunEmitsDynamicParamDiagnostics verifies native dynamic keys remain explicit instead of becoming guessed names.
 func TestRunEmitsDynamicParamDiagnostics(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
@@ -568,19 +805,19 @@ func TestRunEmitsDynamicParamDiagnostics(t *testing.T) {
 		"internal/hello/controller.go": `package hello
 import (
 	"net/http"
-	"github.com/labstack/echo/v5"
+	"github.com/goforj/web"
 )
 type Controller struct{}
-func (c *Controller) Routes() []any {
-	return []any{
-		http.NewRoute(http.MethodGet, "/search/:id", c.Search),
+func (c *Controller) Routes() []web.Route {
+	return []web.Route{
+		web.NewRoute(http.MethodGet, "/search/:id", c.Search),
 	}
 }
-func (c *Controller) Search(ctx *echo.Context) error {
+func (c *Controller) Search(ctx web.Context) error {
 	key := "q"
-	_ = ctx.QueryParam(key)
+	_ = ctx.Query(key)
 	headerKey := "X-Request-ID"
-	_ = ctx.Request().Header.Get(headerKey)
+	_ = ctx.Header(headerKey)
 	paramName := "id"
 	_ = ctx.Param(paramName)
 	return ctx.NoContent(http.StatusNoContent)
