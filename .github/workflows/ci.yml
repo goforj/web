@@ -20,9 +20,16 @@ jobs:
           go-version: "stable"
           cache: true
           cache-dependency-path: |
+            go.mod
             go.sum
             examples/go.mod
             examples/go.sum
+
+      - name: Verify module files are tidy
+        run: |
+          go mod tidy -diff
+          cd examples
+          GOWORK=off go mod tidy -diff
 
       - name: Download dependencies
         run: |
@@ -51,6 +58,7 @@ jobs:
           go-version: "stable"
           cache: true
           cache-dependency-path: |
+            go.mod
             go.sum
 
       - name: Run race tests
@@ -69,6 +77,7 @@ jobs:
           go-version: "stable"
           cache: true
           cache-dependency-path: |
+            go.mod
             go.sum
             examples/go.mod
             examples/go.sum

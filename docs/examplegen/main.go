@@ -81,7 +81,20 @@ func run() error {
 	return nil
 }
 
+// ensureExamplesModule creates the nested module only when absent because its tidy-managed dependency closure must survive documentation regeneration.
 func ensureExamplesModule(examplesDir, modPath string) error {
+	moduleFile := filepath.Join(examplesDir, "go.mod")
+	info, err := os.Stat(moduleFile)
+	if err == nil {
+		if info.IsDir() {
+			return fmt.Errorf("examples module path %q is a directory", moduleFile)
+		}
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect examples module %q: %w", moduleFile, err)
+	}
+
 	content := fmt.Sprintf(`module %s/examples
 
 go 1.25.0
@@ -91,7 +104,7 @@ require %s v0.0.0
 replace %s => ..
 `, modPath, modPath, modPath)
 
-	return os.WriteFile(filepath.Join(examplesDir, "go.mod"), []byte(content), 0o644)
+	return os.WriteFile(moduleFile, []byte(content), 0o644)
 }
 
 // FuncDoc describes one exported symbol for example-page generation.
