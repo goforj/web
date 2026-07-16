@@ -1,21 +1,20 @@
 package main
 
 import (
-	"fmt"
 	"github.com/goforj/web"
+	"github.com/goforj/web/adapter/echoweb"
 	"github.com/goforj/web/webmiddleware"
-	"github.com/goforj/web/webtest"
-	"net/http"
+	"log"
 )
 
 func main() {
-	var captured string
-	mw := webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
-		captured = fmt.Sprintf("%d:%s", status, string(body))
+	router := echoweb.New().Router()
+
+	router.Use(webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
+		log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+	}))
+
+	router.GET("/reports/:id", func(c web.Context) error {
+		return c.Text(404, "report not found")
 	})
-	ctx := webtest.NewContext(nil, nil, "/", nil)
-	handler := mw(func(c web.Context) error { return c.Text(http.StatusBadRequest, "nope") })
-	_ = handler(ctx)
-	fmt.Println(captured)
-	// 400:nope
 }

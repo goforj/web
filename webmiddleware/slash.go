@@ -18,7 +18,7 @@ var DefaultTrailingSlashConfig = TrailingSlashConfig{}
 // @group Middleware - Path Rewriting
 // Example:
 // router := echoweb.New().Router()
-// router.Use(webmiddleware.AddTrailingSlash())
+// router.Pre(webmiddleware.AddTrailingSlash())
 //
 //	router.GET("/docs/", func(c web.Context) error {
 //		return c.Text(200, "docs")
@@ -32,7 +32,7 @@ func AddTrailingSlash() web.Middleware {
 // Example:
 // router := echoweb.New().Router()
 //
-//	router.Use(webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{
+//	router.Pre(webmiddleware.AddTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{
 //		RedirectCode: 308,
 //	}))
 //
@@ -69,7 +69,7 @@ func AddTrailingSlashWithConfig(config TrailingSlashConfig) web.Middleware {
 // @group Middleware - Path Rewriting
 // Example:
 // router := echoweb.New().Router()
-// router.Use(webmiddleware.RemoveTrailingSlash())
+// router.Pre(webmiddleware.RemoveTrailingSlash())
 //
 //	router.GET("/docs", func(c web.Context) error {
 //		return c.Text(200, "docs")
@@ -83,7 +83,7 @@ func RemoveTrailingSlash() web.Middleware {
 // Example:
 // router := echoweb.New().Router()
 //
-//	router.Use(webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{
+//	router.Pre(webmiddleware.RemoveTrailingSlashWithConfig(webmiddleware.TrailingSlashConfig{
 //		RedirectCode: 308,
 //	}))
 //

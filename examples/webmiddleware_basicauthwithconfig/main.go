@@ -1,21 +1,22 @@
 package main
 
 import (
-	"fmt"
 	"github.com/goforj/web"
+	"github.com/goforj/web/adapter/echoweb"
 	"github.com/goforj/web/webmiddleware"
-	"github.com/goforj/web/webtest"
-	"net/http"
 )
 
 func main() {
-	mw := webmiddleware.BasicAuthWithConfig(webmiddleware.BasicAuthConfig{
-		Realm: "Example",
-		Validator: func(user, pass string, c web.Context) (bool, error) { return true, nil },
+	router := echoweb.New().Router()
+
+	router.Use(webmiddleware.BasicAuthWithConfig(webmiddleware.BasicAuthConfig{
+		Realm: "Admin",
+		Validator: func(user, pass string, c web.Context) (bool, error) {
+			return user == "demo" && pass == "secret", nil
+		},
+	}))
+
+	router.GET("/admin", func(c web.Context) error {
+		return c.Text(200, "welcome")
 	})
-	ctx := webtest.NewContext(nil, nil, "/", nil)
-	handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-	_ = handler(ctx)
-	fmt.Println(ctx.StatusCode(), ctx.Response().Header().Get("WWW-Authenticate"))
-	// 401 basic realm=\"Example\"
 }

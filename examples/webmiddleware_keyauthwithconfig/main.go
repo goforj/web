@@ -1,20 +1,22 @@
 package main
 
 import (
-	"fmt"
 	"github.com/goforj/web"
+	"github.com/goforj/web/adapter/echoweb"
 	"github.com/goforj/web/webmiddleware"
-	"github.com/goforj/web/webtest"
-	"net/http"
 )
 
 func main() {
-	mw := webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
-		Validator: func(key string, c web.Context) (bool, error) { return true, nil },
+	router := echoweb.New().Router()
+
+	router.Use(webmiddleware.KeyAuthWithConfig(webmiddleware.KeyAuthConfig{
+		KeyLookup: "query:api_key",
+		Validator: func(key string, c web.Context) (bool, error) {
+			return key == "demo-key", nil
+		},
+	}))
+
+	router.GET("/api/reports", func(c web.Context) error {
+		return c.JSON(200, map[string]any{"ready": true})
 	})
-	ctx := webtest.NewContext(nil, nil, "/", nil)
-	handler := mw(func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
-	_ = handler(ctx)
-	fmt.Println(ctx.StatusCode())
-	// 400
 }

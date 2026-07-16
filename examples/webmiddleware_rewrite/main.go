@@ -1,21 +1,19 @@
 package main
 
 import (
-	"fmt"
 	"github.com/goforj/web"
+	"github.com/goforj/web/adapter/echoweb"
 	"github.com/goforj/web/webmiddleware"
-	"github.com/goforj/web/webtest"
-	"net/http"
-	"net/http/httptest"
 )
 
 func main() {
-	req := httptest.NewRequest(http.MethodGet, "/old/users", nil)
-	ctx := webtest.NewContext(req, nil, "/old/*", nil)
-	handler := webmiddleware.Rewrite(map[string]string{"/old/*": "/new/$1"})(func(c web.Context) error {
-		fmt.Println(c.Request().URL.Path)
-		return nil
+	router := echoweb.New().Router()
+
+	router.Pre(webmiddleware.Rewrite(map[string]string{
+		"/old/*": "/new/$1",
+	}))
+
+	router.GET("/new/:name", func(c web.Context) error {
+		return c.Text(200, c.Param("name"))
 	})
-	_ = handler(ctx)
-	// /new/users
 }

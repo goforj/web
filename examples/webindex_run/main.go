@@ -11,6 +11,7 @@ func main() {
 		Root:    ".",
 		OutPath: "webindex.json",
 	})
+
 	fmt.Println(err == nil, manifest.Version != "")
 	// true true
 }

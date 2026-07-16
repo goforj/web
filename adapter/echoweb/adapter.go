@@ -18,6 +18,7 @@ type Adapter struct {
 // Example:
 // adapter := echoweb.New()
 // fmt.Println(adapter.Router() != nil, adapter.Echo() != nil)
+//
 //	// true true
 func New() *Adapter {
 	engine := echo.New()
@@ -35,6 +36,7 @@ func New() *Adapter {
 // Example:
 // adapter := echoweb.Wrap(nil)
 // fmt.Println(adapter.Echo() != nil)
+//
 //	// true
 func Wrap(engine *echo.Echo) *Adapter {
 	if engine == nil {
@@ -56,6 +58,7 @@ func Wrap(engine *echo.Echo) *Adapter {
 // Example:
 // adapter := echoweb.New()
 // fmt.Println(adapter.Echo() != nil)
+//
 //	// true
 func (a *Adapter) Echo() *echo.Echo {
 	if a == nil {
@@ -69,6 +72,7 @@ func (a *Adapter) Echo() *echo.Echo {
 // Example:
 // adapter := echoweb.New()
 // fmt.Println(adapter.Router() != nil)
+//
 //	// true
 func (a *Adapter) Router() web.Router {
 	if a == nil {
@@ -81,11 +85,12 @@ func (a *Adapter) Router() web.Router {
 // @group Adapter
 // Example:
 // adapter := echoweb.New()
-// adapter.Router().GET("/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) })
+// adapter.Router().GET("/healthz", func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
 // rr := httptest.NewRecorder()
 // req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 // adapter.ServeHTTP(rr, req)
 // fmt.Println(rr.Code)
+//
 //	// 204
 func (a *Adapter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if a == nil || a.engine == nil {

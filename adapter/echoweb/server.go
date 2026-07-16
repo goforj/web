@@ -27,14 +27,17 @@ type Server struct {
 // NewServer creates an Echo-backed server from web route groups and mounts.
 // @group Adapter
 // Example:
-// server, err := echoweb.NewServer(echoweb.ServerConfig{
-// 	RouteGroups: []web.RouteGroup{
-// 		web.NewRouteGroup("/api", []web.Route{
-// 			web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) }),
-// 		}),
-// 	},
-// })
+//
+//	server, err := echoweb.NewServer(echoweb.ServerConfig{
+//		RouteGroups: []web.RouteGroup{
+//			web.NewRouteGroup("/api", []web.Route{
+//				web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusNoContent) }),
+//			}),
+//		},
+//	})
+//
 // fmt.Println(err == nil, server.Router() != nil)
+//
 //	// true true
 func NewServer(config ServerConfig) (*Server, error) {
 	adapter := New()
@@ -66,6 +69,7 @@ func NewServer(config ServerConfig) (*Server, error) {
 // Example:
 // server, _ := echoweb.NewServer(echoweb.ServerConfig{})
 // fmt.Println(server.Router() != nil)
+//
 //	// true
 func (s *Server) Router() web.Router {
 	if s == nil || s.adapter == nil {
@@ -77,17 +81,20 @@ func (s *Server) Router() web.Router {
 // ServeHTTP exposes the server as an http.Handler for tests and local probing.
 // @group Adapter
 // Example:
-// server, _ := echoweb.NewServer(echoweb.ServerConfig{
-// 	RouteGroups: []web.RouteGroup{
-// 		web.NewRouteGroup("/api", []web.Route{
-// 			web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) }),
-// 		}),
-// 	},
-// })
+//
+//	server, _ := echoweb.NewServer(echoweb.ServerConfig{
+//		RouteGroups: []web.RouteGroup{
+//			web.NewRouteGroup("/api", []web.Route{
+//				web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusNoContent) }),
+//			}),
+//		},
+//	})
+//
 // rr := httptest.NewRecorder()
 // req := httptest.NewRequest(http.MethodGet, "/api/healthz", nil)
 // server.ServeHTTP(rr, req)
 // fmt.Println(rr.Code)
+//
 //	// 204
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s == nil || s.httpServer == nil {
@@ -104,6 +111,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // ctx, cancel := context.WithCancel(context.Background())
 // cancel()
 // fmt.Println(server.Serve(ctx) == nil)
+//
 //	// true
 func (s *Server) Serve(ctx context.Context) error {
 	if s == nil || s.httpServer == nil {

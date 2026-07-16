@@ -1,22 +1,18 @@
 package main
 
 import (
-	"fmt"
 	"github.com/goforj/web"
+	"github.com/goforj/web/adapter/echoweb"
 	"github.com/goforj/web/webmiddleware"
-	"github.com/goforj/web/webtest"
-	"net/http"
 )
 
 func main() {
-	mw := webmiddleware.RequestID()
-	handler := mw(func(c web.Context) error {
-		_ = c.Get("request_id")
-		return c.NoContent(http.StatusOK)
+	router := echoweb.New().Router()
+	router.Use(webmiddleware.RequestID())
+
+	router.GET("/healthz", func(c web.Context) error {
+		return c.JSON(200, map[string]any{
+			"request_id": c.Get("request_id"),
+		})
 	})
-	ctx := webtest.NewContext(nil, nil, "/", nil)
-	_ = handler(ctx)
-	fmt.Println(ctx.Response().Header().Get("X-Request-ID") != "")
-	// true
-	// true
 }
