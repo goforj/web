@@ -23,7 +23,7 @@ var DefaultRewriteConfig = RewriteConfig{}
 // Example:
 // router := echoweb.New().Router()
 //
-//	router.Use(webmiddleware.Rewrite(map[string]string{
+//	router.Pre(webmiddleware.Rewrite(map[string]string{
 //		"/old/*": "/new/$1",
 //	}))
 //
@@ -41,7 +41,7 @@ func Rewrite(rules map[string]string) web.Middleware {
 // Example:
 // router := echoweb.New().Router()
 //
-//	router.Use(webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
+//	router.Pre(webmiddleware.RewriteWithConfig(webmiddleware.RewriteConfig{
 //		Rules: map[string]string{"/old/*": "/v2/$1"},
 //	}))
 //

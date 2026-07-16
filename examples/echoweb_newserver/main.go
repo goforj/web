@@ -11,10 +11,11 @@ func main() {
 	server, err := echoweb.NewServer(echoweb.ServerConfig{
 		RouteGroups: []web.RouteGroup{
 			web.NewRouteGroup("/api", []web.Route{
-				web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) }),
+				web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusNoContent) }),
 			}),
 		},
 	})
+
 	fmt.Println(err == nil, server.Router() != nil)
 	// true true
 }

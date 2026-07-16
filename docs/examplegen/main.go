@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"os"
@@ -222,6 +223,7 @@ type docLine struct {
 	pos  token.Pos
 }
 
+// extractExamples preserves blank lines inside examples so generated programs match the documented source.
 func extractExamples(fset *token.FileSet, group *ast.CommentGroup) []Example {
 	var examples []Example
 	lines := make([]docLine, 0, len(group.List))
@@ -251,10 +253,11 @@ func extractExamples(fset *token.FileSet, group *ast.CommentGroup) []Example {
 				if len(block) == 0 {
 					continue
 				}
-				break
 			}
 			block = append(block, next.text)
 		}
+		block = trimBlankLines(block)
+		block = collapseTrailingOutputSpacing(block)
 		if len(block) == 0 {
 			continue
 		}
@@ -265,6 +268,29 @@ func extractExamples(fset *token.FileSet, group *ast.CommentGroup) []Example {
 		})
 	}
 	return examples
+}
+
+// collapseTrailingOutputSpacing keeps expected output directly after the call that produces it.
+func collapseTrailingOutputSpacing(lines []string) []string {
+	firstOutput := len(lines)
+	for firstOutput > 0 && strings.HasPrefix(strings.TrimSpace(lines[firstOutput-1]), "//") {
+		firstOutput--
+	}
+	if firstOutput == 0 || firstOutput == len(lines) || strings.TrimSpace(lines[firstOutput-1]) != "" {
+		return lines
+	}
+	return append(lines[:firstOutput-1], lines[firstOutput:]...)
+}
+
+// trimBlankLines removes comment spacing around an example without flattening its internal structure.
+func trimBlankLines(lines []string) []string {
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return lines
 }
 
 func normalizeIndent(lines []string) []string {
@@ -295,6 +321,7 @@ func normalizeIndent(lines []string) []string {
 	return out
 }
 
+// writeExample formats generated programs so regeneration is stable and compile failures stay readable.
 func writeExample(examplesDir string, fd *FuncDoc) error {
 	dir := filepath.Join(examplesDir, fd.Slug)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -319,7 +346,11 @@ func writeExample(examplesDir string, fd *FuncDoc) error {
 	}
 	buf.WriteString("}\n")
 
-	return os.WriteFile(filepath.Join(dir, "main.go"), buf.Bytes(), 0o644)
+	formatted, err := format.Source(buf.Bytes())
+	if err != nil {
+		return fmt.Errorf("format example %s: %w", fd.Slug, err)
+	}
+	return os.WriteFile(filepath.Join(dir, "main.go"), formatted, 0o644)
 }
 
 func inferImports(code, importPath string) []string {
@@ -370,6 +401,9 @@ func inferImports(code, importPath string) []string {
 	}
 	if strings.Contains(code, "io.") {
 		add("io")
+	}
+	if strings.Contains(code, "log.") {
+		add("log")
 	}
 	if strings.Contains(code, "strings.") {
 		add("strings")

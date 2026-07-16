@@ -14,8 +14,4 @@ wgo -verbose -file=.go -xfile '_test\.go$' -xdir examples \
   go run ./docs/examplegen/main.go :: \
   go run ./docs/readme/main.go &
 
-echo "Starting test badge watcher (_test.go files, runs tests)..."
-wgo -verbose -file '_test\.go$' \
-  go run ./docs/readme/testcounts/main.go &
-
 wait

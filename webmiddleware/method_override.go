@@ -23,7 +23,7 @@ var DefaultMethodOverrideConfig = MethodOverrideConfig{
 // @group Middleware - Method Override
 // Example:
 // router := echoweb.New().Router()
-// router.Use(webmiddleware.MethodOverride())
+// router.Pre(webmiddleware.MethodOverride())
 //
 //	router.PATCH("/articles/:id", func(c web.Context) error {
 //		return c.NoContent(204)
@@ -37,7 +37,7 @@ func MethodOverride() web.Middleware {
 // Example:
 // router := echoweb.New().Router()
 //
-//	router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+//	router.Pre(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
 //		Getter: webmiddleware.MethodFromQuery("_method"),
 //	}))
 //
@@ -68,7 +68,7 @@ func MethodOverrideWithConfig(config MethodOverrideConfig) web.Middleware {
 // Example:
 // router := echoweb.New().Router()
 //
-//	router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+//	router.Pre(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
 //		Getter: webmiddleware.MethodFromHeader("X-HTTP-Method-Override"),
 //	}))
 func MethodFromHeader(header string) MethodOverrideGetter {
@@ -82,7 +82,7 @@ func MethodFromHeader(header string) MethodOverrideGetter {
 // Example:
 // router := echoweb.New().Router()
 //
-//	router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+//	router.Pre(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
 //		Getter: webmiddleware.MethodFromForm("_method"),
 //	}))
 func MethodFromForm(param string) MethodOverrideGetter {
@@ -103,7 +103,7 @@ func MethodFromForm(param string) MethodOverrideGetter {
 // Example:
 // router := echoweb.New().Router()
 //
-//	router.Use(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+//	router.Pre(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
 //		Getter: webmiddleware.MethodFromQuery("_method"),
 //	}))
 func MethodFromQuery(param string) MethodOverrideGetter {

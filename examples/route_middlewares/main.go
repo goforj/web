@@ -8,6 +8,7 @@ import (
 
 func main() {
 	route := web.NewRoute(
+
 		http.MethodGet,
 		"/healthz",
 		func(c web.Context) error { return nil },

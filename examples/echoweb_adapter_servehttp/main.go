@@ -10,7 +10,7 @@ import (
 
 func main() {
 	adapter := echoweb.New()
-	adapter.Router().GET("/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) })
+	adapter.Router().GET("/healthz", func(c web.Context) error { return c.NoContent(http.StatusNoContent) })
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	adapter.ServeHTTP(rr, req)

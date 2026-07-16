@@ -12,10 +12,11 @@ func main() {
 	server, _ := echoweb.NewServer(echoweb.ServerConfig{
 		RouteGroups: []web.RouteGroup{
 			web.NewRouteGroup("/api", []web.Route{
-				web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusOK) }),
+				web.NewRoute(http.MethodGet, "/healthz", func(c web.Context) error { return c.NoContent(http.StatusNoContent) }),
 			}),
 		},
 	})
+
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/healthz", nil)
 	server.ServeHTTP(rr, req)

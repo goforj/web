@@ -11,6 +11,7 @@ func main() {
 		c.Set("ready", true)
 		return nil
 	})
+
 	ctx := webtest.NewContext(nil, nil, "/ws", nil)
 	err := route.WebSocketHandler()(ctx, nil)
 	fmt.Println(err == nil, ctx.Get("ready"))

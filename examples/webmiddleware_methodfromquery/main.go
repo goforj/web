@@ -1,17 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"github.com/goforj/web/adapter/echoweb"
 	"github.com/goforj/web/webmiddleware"
-	"github.com/goforj/web/webtest"
-	"net/http"
-	"net/http/httptest"
 )
 
 func main() {
-	getter := webmiddleware.MethodFromQuery("_method")
-	req := httptest.NewRequest(http.MethodPost, "/?_method=PUT", nil)
-	ctx := webtest.NewContext(req, nil, "/", nil)
-	fmt.Println(getter(ctx))
-	// PUT
+	router := echoweb.New().Router()
+
+	router.Pre(webmiddleware.MethodOverrideWithConfig(webmiddleware.MethodOverrideConfig{
+		Getter: webmiddleware.MethodFromQuery("_method"),
+	}))
 }

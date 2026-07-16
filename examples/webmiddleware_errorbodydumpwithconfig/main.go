@@ -1,19 +1,21 @@
 package main
 
 import (
-	"fmt"
 	"github.com/goforj/web"
+	"github.com/goforj/web/adapter/echoweb"
 	"github.com/goforj/web/webmiddleware"
-	"github.com/goforj/web/webtest"
-	"net/http"
+	"log"
 )
 
 func main() {
-	mw := webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
-		Handler: func(c web.Context, status int, body []byte) { fmt.Println(status) },
-	})
-	ctx := webtest.NewContext(nil, nil, "/", nil)
-	handler := mw(func(c web.Context) error { return c.Text(http.StatusInternalServerError, "boom") })
-	_ = handler(ctx)
-	// 500
+	router := echoweb.New().Router()
+
+	router.Use(webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConfig{
+		Skipper: func(c web.Context) bool {
+			return c.Path() == "/healthz"
+		},
+		Handler: func(c web.Context, status int, body []byte) {
+			log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+		},
+	}))
 }
