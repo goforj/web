@@ -5,7 +5,7 @@ go 1.25.0
 require github.com/labstack/echo/v5 v5.1.0
 
 require (
-	github.com/goforj/str v1.2.0
+	github.com/goforj/str v1.3.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.66.1
