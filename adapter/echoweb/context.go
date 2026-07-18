@@ -4,299 +4,538 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"unsafe"
 
 	"github.com/goforj/web"
 	echo "github.com/labstack/echo/v5"
 )
 
-type contextAdapter struct {
-	echo           *echo.Context
-	echoResponse   *echo.Response
-	responseWriter http.ResponseWriter
-	context        context.Context
-	request        *http.Request
-	sourceName     string
-	sourceContext  context.Context
-	reusable       bool
-	response       responseAdapter
+const contextAdapterStateKey = "\x00goforj.web/echoweb.context-state"
+
+const contextAdapterTrackedKeysKey = "\x00goforj.web/echoweb.tracked-keys"
+
+const contextAdapterTimeoutStateKey = "\x00goforj.web/echoweb.timeout-state"
+
+// contextAdapter is a zero-allocation view over Echo's request context.
+type contextAdapter echo.Context
+
+// echoContextProvider exposes the native context through adapter-owned wrappers.
+type echoContextProvider interface {
+	echoContext() *echo.Context
+}
+
+// contextAdapterState carries the uncommon Web-only state that Echo does not model.
+type contextAdapterState struct {
+	boundContext context.Context
+	request      *http.Request
+	sourceName   string
+	bound        bool
+}
+
+// contextAdapterTimeoutState carries ownership metadata only for detached timeout execution.
+type contextAdapterTimeoutState struct {
+	fallback              *contextAdapterFallback
+	bound                 bool
+	previousBound         bool
+	previousContext       context.Context
+	request               *http.Request
+	healthyRequestContext context.Context
+}
+
+// contextAdapterFallback permits safe Web Get calls against pre-detach native state until ownership ends.
+type contextAdapterFallback struct {
+	mu     sync.RWMutex
+	source *echo.Context
 }
 
 var _ web.Context = (*contextAdapter)(nil)
 
-var contextAdapterPool = sync.Pool{
-	New: func() any {
-		adapted := &contextAdapter{}
-		adapted.response.context = adapted
-		return adapted
-	},
-}
-
-// acquireContextAdapter prepares a pooled adapter for one Echo request.
+// acquireContextAdapter exposes the Echo context through the Web contract without a sidecar allocation.
 func acquireContextAdapter(c *echo.Context) *contextAdapter {
-	// The adapter is pooled because every request needs one, but the embedded
-	// Echo pointers and cached derived state must be reset between requests.
-	adapted := contextAdapterPool.Get().(*contextAdapter)
-	adapted.echo = c
-	adapted.reusable = true
-	adapted.echoResponse = nil
-	adapted.responseWriter = nil
-	adapted.context = nil
-	adapted.request = nil
-	adapted.sourceName = ""
-	adapted.sourceContext = nil
-	return adapted
+	return (*contextAdapter)(c)
 }
 
-// releaseContextAdapter returns a reusable adapter to the pool after a request finishes.
-func releaseContextAdapter(adapted *contextAdapter) {
-	if adapted == nil || !adapted.reusable {
-		return
+// echoContext returns the native Echo view of this context.
+func (c *contextAdapter) echoContext() *echo.Context {
+	return (*echo.Context)(c)
+}
+
+// adapterState returns Web-only request state when a handler has opted into it.
+func (c *contextAdapter) adapterState() contextAdapterState {
+	if c == nil {
+		return contextAdapterState{}
 	}
-	adapted.echo = nil
-	adapted.echoResponse = nil
-	adapted.responseWriter = nil
-	adapted.context = nil
-	adapted.request = nil
-	adapted.sourceName = ""
-	adapted.sourceContext = nil
-	contextAdapterPool.Put(adapted)
+	state, _ := c.echoContext().Get(contextAdapterStateKey).(contextAdapterState)
+	return state
 }
 
-// Context returns the effective request context, including any source-only fast-path state.
+// setAdapterState stores Web-only request state on Echo's request-scoped store.
+func (c *contextAdapter) setAdapterState(state contextAdapterState) {
+	c.echoContext().Set(contextAdapterStateKey, state)
+}
+
+// timeoutState returns timeout-only ownership state from a detached context.
+func (c *contextAdapter) timeoutState() *contextAdapterTimeoutState {
+	if c == nil {
+		return nil
+	}
+	state, _ := c.echoContext().Get(contextAdapterTimeoutStateKey).(*contextAdapterTimeoutState)
+	return state
+}
+
+// setTimeoutState stores timeout-only ownership state outside the normal adapter hot path.
+func (c *contextAdapter) setTimeoutState(state *contextAdapterTimeoutState) {
+	c.echoContext().Set(contextAdapterTimeoutStateKey, state)
+}
+
+// Context returns the effective request context, including source-only metadata.
 func (c *contextAdapter) Context() context.Context {
-	if c.context != nil {
-		return c.context
+	state := c.adapterState()
+	var base context.Context
+	if state.bound {
+		base = state.boundContext
+	} else {
+		base = c.echoContext().Request().Context()
 	}
-	base := c.echo.Request().Context()
-	if c.sourceName == "" {
+	if state.sourceName == "" {
 		return base
 	}
-	if c.sourceContext == nil {
-		// Source-only propagation is common on the hot path, so keep it as a
-		// lightweight wrapper instead of forcing a request clone.
-		c.sourceContext = sourceNameContext{
-			Context: base,
-			source:  c.sourceName,
-		}
+	return sourceNameContext{
+		Context: base,
+		source:  state.sourceName,
 	}
-	return c.sourceContext
 }
 
 // Method returns the current request method.
 func (c *contextAdapter) Method() string {
-	return c.echo.Request().Method
+	return c.echoContext().Request().Method
 }
 
 // Path returns the matched route path.
 func (c *contextAdapter) Path() string {
-	return c.echo.Path()
+	return c.echoContext().Path()
 }
 
 // URI returns the current request URI.
 func (c *contextAdapter) URI() string {
-	return c.echo.Request().URL.RequestURI()
+	return c.echoContext().Request().URL.RequestURI()
 }
 
 // Scheme returns the resolved request scheme.
 func (c *contextAdapter) Scheme() string {
-	return c.echo.Scheme()
+	return c.echoContext().Scheme()
 }
 
 // Host returns the request host.
 func (c *contextAdapter) Host() string {
-	return c.echo.Request().Host
+	return c.echoContext().Request().Host
 }
 
 // Param returns a named route parameter.
 func (c *contextAdapter) Param(name string) string {
-	return c.echo.Param(name)
+	return c.echoContext().Param(name)
 }
 
 // Query returns a query parameter value.
 func (c *contextAdapter) Query(name string) string {
-	return c.echo.QueryParam(name)
+	return c.echoContext().QueryParam(name)
 }
 
 // Header returns a request header value.
 func (c *contextAdapter) Header(name string) string {
-	return c.echo.Request().Header.Get(name)
+	return c.echoContext().Request().Header.Get(name)
 }
 
 // Cookie returns a named request cookie.
 func (c *contextAdapter) Cookie(name string) (*http.Cookie, error) {
-	return c.echo.Cookie(name)
+	return c.echoContext().Cookie(name)
 }
 
 // RealIP returns the best-effort client IP address.
 func (c *contextAdapter) RealIP() string {
-	return c.echo.RealIP()
+	return c.echoContext().RealIP()
 }
 
-// Request returns the request, rebinding its context only when needed.
+// Request returns the active request, rebinding an explicit context only when needed.
 func (c *contextAdapter) Request() *http.Request {
-	base := c.echo.Request()
-	if c.context == nil || base == nil {
+	base := c.echoContext().Request()
+	state := c.adapterState()
+	if !state.bound || base == nil {
 		return base
 	}
-	if c.request == nil || c.request.Context() != c.context {
-		// Only materialize a rebound request when a caller explicitly asks for it.
-		c.request = base.WithContext(c.context)
+	if state.request == nil || state.request.Context() != state.boundContext {
+		state.request = base.WithContext(state.boundContext)
+		c.setAdapterState(state)
 	}
-	return c.request
+	return state.request
 }
 
-// RawRequest returns the underlying Echo request without rebinding.
+// RawRequest returns the request that preceded any Web context rebinding.
 func (c *contextAdapter) RawRequest() *http.Request {
-	if c == nil || c.echo == nil {
+	if c == nil {
 		return nil
 	}
-	return c.echo.Request()
+	return c.echoContext().Request()
 }
 
-// SetRequest replaces the underlying request.
+// SetRequest replaces the underlying request while preserving an explicit context override.
 func (c *contextAdapter) SetRequest(request *http.Request) {
-	c.echo.SetRequest(request)
-	c.request = nil
+	state := c.adapterState()
+	c.echoContext().SetRequest(request)
+	if state.bound {
+		state.request = nil
+		c.setAdapterState(state)
+	}
 }
 
 // SetContext overrides the effective request context for subsequent Request and Context calls.
 func (c *contextAdapter) SetContext(ctx context.Context) {
-	// Any explicit context override supersedes the cheaper source-name fast path.
-	c.context = ctx
-	c.request = nil
-	c.sourceName = ""
-	c.sourceContext = nil
+	state := c.adapterState()
+	if ctx == nil {
+		state.boundContext = nil
+		state.request = nil
+		state.sourceName = ""
+		state.bound = false
+		c.clearTimeoutBinding()
+		c.setAdapterState(state)
+		return
+	}
+	state.boundContext = ctx
+	state.request = nil
+	state.sourceName = ""
+	state.bound = true
+	c.clearTimeoutBinding()
+	c.setAdapterState(state)
+}
+
+// BindTimeoutRequest installs a derived request context while retaining enough state to restore the healthy request.
+func (c *contextAdapter) BindTimeoutRequest(request *http.Request, ctx context.Context) {
+	state := c.adapterState()
+	timeoutState := c.timeoutState()
+	if timeoutState == nil {
+		timeoutState = &contextAdapterTimeoutState{}
+		c.setTimeoutState(timeoutState)
+	}
+	currentRequest := c.echoContext().Request()
+	timeoutState.previousBound = state.bound
+	timeoutState.previousContext = state.boundContext
+	if currentRequest != nil {
+		timeoutState.healthyRequestContext = currentRequest.Context()
+	}
+	timeoutState.request = request
+	timeoutState.bound = true
+	state.boundContext = ctx
+	state.request = request
+	state.bound = true
+	c.echoContext().SetRequest(request)
+	c.setAdapterState(state)
+}
+
+// RestoreTimeoutRequest removes an adapter-owned deadline without discarding handler-request mutations.
+func (c *contextAdapter) RestoreTimeoutRequest() {
+	state := c.adapterState()
+	timeoutState := c.timeoutState()
+	if timeoutState == nil || !timeoutState.bound {
+		return
+	}
+	currentRequest := c.echoContext().Request()
+	if currentRequest != nil && currentRequest == timeoutState.request && timeoutState.healthyRequestContext != nil {
+		currentRequest = currentRequest.WithContext(timeoutState.healthyRequestContext)
+		c.echoContext().SetRequest(currentRequest)
+	}
+	state.bound = timeoutState.previousBound
+	state.boundContext = timeoutState.previousContext
+	state.request = nil
+	c.clearTimeoutBinding()
+	c.setAdapterState(state)
+}
+
+// clearTimeoutBinding removes adapter-only deadline restoration state.
+func (c *contextAdapter) clearTimeoutBinding() {
+	state := c.timeoutState()
+	if state == nil {
+		return
+	}
+	state.bound = false
+	state.previousBound = false
+	state.previousContext = nil
+	state.request = nil
+	state.healthyRequestContext = nil
 }
 
 // SetAppSourceName records the application source name on the adapter fast path.
 func (c *contextAdapter) SetAppSourceName(source string) {
-	c.sourceName = source
-	c.sourceContext = nil
+	state := c.adapterState()
+	state.sourceName = source
+	c.setAdapterState(state)
 }
 
 // AppSourceName returns the application source name attached to the request.
 func (c *contextAdapter) AppSourceName() string {
-	return c.sourceName
+	return c.adapterState().sourceName
 }
 
 // Response returns the response adapter for the current request.
 func (c *contextAdapter) Response() web.Response {
-	return &c.response
+	return (*responseAdapter)(c)
 }
 
 // ResponseWriter returns the active response writer.
 func (c *contextAdapter) ResponseWriter() http.ResponseWriter {
-	return c.echo.Response()
+	return c.echoContext().Response()
 }
 
 // SetResponseWriter replaces the active response writer.
 func (c *contextAdapter) SetResponseWriter(writer http.ResponseWriter) {
-	c.echo.SetResponse(writer)
-	c.refreshResponse()
+	c.echoContext().SetResponse(writer)
 }
 
 // Bind decodes the request body into target using Echo's binder.
 func (c *contextAdapter) Bind(target any) error {
-	return c.echo.Bind(target)
+	return c.echoContext().Bind(target)
 }
 
 // Set stores request-scoped data on the underlying Echo context.
 func (c *contextAdapter) Set(key string, value any) {
-	c.echo.Set(key, value)
+	native := c.echoContext()
+	native.Set(key, value)
+	trackContextAdapterKey(native, key)
 }
 
 // Get reads request-scoped data from the underlying Echo context.
 func (c *contextAdapter) Get(key string) any {
-	return c.echo.Get(key)
+	value := c.echoContext().Get(key)
+	if value != nil || contextAdapterKeyTracked(c.echoContext(), key) {
+		return value
+	}
+	timeoutState := c.timeoutState()
+	if timeoutState == nil || timeoutState.fallback == nil {
+		return nil
+	}
+	value, active := timeoutState.fallback.get(key)
+	if !active {
+		return nil
+	}
+	c.Set(key, value)
+	return value
+}
+
+// contextAdapterKeyTracked reports whether a nil value was explicitly stored through the Web contract.
+func contextAdapterKeyTracked(native *echo.Context, key string) bool {
+	switch tracked := native.Get(contextAdapterTrackedKeysKey).(type) {
+	case string:
+		return tracked == key
+	case []string:
+		for _, trackedKey := range tracked {
+			if trackedKey == key {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // AddHeader appends a response header value.
 func (c *contextAdapter) AddHeader(name string, value string) {
-	c.echo.Response().Header().Add(name, value)
+	c.echoContext().Response().Header().Add(name, value)
 }
 
 // SetHeader sets a response header value.
 func (c *contextAdapter) SetHeader(name string, value string) {
-	c.echo.Response().Header().Set(name, value)
+	c.echoContext().Response().Header().Set(name, value)
 }
 
 // SetCookie writes a response cookie.
 func (c *contextAdapter) SetCookie(cookie *http.Cookie) {
-	http.SetCookie(c.echo.Response(), cookie)
+	http.SetCookie(c.echoContext().Response(), cookie)
 }
 
 // JSON writes a JSON response.
 func (c *contextAdapter) JSON(code int, payload any) error {
-	return c.echo.JSON(code, payload)
+	return c.echoContext().JSON(code, payload)
 }
 
 // Blob writes a raw byte response with the provided content type.
 func (c *contextAdapter) Blob(code int, contentType string, body []byte) error {
-	return c.echo.Blob(code, contentType, body)
+	return c.echoContext().Blob(code, contentType, body)
 }
 
 // File serves a file from disk.
 func (c *contextAdapter) File(path string) error {
-	http.ServeFile(c.echo.Response(), c.echo.Request(), path)
+	http.ServeFile(c.echoContext().Response(), c.echoContext().Request(), path)
 	return nil
 }
 
 // Text writes a plain-text response.
 func (c *contextAdapter) Text(code int, body string) error {
-	return c.echo.String(code, body)
+	return c.echoContext().Blob(code, echo.MIMETextPlainCharsetUTF8, immutableStringBytes(body))
 }
 
 // HTML writes an HTML response.
 func (c *contextAdapter) HTML(code int, body string) error {
-	return c.echo.HTML(code, body)
+	return c.echoContext().Blob(code, echo.MIMETextHTMLCharsetUTF8, immutableStringBytes(body))
 }
 
 // NoContent writes an empty response with the provided status code.
 func (c *contextAdapter) NoContent(code int) error {
-	return c.echo.NoContent(code)
+	return c.echoContext().NoContent(code)
 }
 
 // Redirect sends an HTTP redirect response.
 func (c *contextAdapter) Redirect(code int, url string) error {
-	return c.echo.Redirect(code, url)
+	return c.echoContext().Redirect(code, url)
 }
 
 // StatusCode returns the response status code.
 func (c *contextAdapter) StatusCode() int {
-	return c.response.StatusCode()
+	return (*responseAdapter)(c).StatusCode()
 }
 
 // Native returns the underlying Echo context.
 func (c *contextAdapter) Native() any {
-	return c.echo
+	return c.echoContext()
 }
 
-// DisableReuse prevents the adapter from returning to the pool after use.
-func (c *contextAdapter) DisableReuse() {
-	c.reusable = false
+// DisableReuse is retained for middleware compatibility; detached contexts now provide lifecycle isolation.
+func (c *contextAdapter) DisableReuse() {}
+
+// DetachedContext creates an independently owned request context and a synchronous commit callback.
+// Echo does not expose a race-safe native-store snapshot, so cross-boundary
+// state is bridged and committed only through the Web Set and Get contract.
+func (c *contextAdapter) DetachedContext() (web.Context, func()) {
+	if c == nil {
+		return c, func() {}
+	}
+
+	source := c.echoContext()
+	engine := source.Echo()
+	if engine == nil {
+		engine = echo.New()
+	}
+
+	request := c.Request()
+	if request != nil {
+		request = request.Clone(c.Context())
+	}
+	detachedNative := engine.NewContext(request, c.ResponseWriter())
+	route := source.RouteInfo()
+	pathValues := append(make(echo.PathValues, 0, len(source.PathValues())), source.PathValues()...)
+	detachedNative.InitializeRoute(&route, &pathValues)
+	detachedNative.SetPath(source.Path())
+	detachedNative.SetLogger(source.Logger())
+
+	state := c.adapterState()
+	state.request = nil
+	detached := acquireContextAdapter(detachedNative)
+	detached.setAdapterState(state)
+	detached.setTimeoutState(&contextAdapterTimeoutState{
+		fallback: &contextAdapterFallback{source: source},
+	})
+	copyTrackedContextAdapterValues(source, detachedNative)
+
+	return detached, func() {
+		detached.commitTo(c)
+	}
 }
 
-// refreshResponse resynchronizes cached response wrappers after writer swaps.
-func (c *contextAdapter) refreshResponse() {
-	if c == nil || c.echo == nil {
-		c.echoResponse = nil
-		c.responseWriter = nil
+// commitTo synchronizes handler-visible context changes after detached work completes before its deadline.
+func (c *contextAdapter) commitTo(target *contextAdapter) {
+	if c == nil || target == nil {
 		return
 	}
-	writer := c.echo.Response()
-	c.responseWriter = writer
-	response, err := echo.UnwrapResponse(writer)
-	if err != nil {
-		c.echoResponse = nil
+
+	c.ReleaseDetachedContext()
+	source := c.echoContext()
+	destination := target.echoContext()
+	destination.SetRequest(c.Request())
+	state := c.adapterState()
+	state.request = nil
+	target.setAdapterState(state)
+	copyTrackedContextAdapterValues(source, destination)
+
+	route := source.RouteInfo()
+	pathValues := append(make(echo.PathValues, 0, len(source.PathValues())), source.PathValues()...)
+	destination.InitializeRoute(&route, &pathValues)
+	destination.SetPath(source.Path())
+	destination.SetLogger(source.Logger())
+}
+
+// trackContextAdapterKey records Web-visible values without allocating for the common single-key case.
+func trackContextAdapterKey(native *echo.Context, key string) {
+	if key == contextAdapterStateKey || key == contextAdapterTrackedKeysKey || key == contextAdapterTimeoutStateKey {
 		return
 	}
-	c.echoResponse = response
+
+	switch tracked := native.Get(contextAdapterTrackedKeysKey).(type) {
+	case nil:
+		native.Set(contextAdapterTrackedKeysKey, key)
+	case string:
+		if tracked != key {
+			native.Set(contextAdapterTrackedKeysKey, []string{tracked, key})
+		}
+	case []string:
+		for _, trackedKey := range tracked {
+			if trackedKey == key {
+				return
+			}
+		}
+		native.Set(contextAdapterTrackedKeysKey, append(tracked, key))
+	}
 }
 
-type responseAdapter struct {
-	context *contextAdapter
+// copyTrackedContextAdapterValues preserves values written through the Web context contract.
+func copyTrackedContextAdapterValues(source *echo.Context, destination *echo.Context) {
+	tracked := source.Get(contextAdapterTrackedKeysKey)
+	switch keys := tracked.(type) {
+	case string:
+		destination.Set(keys, source.Get(keys))
+	case []string:
+		for _, key := range keys {
+			destination.Set(key, source.Get(key))
+		}
+		tracked = append([]string(nil), keys...)
+	default:
+		return
+	}
+	destination.Set(contextAdapterTrackedKeysKey, tracked)
 }
 
+// get reads an original native value only while the detached request still owns that source.
+func (f *contextAdapterFallback) get(key string) (any, bool) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	if f.source == nil {
+		return nil, false
+	}
+	return f.source.Get(key), true
+}
+
+// close prevents late handlers from consulting an Echo context that is about to be reused.
+func (f *contextAdapterFallback) close() {
+	f.mu.Lock()
+	f.source = nil
+	f.mu.Unlock()
+}
+
+// ReleaseDetachedContext severs access to the original Echo context before its request ownership ends.
+func (c *contextAdapter) ReleaseDetachedContext() {
+	state := c.timeoutState()
+	if state != nil && state.fallback != nil {
+		state.fallback.close()
+	}
+}
+
+// immutableStringBytes creates a read-only byte view for the duration of a response write.
+func immutableStringBytes(value string) []byte {
+	// io.Writer implementations may neither retain nor mutate the supplied bytes,
+	// which lets Text and HTML avoid copying an immutable string before Echo writes it.
+	return unsafe.Slice(unsafe.StringData(value), len(value))
+}
+
+// responseAdapter is a zero-allocation response view over Echo's request context.
+type responseAdapter contextAdapter
+
+// sourceNameContext carries application source metadata without cloning a request.
 type sourceNameContext struct {
 	context.Context
 	source string
@@ -309,20 +548,24 @@ func (c sourceNameContext) AppSourceName() string {
 
 var _ web.Response = (*responseAdapter)(nil)
 
+// echoContext returns the native Echo context that owns this response.
+func (r *responseAdapter) echoContext() *echo.Context {
+	return (*echo.Context)(r)
+}
+
 // Header returns the response header map.
 func (r *responseAdapter) Header() http.Header {
-	return r.context.echo.Response().Header()
+	return r.echoContext().Response().Header()
 }
 
 // Writer returns the active response writer.
 func (r *responseAdapter) Writer() http.ResponseWriter {
-	return r.context.echo.Response()
+	return r.echoContext().Response()
 }
 
 // SetWriter replaces the active response writer.
 func (r *responseAdapter) SetWriter(writer http.ResponseWriter) {
-	r.context.echo.SetResponse(writer)
-	r.context.refreshResponse()
+	r.echoContext().SetResponse(writer)
 }
 
 // StatusCode returns the committed response status code.
@@ -354,18 +597,22 @@ func (r *responseAdapter) Committed() bool {
 
 // Native returns the underlying Echo response writer.
 func (r *responseAdapter) Native() any {
-	return r.context.echo.Response()
-}
-
-// currentResponse returns the cached Echo response, refreshing it when needed.
-func (r *responseAdapter) currentResponse() *echo.Response {
-	if r == nil || r.context == nil {
+	if r == nil {
 		return nil
 	}
-	if r.context.responseWriter != r.context.echo.Response() {
-		r.context.refreshResponse()
+	return r.echoContext().Response()
+}
+
+// currentResponse unwraps the active writer to Echo's response state.
+func (r *responseAdapter) currentResponse() *echo.Response {
+	if r == nil {
+		return nil
 	}
-	return r.context.echoResponse
+	response, err := echo.UnwrapResponse(r.echoContext().Response())
+	if err != nil {
+		return nil
+	}
+	return response
 }
 
 // UnwrapContext returns the underlying Echo context when the web.Context came from this adapter.
@@ -385,9 +632,10 @@ func (r *responseAdapter) currentResponse() *echo.Response {
 //
 //	// true
 func UnwrapContext(ctx web.Context) (*echo.Context, bool) {
-	adapted, ok := ctx.(*contextAdapter)
-	if !ok || adapted == nil || adapted.echo == nil {
+	provider, ok := ctx.(echoContextProvider)
+	if !ok || provider == nil {
 		return nil, false
 	}
-	return adapted.echo, true
+	native := provider.echoContext()
+	return native, native != nil
 }

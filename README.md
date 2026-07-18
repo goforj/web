@@ -1265,6 +1265,8 @@ router.GET("/healthz", func(c web.Context) error {
 #### <a id="webmiddleware-timeoutwithconfig"></a>webmiddleware.TimeoutWithConfig
 
 TimeoutWithConfig returns a response-timeout middleware with config.
+Timed work may run on an isolated native adapter context; request state that
+must cross the timeout boundary should use web.Context.Set and web.Context.Get.
 
 ```go
 router := echoweb.New().Router()

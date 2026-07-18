@@ -706,6 +706,91 @@ func TestTimeoutReturnsServiceUnavailableWhenHandlerRunsTooLong(t *testing.T) {
 	}
 }
 
+// TestTimeoutCancellationNeverCommitsDetachedContext verifies cancellation owns state without invoking commit.
+func TestTimeoutCancellationNeverCommitsDetachedContext(t *testing.T) {
+	original := newMutableContext(httptest.NewRequest(http.MethodGet, "/timeout", nil))
+	detached := newMutableContext(original.Request().Clone(original.Context()))
+	commitCh := make(chan struct{}, 1)
+	ctx := &detachingMutableContext{
+		mutableContext: original,
+		detached:       detached,
+		commit: func() {
+			commitCh <- struct{}{}
+		},
+	}
+	started := make(chan struct{})
+	release := make(chan struct{})
+	lateWriteErr := make(chan error, 1)
+	handlerDone := make(chan struct{})
+
+	handler := TimeoutWithConfig(TimeoutConfig{
+		Timeout:      10 * time.Millisecond,
+		ErrorMessage: "timeout",
+	})(func(ctx web.Context) error {
+		close(started)
+		<-release
+		ctx.Set("late-state", "must-not-commit")
+		lateWriteErr <- ctx.Text(http.StatusCreated, "late")
+		close(handlerDone)
+		return errors.New("late error")
+	})
+	if err := handler(ctx); err != nil {
+		t.Fatalf("TimeoutWithConfig() error = %v", err)
+	}
+	<-started
+	if recorder := original.ResponseWriter().(*httptest.ResponseRecorder); recorder.Code != http.StatusServiceUnavailable || strings.TrimSpace(recorder.Body.String()) != "timeout" {
+		t.Fatalf("timeout response = (%d, %q)", recorder.Code, recorder.Body.String())
+	}
+
+	close(release)
+	<-handlerDone
+	if err := <-lateWriteErr; !errors.Is(err, http.ErrHandlerTimeout) {
+		t.Fatalf("late write error = %v, want %v", err, http.ErrHandlerTimeout)
+	}
+	select {
+	case <-commitCh:
+		t.Fatal("cancellation winner invoked detached commit")
+	default:
+	}
+}
+
+// TestTimeoutCompletionOwnsCommitAfterDeadlinePasses verifies an established completion winner retains ownership.
+func TestTimeoutCompletionOwnsCommitAfterDeadlinePasses(t *testing.T) {
+	original := newMutableContext(httptest.NewRequest(http.MethodGet, "/complete", nil))
+	detached := newMutableContext(original.Request().Clone(original.Context()))
+	commitStarted := make(chan struct{})
+	releaseCommit := make(chan struct{})
+	ctx := &detachingMutableContext{
+		mutableContext: original,
+		detached:       detached,
+		commit: func() {
+			close(commitStarted)
+			<-releaseCommit
+		},
+	}
+	resultCh := make(chan error, 1)
+	go func() {
+		resultCh <- TimeoutWithConfig(TimeoutConfig{
+			Timeout:      20 * time.Millisecond,
+			ErrorMessage: "timeout",
+		})(func(ctx web.Context) error {
+			ctx.Set("completed-state", "committed")
+			return ctx.Text(http.StatusOK, "completed")
+		})(ctx)
+	}()
+
+	<-commitStarted
+	time.Sleep(30 * time.Millisecond)
+	close(releaseCommit)
+	if err := <-resultCh; err != nil {
+		t.Fatalf("TimeoutWithConfig() error = %v", err)
+	}
+	recorder := original.ResponseWriter().(*httptest.ResponseRecorder)
+	if recorder.Code != http.StatusOK || strings.TrimSpace(recorder.Body.String()) != "completed" {
+		t.Fatalf("completion response = (%d, %q), want completed 200", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestDecompressInflatesGzipRequestBody(t *testing.T) {
 	var compressed bytes.Buffer
 	zw := gzip.NewWriter(&compressed)
@@ -1302,17 +1387,25 @@ func TestMiddlewareInternalHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("ignorable writer", func(t *testing.T) {
-		rec := httptest.NewRecorder()
-		writer := &ignorableWriter{ResponseWriter: rec}
-		writer.Ignore(true)
+	t.Run("timeout writer suppresses late writes", func(t *testing.T) {
+		writer := newTimeoutResponseWriter()
+		if err := writer.Push("/assets/app.js", nil); !errors.Is(err, http.ErrNotSupported) {
+			t.Fatalf("Push() error = %v, want %v", err, http.ErrNotSupported)
+		}
+		writer.abort(http.ErrHandlerTimeout)
 		writer.WriteHeader(http.StatusCreated)
-		if _, err := writer.Write([]byte("ignored")); err != nil {
-			t.Fatalf("Write(): %v", err)
+		if _, err := writer.Write([]byte("ignored")); !errors.Is(err, http.ErrHandlerTimeout) {
+			t.Fatalf("Write() error = %v, want %v", err, http.ErrHandlerTimeout)
 		}
-		if rec.Code == http.StatusCreated || rec.Body.Len() != 0 {
-			t.Fatalf("ignore should suppress writes: code=%d body=%q", rec.Code, rec.Body.String())
-		}
+	})
+
+	t.Run("timeout writer rejects invalid status", func(t *testing.T) {
+		defer func() {
+			if recover() == nil {
+				t.Fatal("WriteHeader(99) did not panic")
+			}
+		}()
+		newTimeoutResponseWriter().WriteHeader(99)
 	})
 
 	t.Run("request id handler and defaults", func(t *testing.T) {
@@ -1393,56 +1486,46 @@ func TestMiddlewareInternalHelpers(t *testing.T) {
 		}
 	})
 
-	t.Run("timeout handler panic restores writer", func(t *testing.T) {
+	t.Run("timeout runner captures panic for the request owner", func(t *testing.T) {
 		ctx := newMutableContext(httptest.NewRequest(http.MethodGet, "/", nil))
-		original := ctx.ResponseWriter()
-		handler := timeoutHandler{
-			writer:  &ignorableWriter{ResponseWriter: original},
-			ctx:     ctx,
-			handler: func(c web.Context) error { panic("boom") },
-			errCh:   make(chan error, 1),
+		resultCh := make(chan timeoutResult, 1)
+		runTimeoutHandler(timeoutRun{
+			ctx:        ctx,
+			handler:    func(c web.Context) error { panic("boom") },
+			requestCtx: ctx.Context(),
+			arbiter:    &timeoutArbiter{},
+			resultCh:   resultCh,
+		})
+		result := <-resultCh
+		if result.panicValue != "boom" || !result.completed {
+			t.Fatalf("timeout result = %#v, want completed boom panic", result)
 		}
-		defer func() {
-			if recover() == nil {
-				t.Fatal("expected panic from timeoutHandler")
-			}
-			if ctx.ResponseWriter() != original {
-				t.Fatal("timeoutHandler should restore original writer after panic")
-			}
-		}()
-		handler.ServeHTTP(handler.writer, ctx.Request())
 	})
 
-	t.Run("timeout handler returns error and success paths", func(t *testing.T) {
+	t.Run("timeout runner returns error and success paths", func(t *testing.T) {
 		ctx := newMutableContext(httptest.NewRequest(http.MethodGet, "/", nil))
-		original := ctx.ResponseWriter()
-		errCh := make(chan error, 1)
-		handler := timeoutHandler{
-			writer:  &ignorableWriter{ResponseWriter: original},
-			ctx:     ctx,
-			handler: func(c web.Context) error { return errors.New("boom") },
-			errCh:   errCh,
-		}
-		handler.ServeHTTP(handler.writer, ctx.Request())
-		if got := <-errCh; got == nil || got.Error() != "boom" {
-			t.Fatalf("timeoutHandler error = %v", got)
-		}
-		if ctx.ResponseWriter() != original {
-			t.Fatal("timeoutHandler should restore original writer on error")
+		resultCh := make(chan timeoutResult, 1)
+		runTimeoutHandler(timeoutRun{
+			ctx:        ctx,
+			handler:    func(c web.Context) error { return errors.New("boom") },
+			requestCtx: ctx.Context(),
+			arbiter:    &timeoutArbiter{},
+			resultCh:   resultCh,
+		})
+		if result := <-resultCh; result.err == nil || result.err.Error() != "boom" || !result.completed {
+			t.Fatalf("timeout result = %#v", result)
 		}
 
-		errCh = make(chan error, 1)
-		handler = timeoutHandler{
-			writer:  &ignorableWriter{ResponseWriter: original},
-			ctx:     ctx,
-			handler: func(c web.Context) error { return c.NoContent(http.StatusAccepted) },
-			errCh:   errCh,
-		}
-		handler.ServeHTTP(handler.writer, ctx.Request())
-		select {
-		case err := <-errCh:
-			t.Fatalf("unexpected timeoutHandler error: %v", err)
-		default:
+		resultCh = make(chan timeoutResult, 1)
+		runTimeoutHandler(timeoutRun{
+			ctx:        ctx,
+			handler:    func(c web.Context) error { return c.NoContent(http.StatusAccepted) },
+			requestCtx: ctx.Context(),
+			arbiter:    &timeoutArbiter{},
+			resultCh:   resultCh,
+		})
+		if result := <-resultCh; result.err != nil || !result.completed {
+			t.Fatalf("unexpected timeout result: %#v", result)
 		}
 	})
 
@@ -1925,6 +2008,17 @@ func (requestIsHTTPOnlyContext) NoContent(int) error                   { return 
 func (requestIsHTTPOnlyContext) Redirect(int, string) error            { return nil }
 func (requestIsHTTPOnlyContext) StatusCode() int                       { return 0 }
 func (requestIsHTTPOnlyContext) Native() any                           { return nil }
+
+type detachingMutableContext struct {
+	*mutableContext
+	detached *mutableContext
+	commit   func()
+}
+
+// DetachedContext returns the independently owned test context and its observable commit hook.
+func (c *detachingMutableContext) DetachedContext() (web.Context, func()) {
+	return c.detached, c.commit
+}
 
 type mutableContext struct {
 	request *http.Request
