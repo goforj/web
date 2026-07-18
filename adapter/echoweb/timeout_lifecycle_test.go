@@ -291,6 +291,64 @@ func TestTimeoutContextIsolatesLateHandlerFromReusedEchoContext(t *testing.T) {
 	}
 }
 
+// TestTimeoutContextPreservesRootStateForScopedTimeouts verifies state ownership when Timeout is registered below root middleware.
+func TestTimeoutContextPreservesRootStateForScopedTimeouts(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   string
+		group bool
+	}{
+		{name: "route", key: "request-id"},
+		{name: "route empty key", key: ""},
+		{name: "group", key: "request-id", group: true},
+		{name: "group empty key", key: "", group: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			adapter := echoweb.New()
+			router := adapter.Router()
+			started := make(chan struct{})
+			release := make(chan struct{})
+			observed := make(chan any, 1)
+			router.Use(func(next web.Handler) web.Handler {
+				return func(ctx web.Context) error {
+					ctx.Set(test.key, "root-state")
+					return next(ctx)
+				}
+			})
+
+			timeout := webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{
+				Timeout:      20 * time.Millisecond,
+				ErrorMessage: "timeout",
+			})
+			handler := func(ctx web.Context) error {
+				close(started)
+				<-release
+				observed <- ctx.Get(test.key)
+				return nil
+			}
+			path := "/scoped-timeout"
+			if test.group {
+				router.Group("/group", timeout).GET(path, handler)
+				path = "/group" + path
+			} else {
+				router.GET(path, handler, timeout)
+			}
+
+			recorder := httptest.NewRecorder()
+			adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+			<-started
+			if recorder.Code != http.StatusServiceUnavailable || strings.TrimSpace(recorder.Body.String()) != "timeout" {
+				t.Fatalf("response = (%d, %q), want (503, timeout)", recorder.Code, recorder.Body.String())
+			}
+			close(release)
+			if got := <-observed; got != "root-state" {
+				t.Fatalf("late scoped state = %#v, want root-state", got)
+			}
+		})
+	}
+}
+
 // TestTimeoutContextPanicLeavesOriginalRequestHealthy verifies recovery and subsequent pooled reuse.
 func TestTimeoutContextPanicLeavesOriginalRequestHealthy(t *testing.T) {
 	adapter := echoweb.New()

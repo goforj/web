@@ -23,7 +23,8 @@ type Adapter struct {
 func New() *Adapter {
 	engine := echo.New()
 	engine.IPExtractor = echo.LegacyIPExtractor()
-	router := &routerAdapter{engine: engine, group: engine}
+	_, directWebRoutes := engine.Router().(*echo.DefaultRouter)
+	router := &routerAdapter{engine: engine, group: engine, directWebRoutes: directWebRoutes}
 	engine.Use(adaptRouterMiddlewares(router))
 	return &Adapter{
 		engine: engine,
@@ -45,7 +46,8 @@ func Wrap(engine *echo.Echo) *Adapter {
 	if engine.IPExtractor == nil {
 		engine.IPExtractor = echo.LegacyIPExtractor()
 	}
-	router := &routerAdapter{engine: engine, group: engine}
+	_, directWebRoutes := engine.Router().(*echo.DefaultRouter)
+	router := &routerAdapter{engine: engine, group: engine, directWebRoutes: directWebRoutes}
 	engine.Use(adaptRouterMiddlewares(router))
 	return &Adapter{
 		engine: engine,

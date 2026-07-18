@@ -352,12 +352,19 @@ func (c *contextAdapter) SetCookie(cookie *http.Cookie) {
 
 // JSON writes a JSON response.
 func (c *contextAdapter) JSON(code int, payload any) error {
-	return c.echoContext().JSON(code, payload)
+	native := c.echoContext()
+	setResponseContentType(native.Response(), echo.MIMEApplicationJSON)
+	response, err := echo.UnwrapResponse(native.Response())
+	if err != nil {
+		return native.JSON(code, payload)
+	}
+	response.Status = code
+	return native.Echo().JSONSerializer.Serialize(native, payload, "")
 }
 
 // Blob writes a raw byte response with the provided content type.
 func (c *contextAdapter) Blob(code int, contentType string, body []byte) error {
-	return c.echoContext().Blob(code, contentType, body)
+	return writeResponseBlob(c.echoContext(), code, contentType, body)
 }
 
 // File serves a file from disk.
@@ -368,12 +375,12 @@ func (c *contextAdapter) File(path string) error {
 
 // Text writes a plain-text response.
 func (c *contextAdapter) Text(code int, body string) error {
-	return c.echoContext().Blob(code, echo.MIMETextPlainCharsetUTF8, immutableStringBytes(body))
+	return writeResponseBlob(c.echoContext(), code, echo.MIMETextPlainCharsetUTF8, immutableStringBytes(body))
 }
 
 // HTML writes an HTML response.
 func (c *contextAdapter) HTML(code int, body string) error {
-	return c.echoContext().Blob(code, echo.MIMETextHTMLCharsetUTF8, immutableStringBytes(body))
+	return writeResponseBlob(c.echoContext(), code, echo.MIMETextHTMLCharsetUTF8, immutableStringBytes(body))
 }
 
 // NoContent writes an empty response with the provided status code.
@@ -530,6 +537,22 @@ func immutableStringBytes(value string) []byte {
 	// io.Writer implementations may neither retain nor mutate the supplied bytes,
 	// which lets Text and HTML avoid copying an immutable string before Echo writes it.
 	return unsafe.Slice(unsafe.StringData(value), len(value))
+}
+
+// setResponseContentType matches Echo's first-value semantics without repeatedly canonicalizing a constant header name.
+func setResponseContentType(writer http.ResponseWriter, value string) {
+	header := writer.Header()
+	if values := header[echo.HeaderContentType]; len(values) == 0 || values[0] == "" {
+		header[echo.HeaderContentType] = []string{value}
+	}
+}
+
+// writeResponseBlob preserves Echo's response lifecycle while avoiding its generic header canonicalization path.
+func writeResponseBlob(native *echo.Context, code int, contentType string, body []byte) error {
+	setResponseContentType(native.Response(), contentType)
+	native.Response().WriteHeader(code)
+	_, err := native.Response().Write(body)
+	return err
 }
 
 // responseAdapter is a zero-allocation response view over Echo's request context.

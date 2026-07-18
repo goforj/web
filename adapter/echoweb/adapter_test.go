@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,6 +18,48 @@ import (
 	"github.com/gorilla/websocket"
 	echo "github.com/labstack/echo/v5"
 )
+
+// wrappingEchoRouter models a custom router that decorates the selected handler at dispatch time.
+type wrappingEchoRouter struct {
+	echo.Router
+}
+
+// Route decorates the underlying router result without changing request behavior.
+func (r *wrappingEchoRouter) Route(c *echo.Context) echo.HandlerFunc {
+	next := r.Router.Route(c)
+	return func(c *echo.Context) error {
+		return next(c)
+	}
+}
+
+// stateObservingBinder records request state visible to a configured Echo binder.
+type stateObservingBinder struct {
+	observed any
+}
+
+// Bind records native request state without altering the target.
+func (b *stateObservingBinder) Bind(c *echo.Context, _ any) error {
+	b.observed = c.Get("request-state")
+	c.Set("request-state", "binder")
+	return nil
+}
+
+// stateObservingJSONSerializer records request state before delegating to Echo's default serializer.
+type stateObservingJSONSerializer struct {
+	observed any
+}
+
+// Serialize records native request state before writing the JSON response.
+func (s *stateObservingJSONSerializer) Serialize(c *echo.Context, target any, indent string) error {
+	s.observed = c.Get("request-state")
+	c.Set("request-state", "serializer")
+	return (echo.DefaultJSONSerializer{}).Serialize(c, target, indent)
+}
+
+// Deserialize delegates request decoding to Echo's default serializer.
+func (s *stateObservingJSONSerializer) Deserialize(c *echo.Context, target any) error {
+	return (echo.DefaultJSONSerializer{}).Deserialize(c, target)
+}
 
 func TestRouterRegistersRouteAndContext(t *testing.T) {
 	adapter := New()
@@ -157,6 +200,294 @@ func TestRouterUseAppliesMiddleware(t *testing.T) {
 	}
 }
 
+// TestRouterUsePromotesInlineStateAtNativeBoundary verifies Web and Echo observe one shared request store.
+func TestRouterUsePromotesInlineStateAtNativeBoundary(t *testing.T) {
+	adapter := New()
+	router := adapter.Router()
+	router.Use(func(next web.Handler) web.Handler {
+		return func(ctx web.Context) error {
+			ctx.Set("request-state", "web")
+			native, ok := UnwrapContext(ctx)
+			if !ok {
+				t.Fatal("root context did not unwrap")
+			}
+			if got := native.Get("request-state"); got != "web" {
+				t.Fatalf("native request state = %#v, want web", got)
+			}
+			native.Set("request-state", "native")
+			if got := ctx.Get("request-state"); got != "native" {
+				t.Fatalf("Web request state = %#v, want native", got)
+			}
+			ctx.Set("after-unwrapping", "shared")
+			if got := native.Get("after-unwrapping"); got != "shared" {
+				t.Fatalf("state set after unwrapping = %#v, want shared", got)
+			}
+			return next(ctx)
+		}
+	})
+	router.GET("/native-state", func(ctx web.Context) error {
+		if got := ctx.Get("request-state"); got != "native" {
+			t.Fatalf("handler request state = %#v, want native", got)
+		}
+		return ctx.NoContent(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/native-state", nil))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+}
+
+// TestRouterUsePromotesStateForConfiguredEchoCallbacks verifies adapter callbacks observe root state.
+func TestRouterUsePromotesStateForConfiguredEchoCallbacks(t *testing.T) {
+	t.Run("binder", func(t *testing.T) {
+		adapter := New()
+		binder := &stateObservingBinder{}
+		after := any(nil)
+		adapter.Echo().Binder = binder
+		adapter.Router().Use(func(next web.Handler) web.Handler {
+			return func(ctx web.Context) error {
+				ctx.Set("request-state", "web")
+				err := next(ctx)
+				after = ctx.Get("request-state")
+				return err
+			}
+		})
+		adapter.Router().GET("/bind-state", func(ctx web.Context) error {
+			if err := ctx.Bind(&struct{}{}); err != nil {
+				return err
+			}
+			return ctx.NoContent(http.StatusNoContent)
+		})
+
+		recorder := httptest.NewRecorder()
+		adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/bind-state", nil))
+		if recorder.Code != http.StatusNoContent {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+		}
+		if binder.observed != "web" {
+			t.Fatalf("binder state = %#v, want web", binder.observed)
+		}
+		if after != "binder" {
+			t.Fatalf("state after binder = %#v, want binder", after)
+		}
+	})
+
+	t.Run("JSON serializer", func(t *testing.T) {
+		adapter := New()
+		serializer := &stateObservingJSONSerializer{}
+		after := any(nil)
+		adapter.Echo().JSONSerializer = serializer
+		adapter.Router().Use(func(next web.Handler) web.Handler {
+			return func(ctx web.Context) error {
+				ctx.Set("request-state", "web")
+				err := next(ctx)
+				after = ctx.Get("request-state")
+				return err
+			}
+		})
+		adapter.Router().GET("/json-state", func(ctx web.Context) error {
+			return ctx.JSON(http.StatusOK, map[string]bool{"ok": true})
+		})
+
+		recorder := httptest.NewRecorder()
+		adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/json-state", nil))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+		}
+		if serializer.observed != "web" {
+			t.Fatalf("serializer state = %#v, want web", serializer.observed)
+		}
+		if after != "serializer" {
+			t.Fatalf("state after serializer = %#v, want serializer", after)
+		}
+	})
+}
+
+// TestRouterUsePromotesMultipleInlineValues verifies distinct request keys retain ordinary map semantics.
+func TestRouterUsePromotesMultipleInlineValues(t *testing.T) {
+	adapter := New()
+	router := adapter.Router()
+	router.Use(func(next web.Handler) web.Handler {
+		return func(ctx web.Context) error {
+			ctx.Set("first", "one")
+			ctx.Set("second", "two")
+			return next(ctx)
+		}
+	})
+	router.GET("/multiple-state", func(ctx web.Context) error {
+		if got := ctx.Get("first"); got != "one" {
+			t.Fatalf("first state = %#v, want one", got)
+		}
+		if got := ctx.Get("second"); got != "two" {
+			t.Fatalf("second state = %#v, want two", got)
+		}
+		return ctx.NoContent(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/multiple-state", nil))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+}
+
+// TestRouterUsePromotesEmptyNilState verifies inline sentinels do not collide with valid context data.
+func TestRouterUsePromotesEmptyNilState(t *testing.T) {
+	adapter := New()
+	adapter.Router().Use(func(next web.Handler) web.Handler {
+		return func(ctx web.Context) error {
+			ctx.Set("", nil)
+			ctx.Set("second", "two")
+			return next(ctx)
+		}
+	})
+	adapter.Router().GET("/empty-state", func(ctx web.Context) error {
+		native, ok := UnwrapContext(ctx)
+		if !ok || !contextAdapterKeyTracked(native, "") {
+			t.Fatal("empty nil state was not preserved during promotion")
+		}
+		if got := ctx.Get(""); got != nil {
+			t.Fatalf("empty state = %#v, want nil", got)
+		}
+		if got := ctx.Get("second"); got != "two" {
+			t.Fatalf("second state = %#v, want two", got)
+		}
+		return ctx.NoContent(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/empty-state", nil))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+}
+
+// TestRouterUsePromotesStateBeforeLaterEchoMiddleware verifies the dynamic interop path synchronizes state.
+func TestRouterUsePromotesStateBeforeLaterEchoMiddleware(t *testing.T) {
+	adapter := New()
+	router := adapter.Router()
+	router.Use(func(next web.Handler) web.Handler {
+		return func(ctx web.Context) error {
+			ctx.Set("request-state", "web")
+			return next(ctx)
+		}
+	})
+	adapter.Echo().Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(ctx *echo.Context) error {
+			if got := ctx.Get("request-state"); got != "web" {
+				t.Fatalf("native middleware state = %#v, want web", got)
+			}
+			ctx.Set("request-state", "native")
+			return next(ctx)
+		}
+	})
+	router.GET("/native-middleware-state", func(ctx web.Context) error {
+		if got := ctx.Get("request-state"); got != "native" {
+			t.Fatalf("handler request state = %#v, want native", got)
+		}
+		return ctx.NoContent(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/native-middleware-state", nil))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+}
+
+// TestRouterUsePromotesStateBeforeEchoErrorHandling verifies failures expose the final Web request state.
+func TestRouterUsePromotesStateBeforeEchoErrorHandling(t *testing.T) {
+	adapter := New()
+	adapter.Echo().HTTPErrorHandler = func(ctx *echo.Context, _ error) {
+		if got := ctx.Get("request-state"); got != "failed" {
+			t.Fatalf("error handler state = %#v, want failed", got)
+		}
+		_ = ctx.NoContent(http.StatusTeapot)
+	}
+	adapter.Router().Use(func(next web.Handler) web.Handler {
+		return func(ctx web.Context) error {
+			ctx.Set("request-state", "failed")
+			return next(ctx)
+		}
+	})
+	adapter.Router().GET("/error-state", func(web.Context) error {
+		return errors.New("route failed")
+	})
+
+	recorder := httptest.NewRecorder()
+	adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/error-state", nil))
+	if recorder.Code != http.StatusTeapot {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusTeapot)
+	}
+}
+
+// TestRouterUsePromotesStateForEchoPreMiddleware verifies pre-routing callbacks observe Web state during and after response handling.
+func TestRouterUsePromotesStateForEchoPreMiddleware(t *testing.T) {
+	adapter := New()
+	beforeState := any(nil)
+	afterState := any(nil)
+	adapter.Echo().Pre(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(ctx *echo.Context) error {
+			response, err := echo.UnwrapResponse(ctx.Response())
+			if err != nil {
+				t.Fatal(err)
+			}
+			response.Before(func() {
+				beforeState = ctx.Get("request-state")
+			})
+			err = next(ctx)
+			afterState = ctx.Get("request-state")
+			return err
+		}
+	})
+	adapter.Router().Use(func(next web.Handler) web.Handler {
+		return func(ctx web.Context) error {
+			ctx.Set("request-state", "web")
+			return next(ctx)
+		}
+	})
+	adapter.Router().GET("/pre-state", func(ctx web.Context) error {
+		return ctx.Text(http.StatusOK, "ok")
+	})
+
+	recorder := httptest.NewRecorder()
+	adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/pre-state", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if beforeState != "web" || afterState != "web" {
+		t.Fatalf("pre middleware states = before:%#v after:%#v, want web", beforeState, afterState)
+	}
+}
+
+// TestRouterUseWithWrappingCustomRouterRunsOnce verifies custom dispatch wrappers use the fail-safe dynamic path.
+func TestRouterUseWithWrappingCustomRouterRunsOnce(t *testing.T) {
+	nativeRouter := echo.NewRouter(echo.RouterConfig{})
+	engine := echo.NewWithConfig(echo.Config{Router: &wrappingEchoRouter{Router: nativeRouter}})
+	adapter := Wrap(engine)
+	handled := 0
+	adapter.Router().Use(func(next web.Handler) web.Handler {
+		return func(ctx web.Context) error {
+			handled++
+			return next(ctx)
+		}
+	})
+	adapter.Router().GET("/custom-router", func(ctx web.Context) error {
+		return ctx.NoContent(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/custom-router", nil))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+	if handled != 1 {
+		t.Fatalf("root middleware handled %d times, want 1", handled)
+	}
+}
+
 // TestRouterUseConstructsMiddlewareOnceForEveryDispatchKind verifies one shared root middleware lifecycle.
 func TestRouterUseConstructsMiddlewareOnceForEveryDispatchKind(t *testing.T) {
 	adapter := New()
@@ -213,6 +544,37 @@ func TestRouterUseConstructsMiddlewareOnceForEveryDispatchKind(t *testing.T) {
 	}
 	if handled != len(requests) {
 		t.Fatalf("middleware handled %d requests, want %d", handled, len(requests))
+	}
+}
+
+// TestRouterUsePreservesMiddlewareConstructionOrder verifies constructor side effects remain registration ordered.
+func TestRouterUsePreservesMiddlewareConstructionOrder(t *testing.T) {
+	adapter := New()
+	router := adapter.Router()
+	events := make([]string, 0, 7)
+	middleware := func(name string) web.Middleware {
+		return func(next web.Handler) web.Handler {
+			events = append(events, "construct-"+name)
+			return func(ctx web.Context) error {
+				events = append(events, "handle-"+name)
+				return next(ctx)
+			}
+		}
+	}
+	router.Use(middleware("first"), middleware("second"), middleware("third"))
+	router.GET("/construction-order", func(ctx web.Context) error {
+		events = append(events, "handler")
+		return ctx.NoContent(http.StatusNoContent)
+	})
+
+	recorder := httptest.NewRecorder()
+	adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/construction-order", nil))
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusNoContent)
+	}
+	want := "construct-first,construct-second,construct-third,handle-first,handle-second,handle-third,handler"
+	if got := strings.Join(events, ","); got != want {
+		t.Fatalf("events = %q, want %q", got, want)
 	}
 }
 

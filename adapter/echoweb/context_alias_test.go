@@ -2,6 +2,7 @@ package echoweb
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,6 +10,28 @@ import (
 	"github.com/goforj/web"
 	echo "github.com/labstack/echo/v5"
 )
+
+// contextAliasJSONSerializer records configured serializer use and can inject a serialization failure.
+type contextAliasJSONSerializer struct {
+	called bool
+	body   string
+	err    error
+}
+
+// Serialize records the call before writing the configured body or returning an error.
+func (s *contextAliasJSONSerializer) Serialize(c *echo.Context, _ any, _ string) error {
+	s.called = true
+	if s.err != nil {
+		return s.err
+	}
+	_, err := c.Response().Write([]byte(s.body))
+	return err
+}
+
+// Deserialize is unused by response tests and satisfies Echo's serializer contract.
+func (s *contextAliasJSONSerializer) Deserialize(_ *echo.Context, _ any) error {
+	return nil
+}
 
 // TestContextAdapterBindContextPreservesRawRequest verifies lazy context rebinding retains raw request ownership.
 func TestContextAdapterBindContextPreservesRawRequest(t *testing.T) {
@@ -127,5 +150,110 @@ func TestContextAdapterResponseViewTracksWriterReplacement(t *testing.T) {
 	}
 	if !response.Committed() {
 		t.Fatal("response was not committed")
+	}
+}
+
+// TestContextAdapterResponseFastPathsPreserveContentType verifies optimized writers retain caller-owned headers.
+func TestContextAdapterResponseFastPathsPreserveContentType(t *testing.T) {
+	tests := []struct {
+		name  string
+		write func(*contextAdapter) error
+	}{
+		{name: "text", write: func(c *contextAdapter) error { return c.Text(http.StatusAccepted, "text") }},
+		{name: "html", write: func(c *contextAdapter) error { return c.HTML(http.StatusAccepted, "<b>html</b>") }},
+		{name: "blob", write: func(c *contextAdapter) error {
+			return c.Blob(http.StatusAccepted, "application/octet-stream", []byte("blob"))
+		}},
+		{name: "json", write: func(c *contextAdapter) error { return c.JSON(http.StatusAccepted, map[string]string{"kind": "json"}) }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			engine := echo.New()
+			recorder := httptest.NewRecorder()
+			native := engine.NewContext(httptest.NewRequest(http.MethodGet, "/response", nil), recorder)
+			native.Response().Header().Set(echo.HeaderContentType, "application/custom")
+			if err := test.write(acquireContextAdapter(native)); err != nil {
+				t.Fatal(err)
+			}
+			if got := recorder.Code; got != http.StatusAccepted {
+				t.Fatalf("status = %d, want %d", got, http.StatusAccepted)
+			}
+			if got := recorder.Header().Get(echo.HeaderContentType); got != "application/custom" {
+				t.Fatalf("Content-Type = %q, want application/custom", got)
+			}
+		})
+	}
+}
+
+// TestContextAdapterResponseFastPathTracksBeforeReplacement verifies body writes follow Echo response swaps.
+func TestContextAdapterResponseFastPathTracksBeforeReplacement(t *testing.T) {
+	engine := echo.New()
+	originalRecorder := httptest.NewRecorder()
+	native := engine.NewContext(httptest.NewRequest(http.MethodGet, "/response", nil), originalRecorder)
+	originalResponse, err := echo.UnwrapResponse(native.Response())
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementRecorder := httptest.NewRecorder()
+	replacementResponse := echo.NewResponse(replacementRecorder, engine.Logger)
+	originalResponse.Before(func() {
+		native.SetResponse(replacementResponse)
+	})
+
+	if err := acquireContextAdapter(native).Text(http.StatusAccepted, "replacement"); err != nil {
+		t.Fatal(err)
+	}
+	if originalRecorder.Code != http.StatusAccepted || originalRecorder.Body.Len() != 0 {
+		t.Fatalf("original response = (%d, %q), want empty 202", originalRecorder.Code, originalRecorder.Body.String())
+	}
+	if replacementRecorder.Code != http.StatusOK || replacementRecorder.Body.String() != "replacement" {
+		t.Fatalf("replacement response = (%d, %q), want (200, replacement)", replacementRecorder.Code, replacementRecorder.Body.String())
+	}
+}
+
+// TestContextAdapterJSONUsesConfiguredSerializer verifies optimization does not replace Echo serialization semantics.
+func TestContextAdapterJSONUsesConfiguredSerializer(t *testing.T) {
+	engine := echo.New()
+	serializer := &contextAliasJSONSerializer{body: "configured\n"}
+	engine.JSONSerializer = serializer
+	recorder := httptest.NewRecorder()
+	native := engine.NewContext(httptest.NewRequest(http.MethodGet, "/json", nil), recorder)
+	if err := acquireContextAdapter(native).JSON(http.StatusCreated, map[string]bool{"ok": true}); err != nil {
+		t.Fatal(err)
+	}
+	if !serializer.called {
+		t.Fatal("configured serializer was not called")
+	}
+	if got := recorder.Code; got != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", got, http.StatusCreated)
+	}
+	if got := recorder.Body.String(); got != "configured\n" {
+		t.Fatalf("body = %q, want configured serializer output", got)
+	}
+	if got := recorder.Header().Get(echo.HeaderContentType); got != echo.MIMEApplicationJSON {
+		t.Fatalf("Content-Type = %q, want %q", got, echo.MIMEApplicationJSON)
+	}
+}
+
+// TestContextAdapterJSONDelaysStatusOnSerializerFailure verifies errors leave the response uncommitted.
+func TestContextAdapterJSONDelaysStatusOnSerializerFailure(t *testing.T) {
+	wantErr := errors.New("serialize failed")
+	engine := echo.New()
+	engine.JSONSerializer = &contextAliasJSONSerializer{err: wantErr}
+	recorder := httptest.NewRecorder()
+	native := engine.NewContext(httptest.NewRequest(http.MethodGet, "/json", nil), recorder)
+	err := acquireContextAdapter(native).JSON(http.StatusCreated, map[string]bool{"ok": true})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("JSON error = %v, want %v", err, wantErr)
+	}
+	response, unwrapErr := echo.UnwrapResponse(native.Response())
+	if unwrapErr != nil {
+		t.Fatal(unwrapErr)
+	}
+	if response.Status != http.StatusCreated || response.Committed {
+		t.Fatalf("response = status:%d committed:%t, want proposed uncommitted %d", response.Status, response.Committed, http.StatusCreated)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("body = %q, want empty", recorder.Body.String())
 	}
 }

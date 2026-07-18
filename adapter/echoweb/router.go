@@ -38,18 +38,22 @@ type routerAdapter struct {
 	rootMiddlewareMu  sync.Mutex
 	rootMiddleware    atomic.Pointer[rootMiddlewareHandler]
 	rootMiddlewareEnd *rootMiddlewareLink
+	rootContexts      sync.Pool
 
-	routeHandlers       webRouteHandlers
-	routeDispatcher     echo.HandlerFunc
-	routeDispatcherCode uintptr
-	rootWebHandler      echo.HandlerFunc
+	webRouteHandlerCode uintptr
+	directWebRoutes     bool
 }
 
 // rootMiddlewareContext carries Echo's request-selected handler through the
 // one root middleware chain shared by every request.
 type rootMiddlewareContext struct {
 	*contextAdapter
-	next echo.HandlerFunc
+	nextEcho    echo.HandlerFunc
+	nextWeb     web.Handler
+	stateKey    string
+	stateValue  any
+	stateSet    bool
+	nativeState bool
 }
 
 // echoContext returns the native request context behind a root middleware invocation.
@@ -57,16 +61,106 @@ func (c *rootMiddlewareContext) echoContext() *echo.Context {
 	if c == nil || c.contextAdapter == nil {
 		return nil
 	}
+	c.promoteStateToNative()
 	return c.contextAdapter.echoContext()
+}
+
+// Set keeps one request value inline until interoperability requires Echo's general-purpose store.
+func (c *rootMiddlewareContext) Set(key string, value any) {
+	if key == contextAdapterStateKey || key == contextAdapterTrackedKeysKey || key == contextAdapterTimeoutStateKey {
+		c.contextAdapter.echoContext().Set(key, value)
+		return
+	}
+	if c.nativeState {
+		c.contextAdapter.Set(key, value)
+		return
+	}
+	if !c.stateSet || c.stateKey == key {
+		c.stateKey = key
+		c.stateValue = value
+		c.stateSet = true
+		return
+	}
+	c.promoteStateToNative()
+	c.contextAdapter.Set(key, value)
+}
+
+// Get reads inline request state before consulting Echo and detached Timeout fallbacks.
+func (c *rootMiddlewareContext) Get(key string) any {
+	if c.stateSet && c.stateKey == key {
+		return c.stateValue
+	}
+	return c.contextAdapter.Get(key)
+}
+
+// promoteStateToNative preserves Web state before code can observe or retain the native Echo context.
+func (c *rootMiddlewareContext) promoteStateToNative() {
+	if c == nil || c.contextAdapter == nil {
+		return
+	}
+	if c.stateSet {
+		c.contextAdapter.Set(c.stateKey, c.stateValue)
+		c.stateKey = ""
+		c.stateValue = nil
+		c.stateSet = false
+	}
+	c.nativeState = true
+}
+
+// Native returns the underlying Echo context after synchronizing inline request state.
+func (c *rootMiddlewareContext) Native() any {
+	return c.echoContext()
+}
+
+// Bind synchronizes inline request state before invoking Echo's configured binder.
+func (c *rootMiddlewareContext) Bind(target any) error {
+	c.promoteStateToNative()
+	return c.contextAdapter.Bind(target)
+}
+
+// JSON synchronizes inline request state before invoking Echo's configured serializer.
+func (c *rootMiddlewareContext) JSON(code int, payload any) error {
+	c.promoteStateToNative()
+	return c.contextAdapter.JSON(code, payload)
 }
 
 // DetachedContext creates an independently owned root invocation for asynchronous middleware.
 func (c *rootMiddlewareContext) DetachedContext() (web.Context, func()) {
+	c.promoteStateToNative()
 	detached, commit := c.contextAdapter.DetachedContext()
-	return &rootMiddlewareContext{
+	detachedContext := &rootMiddlewareContext{
 		contextAdapter: detached.(*contextAdapter),
-		next:           c.next,
-	}, commit
+		nextEcho:       c.nextEcho,
+		nextWeb:        c.nextWeb,
+	}
+	return detachedContext, func() {
+		detachedContext.promoteStateToNative()
+		commit()
+	}
+}
+
+// acquireRootContext reuses the short-lived state carrier needed by root middleware and Timeout snapshots.
+func (r *routerAdapter) acquireRootContext(c *echo.Context, nextEcho echo.HandlerFunc, nextWeb web.Handler) *rootMiddlewareContext {
+	ctx, _ := r.rootContexts.Get().(*rootMiddlewareContext)
+	if ctx == nil {
+		ctx = &rootMiddlewareContext{}
+	}
+	ctx.contextAdapter = acquireContextAdapter(c)
+	ctx.nextEcho = nextEcho
+	ctx.nextWeb = nextWeb
+	return ctx
+}
+
+// releaseRootContext clears request ownership before returning a middleware state carrier to the pool.
+func (r *routerAdapter) releaseRootContext(ctx *rootMiddlewareContext) {
+	ctx.contextAdapter = nil
+	ctx.nextEcho = nil
+	ctx.nextWeb = nil
+	ctx.stateKey = ""
+	ctx.stateValue = nil
+	ctx.stateSet = false
+	ctx.nativeState = false
+	r.rootContexts.Put(ctx)
 }
 
 // rootMiddlewareHandler holds one immutable middleware handler.
@@ -85,21 +179,39 @@ func (l *rootMiddlewareLink) handle(ctx web.Context) error {
 	return l.next.Load().handler(ctx)
 }
 
-// webRouteKey identifies a Web-owned handler after Echo has resolved its route pattern.
-type webRouteKey struct {
-	method string
-	path   string
+// rootMiddlewareStaticLink connects middleware built in registration order without an atomic load per stage.
+type rootMiddlewareStaticLink struct {
+	next web.Handler
 }
 
-// webRouteHandler holds one Web-owned Echo handler so registrations can share identity safely.
+// handle invokes the immutable continuation assigned after middleware construction.
+func (l *rootMiddlewareStaticLink) handle(ctx web.Context) error {
+	return l.next(ctx)
+}
+
+// webRouteHandler lets an already-selected Echo route enter the shared root middleware chain directly.
 type webRouteHandler struct {
-	handler echo.HandlerFunc
+	handler      web.Handler
+	root         *routerAdapter
+	routeHandler echo.HandlerFunc
 }
 
-// webRouteHandlers maps Echo's resolved routes and unambiguous paths to Web-owned handlers.
-type webRouteHandlers struct {
-	routes map[webRouteKey]*webRouteHandler
-	paths  map[string]*webRouteHandler
+// handle invokes root middleware inside Web-owned routes when no other Echo middleware changes ordering.
+func (h *webRouteHandler) handle(c *echo.Context) error {
+	if h == nil || h.root == nil || h.handler == nil {
+		return echo.ErrInternalServerError
+	}
+	head := h.root.rootMiddleware.Load()
+	if head == nil || !h.root.directWebRoutes || len(h.root.engine.Middlewares()) != 1 || len(h.root.engine.PreMiddlewares()) != 0 {
+		return h.handler(acquireContextAdapter(c))
+	}
+	ctx := h.root.acquireRootContext(c, nil, h.handler)
+	err := head.handler(ctx)
+	if err != nil {
+		ctx.promoteStateToNative()
+	}
+	h.root.releaseRootContext(ctx)
+	return err
 }
 
 var _ web.Router = (*routerAdapter)(nil)
@@ -153,78 +265,86 @@ func (r *routerAdapter) Handle(method string, path string, handler web.Handler, 
 	return nil
 }
 
+// newWebRouteHandler binds one adapted handler to the root middleware owner selected at request time.
+func (r *routerAdapter) newWebRouteHandler(handler web.Handler) *webRouteHandler {
+	adapted := &webRouteHandler{handler: handler, root: r.rootRouter()}
+	adapted.routeHandler = adapted.handle
+	if adapted.root.directWebRoutes && adapted.root.webRouteHandlerCode == 0 {
+		adapted.root.webRouteHandlerCode = reflect.ValueOf(adapted.routeHandler).Pointer()
+	}
+	return adapted
+}
+
 // CONNECT registers a CONNECT route.
 func (r *routerAdapter) CONNECT(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.CONNECT(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.CONNECT(path, adapted.routeHandler)
 }
 
 // DELETE registers a DELETE route.
 func (r *routerAdapter) DELETE(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.DELETE(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.DELETE(path, adapted.routeHandler)
 }
 
 // GET registers a GET route.
 func (r *routerAdapter) GET(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.GET(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.GET(path, adapted.routeHandler)
 }
 
 // GETWS registers a GET websocket route.
 func (r *routerAdapter) GETWS(path string, handler web.WebSocketHandler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptWebSocketHandler(handler, r.routeMiddlewares(middleware)...)}
-	r.registerWebRoute(r.group.GET(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyWebSocketHandler(handler, r.routeMiddlewares(middleware)...))
+	r.group.GET(path, adapted.routeHandler)
 }
 
 // HEAD registers a HEAD route.
 func (r *routerAdapter) HEAD(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.HEAD(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.HEAD(path, adapted.routeHandler)
 }
 
 // OPTIONS registers an OPTIONS route.
 func (r *routerAdapter) OPTIONS(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.OPTIONS(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.OPTIONS(path, adapted.routeHandler)
 }
 
 // PATCH registers a PATCH route.
 func (r *routerAdapter) PATCH(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.PATCH(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.PATCH(path, adapted.routeHandler)
 }
 
 // POST registers a POST route.
 func (r *routerAdapter) POST(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.POST(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.POST(path, adapted.routeHandler)
 }
 
 // PUT registers a PUT route.
 func (r *routerAdapter) PUT(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.PUT(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.PUT(path, adapted.routeHandler)
 }
 
 // TRACE registers a TRACE route.
 func (r *routerAdapter) TRACE(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.TRACE(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.TRACE(path, adapted.routeHandler)
 }
 
 // Any registers a route for every standard HTTP method.
 func (r *routerAdapter) Any(path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	r.registerWebRoute(r.group.Any(path, r.rootRouter().routeDispatcher), adapted)
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.Any(path, adapted.routeHandler)
 }
 
 // Match registers a route for the provided set of HTTP methods.
 func (r *routerAdapter) Match(methods []string, path string, handler web.Handler, middleware ...web.Middleware) {
-	adapted := &webRouteHandler{handler: adaptHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))}
-	for _, route := range r.group.Match(methods, path, r.rootRouter().routeDispatcher) {
-		r.registerWebRoute(route, adapted)
-	}
+	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
+	r.group.Match(methods, path, adapted.routeHandler)
 }
 
 // Group creates a child router with a prefixed path scope.
@@ -238,7 +358,7 @@ func (r *routerAdapter) Group(prefix string, middleware ...web.Middleware) web.R
 	return child
 }
 
-// rootRouter returns the adapter that owns request-wide middleware and route dispatch.
+// rootRouter returns the adapter that owns request-wide middleware.
 func (r *routerAdapter) rootRouter() *routerAdapter {
 	for r.parent != nil {
 		r = r.parent
@@ -246,53 +366,8 @@ func (r *routerAdapter) rootRouter() *routerAdapter {
 	return r
 }
 
-// registerWebRoute publishes a Web-owned route alongside Echo's setup-only route table.
-func (r *routerAdapter) registerWebRoute(route echo.RouteInfo, handler *webRouteHandler) {
-	root := r.rootRouter()
-	root.routeHandlers.routes[webRouteKey{method: route.Method, path: route.Path}] = handler
-	current, registered := root.routeHandlers.paths[route.Path]
-	if !registered {
-		root.routeHandlers.paths[route.Path] = handler
-	} else if current != handler {
-		// A nil path entry records that Echo's selected method is required to
-		// distinguish multiple handlers mounted on the same route pattern.
-		root.routeHandlers.paths[route.Path] = nil
-	}
-}
-
-// dispatchWebRoute invokes the Web handler associated with Echo's resolved route.
-func (r *routerAdapter) dispatchWebRoute(c *echo.Context) error {
-	path := selectedWebRoutePath(c)
-	if handler, ok := r.routeHandlers.paths[path]; ok && handler != nil {
-		return handler.handler(c)
-	}
-	selected := c.RouteInfo()
-	handler, ok := r.routeHandlers.routes[webRouteKey{method: selected.Method, path: path}]
-	if !ok {
-		return echo.ErrInternalServerError
-	}
-	return handler.handler(c)
-}
-
-// selectedWebRoutePath returns Echo's immutable route selection when middleware changed a public path view.
-func selectedWebRoutePath(c *echo.Context) string {
-	path := c.Path()
-	request := c.Request()
-	if request != nil && request.Pattern != "" && request.Pattern == path {
-		return path
-	}
-	return c.RouteInfo().Path
-}
-
 // adaptRouterMiddlewares bridges web middleware into Echo middleware for a router scope.
 func adaptRouterMiddlewares(r *routerAdapter) echo.MiddlewareFunc {
-	r.routeHandlers = webRouteHandlers{
-		routes: make(map[webRouteKey]*webRouteHandler),
-		paths:  make(map[string]*webRouteHandler),
-	}
-	r.routeDispatcher = r.dispatchWebRoute
-	r.routeDispatcherCode = reflect.ValueOf(r.routeDispatcher).Pointer()
-	r.rootWebHandler = r.dispatchRootWebRoute
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return r.rootMiddlewareHandler(next)
 	}
@@ -306,26 +381,19 @@ func (r *routerAdapter) rootMiddlewareHandler(next echo.HandlerFunc) echo.Handle
 	}
 	// Native middleware and additional wrapped adapters can obscure which
 	// receiver owns a method-value code pointer, so they use the dynamic path.
-	if len(r.engine.Middlewares()) == 1 && reflect.ValueOf(next).Pointer() == r.routeDispatcherCode {
-		return r.rootWebHandler
+	if r.directWebRoutes && len(r.engine.Middlewares()) == 1 && len(r.engine.PreMiddlewares()) == 0 && r.webRouteHandlerCode != 0 && reflect.ValueOf(next).Pointer() == r.webRouteHandlerCode {
+		return next
 	}
 
 	return func(c *echo.Context) error {
-		ctx := rootMiddlewareContext{
-			contextAdapter: acquireContextAdapter(c),
-			next:           next,
-		}
-		return head.handler(&ctx)
+		ctx := r.acquireRootContext(c, next, nil)
+		ctx.nativeState = true
+		defer func() {
+			ctx.promoteStateToNative()
+			r.releaseRootContext(ctx)
+		}()
+		return head.handler(ctx)
 	}
-}
-
-// dispatchRootWebRoute runs the allocation-free path for a Web-owned route.
-func (r *routerAdapter) dispatchRootWebRoute(c *echo.Context) error {
-	head := r.rootMiddleware.Load()
-	if head == nil {
-		return r.dispatchWebRoute(c)
-	}
-	return head.handler(acquireContextAdapter(c))
 }
 
 // appendRootMiddlewares extends the shared chain without reconstructing existing middleware.
@@ -348,35 +416,42 @@ func (r *routerAdapter) appendRootMiddlewares(middleware []web.Middleware) {
 // compileRootMiddlewareSegment constructs each middleware exactly once and preserves registration order.
 func (r *routerAdapter) compileRootMiddlewareSegment(middleware []web.Middleware) (*rootMiddlewareHandler, *rootMiddlewareLink) {
 	terminal := &rootMiddlewareHandler{handler: r.invokeRootMiddlewareNext}
+	tail := &rootMiddlewareLink{}
+	tail.next.Store(terminal)
 	var head *rootMiddlewareHandler
-	var end *rootMiddlewareLink
+	var previous *rootMiddlewareStaticLink
 	for _, item := range middleware {
-		link := &rootMiddlewareLink{}
-		link.next.Store(terminal)
+		link := &rootMiddlewareStaticLink{}
 		current := &rootMiddlewareHandler{handler: item(link.handle)}
 		if head == nil {
 			head = current
 		} else {
-			end.next.Store(current)
+			previous.next = current.handler
 		}
-		end = link
+		previous = link
 	}
-	return head, end
+	if previous == nil {
+		return nil, nil
+	}
+	previous.next = tail.handle
+	return head, tail
 }
 
 // invokeRootMiddlewareNext continues through the Echo middleware and route selected for this request.
 func (r *routerAdapter) invokeRootMiddlewareNext(ctx web.Context) error {
 	if root, ok := ctx.(*rootMiddlewareContext); ok {
-		if root == nil || root.next == nil || root.echoContext() == nil {
+		if root == nil || root.contextAdapter == nil {
 			return echo.ErrInternalServerError
 		}
-		return root.next(root.echoContext())
+		if root.nextWeb != nil {
+			return root.nextWeb(root)
+		}
+		if root.nextEcho != nil {
+			root.promoteStateToNative()
+			return root.nextEcho(root.contextAdapter.echoContext())
+		}
 	}
-	adapted, ok := ctx.(*contextAdapter)
-	if !ok || adapted == nil {
-		return echo.ErrInternalServerError
-	}
-	return r.dispatchWebRoute(adapted.echoContext())
+	return echo.ErrInternalServerError
 }
 
 // middlewareSnapshot returns an immutable copy of the current middleware configuration.
@@ -444,8 +519,8 @@ func adaptHandler(handler web.Handler) echo.HandlerFunc {
 	}
 }
 
-// adaptWebSocketHandler compiles HTTP middleware around a websocket upgrade and handler.
-func adaptWebSocketHandler(handler web.WebSocketHandler, middleware ...web.Middleware) echo.HandlerFunc {
+// applyWebSocketHandler compiles HTTP middleware around a websocket upgrade and handler.
+func applyWebSocketHandler(handler web.WebSocketHandler, middleware ...web.Middleware) web.Handler {
 	applied := applyMiddlewares(func(ctx web.Context) error {
 		native, ok := UnwrapContext(ctx)
 		if !ok {
@@ -458,7 +533,7 @@ func adaptWebSocketHandler(handler web.WebSocketHandler, middleware ...web.Middl
 		}
 		return handler(ctx, newWebSocketConn(conn))
 	}, middleware...)
-	return adaptHandler(applied)
+	return applied
 }
 
 // cleanMiddlewares drops nil entries while preserving middleware order.
@@ -489,18 +564,21 @@ func mustAdaptMiddlewares(middleware []web.Middleware) []echo.MiddlewareFunc {
 func adaptMiddlewares(middlewares []web.Middleware) echo.MiddlewareFunc {
 	adapted := applyMiddlewares(func(r web.Context) error {
 		root, ok := r.(*rootMiddlewareContext)
-		if !ok || root == nil || root.next == nil || root.echoContext() == nil {
+		if !ok || root == nil || root.nextEcho == nil || root.contextAdapter == nil {
 			return echo.ErrInternalServerError
 		}
-		return root.next(root.echoContext())
+		root.promoteStateToNative()
+		return root.nextEcho(root.contextAdapter.echoContext())
 	}, middlewares...)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			ctx := rootMiddlewareContext{
 				contextAdapter: acquireContextAdapter(c),
-				next:           next,
+				nextEcho:       next,
+				nativeState:    true,
 			}
+			defer ctx.promoteStateToNative()
 			return adapted(&ctx)
 		}
 	}
