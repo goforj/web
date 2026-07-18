@@ -5,9 +5,12 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/goforj/web"
+	"github.com/goforj/web/webmiddleware"
 	echo "github.com/labstack/echo/v5"
 )
 
@@ -16,6 +19,22 @@ type contextAliasJSONSerializer struct {
 	called bool
 	body   string
 	err    error
+}
+
+// contextAliasFallbackContext exposes an adapter without shadowing its Context method through an interface field name.
+type contextAliasFallbackContext struct {
+	*contextAdapter
+}
+
+// contextAliasNilDetacher provides a valid fallback context while simulating an adapter that no longer owns a request.
+type contextAliasNilDetacher struct {
+	contextAliasFallbackContext
+}
+
+// DetachedContext delegates to a nil adapter to exercise timeout middleware's unsupported-detachment fallback.
+func (c contextAliasNilDetacher) DetachedContext() (web.Context, func()) {
+	var adapted *contextAdapter
+	return adapted.DetachedContext()
 }
 
 // Serialize records the call before writing the configured body or returning an error.
@@ -255,5 +274,199 @@ func TestContextAdapterJSONDelaysStatusOnSerializerFailure(t *testing.T) {
 	}
 	if recorder.Body.Len() != 0 {
 		t.Fatalf("body = %q, want empty", recorder.Body.String())
+	}
+}
+
+// TestContextAdapterNilReceiverGuards verifies optional lifecycle views remain safe when no request is owned.
+func TestContextAdapterNilReceiverGuards(t *testing.T) {
+	var adapted *contextAdapter
+	if state := adapted.adapterState(); state.bound || state.boundContext != nil || state.request != nil || state.sourceName != "" {
+		t.Fatalf("adapter state = %#v, want empty", state)
+	}
+	if state := adapted.timeoutState(); state != nil {
+		t.Fatalf("timeout state = %#v, want nil", state)
+	}
+	if request := adapted.RawRequest(); request != nil {
+		t.Fatalf("raw request = %#v, want nil", request)
+	}
+
+	detached, commit := adapted.DetachedContext()
+	if detached != nil {
+		t.Fatalf("detached context = %#v, want nil", detached)
+	}
+	commit()
+
+	var response *responseAdapter
+	if native := response.Native(); native != nil {
+		t.Fatalf("native response = %#v, want nil", native)
+	}
+}
+
+// TestContextAdapterNilDetachmentFallsBackInTimeout verifies a typed nil cannot escape into middleware execution.
+func TestContextAdapterNilDetachmentFallsBackInTimeout(t *testing.T) {
+	engine := echo.New()
+	recorder := httptest.NewRecorder()
+	native := engine.NewContext(httptest.NewRequest(http.MethodGet, "/timeout", nil), recorder)
+	ctx := contextAliasNilDetacher{
+		contextAliasFallbackContext: contextAliasFallbackContext{
+			contextAdapter: acquireContextAdapter(native),
+		},
+	}
+	middleware := webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{
+		Skipper: func(web.Context) bool { return false },
+		Timeout: time.Second,
+	})
+	handler := middleware(func(ctx web.Context) error {
+		return ctx.Text(http.StatusAccepted, "fallback")
+	})
+	if err := handler(ctx); err != nil {
+		t.Fatalf("timeout handler: %v", err)
+	}
+	if recorder.Code != http.StatusAccepted || recorder.Body.String() != "fallback" {
+		t.Fatalf("response = (%d, %q), want (202, fallback)", recorder.Code, recorder.Body.String())
+	}
+}
+
+// TestContextAdapterTimeoutBindingLifecycle verifies direct timeout binding creates and clears adapter ownership state.
+func TestContextAdapterTimeoutBindingLifecycle(t *testing.T) {
+	type contextKey string
+
+	engine := echo.New()
+	healthyContext := context.WithValue(context.Background(), contextKey("phase"), "healthy")
+	healthyRequest := httptest.NewRequest(http.MethodGet, "/timeout", nil).WithContext(healthyContext)
+	native := engine.NewContext(healthyRequest, httptest.NewRecorder())
+	adapted := acquireContextAdapter(native)
+
+	adapted.RestoreTimeoutRequest()
+	if native.Request() != healthyRequest {
+		t.Fatal("restoring an unbound timeout changed the request")
+	}
+
+	timeoutContext, cancel := context.WithCancel(healthyContext)
+	t.Cleanup(cancel)
+	timeoutRequest := healthyRequest.WithContext(timeoutContext)
+	adapted.BindTimeoutRequest(timeoutRequest, timeoutContext)
+	if state := adapted.timeoutState(); state == nil || !state.bound {
+		t.Fatalf("timeout state = %#v, want an active binding", state)
+	}
+	if adapted.Request() != timeoutRequest || adapted.Context() != timeoutContext {
+		t.Fatal("timeout binding did not expose the derived request context")
+	}
+
+	adapted.RestoreTimeoutRequest()
+	if got := adapted.Context().Value(contextKey("phase")); got != "healthy" {
+		t.Fatalf("restored context value = %#v, want healthy", got)
+	}
+	if adapted.Request().Context() != healthyContext {
+		t.Fatal("restored request did not recover its healthy context")
+	}
+	if state := adapted.timeoutState(); state == nil || state.bound {
+		t.Fatalf("restored timeout state = %#v, want inactive ownership", state)
+	}
+
+	adapted.RestoreTimeoutRequest()
+}
+
+// TestContextAdapterDetachedContextSupportsEngineLessEchoContexts verifies Echo's documented test-context form remains usable.
+func TestContextAdapterDetachedContextSupportsEngineLessEchoContexts(t *testing.T) {
+	native := echo.NewContext(
+		httptest.NewRequest(http.MethodGet, "/detached", nil),
+		httptest.NewRecorder(),
+	)
+	adapted := acquireContextAdapter(native)
+	detached, commit := adapted.DetachedContext()
+	detachedNative, ok := UnwrapContext(detached)
+	if !ok || detachedNative.Echo() == nil {
+		t.Fatal("detached context did not acquire an independent Echo engine")
+	}
+	detached.Set("result", "committed")
+	commit()
+	if got := adapted.Get("result"); got != "committed" {
+		t.Fatalf("committed state = %#v, want committed", got)
+	}
+}
+
+// TestContextAdapterDetachedFallbackCloses verifies released work cannot consult the original Echo request store.
+func TestContextAdapterDetachedFallbackCloses(t *testing.T) {
+	engine := echo.New()
+	native := engine.NewContext(
+		httptest.NewRequest(http.MethodGet, "/detached", nil),
+		httptest.NewRecorder(),
+	)
+	native.Set("native-before", "visible")
+	native.Set("native-after", "hidden")
+	detachedContext, _ := acquireContextAdapter(native).DetachedContext()
+	detached := detachedContext.(*contextAdapter)
+	if got := detached.Get("native-before"); got != "visible" {
+		t.Fatalf("active fallback value = %#v, want visible", got)
+	}
+
+	detached.ReleaseDetachedContext()
+	if got := detached.Get("native-after"); got != nil {
+		t.Fatalf("released fallback value = %#v, want nil", got)
+	}
+}
+
+// TestContextAdapterTracksMultipleUpdatedValues verifies detached commits preserve larger request stores and updates.
+func TestContextAdapterTracksMultipleUpdatedValues(t *testing.T) {
+	engine := echo.New()
+	native := engine.NewContext(
+		httptest.NewRequest(http.MethodGet, "/detached", nil),
+		httptest.NewRecorder(),
+	)
+	adapted := acquireContextAdapter(native)
+	adapted.Set("first", "one")
+	adapted.Set("second", "two")
+	adapted.Set("third", "three")
+	adapted.Set("second", "updated")
+
+	detached, commit := adapted.DetachedContext()
+	detached.Set("third", "changed")
+	detached.Set("fourth", "four")
+	commit()
+
+	for key, want := range map[string]string{
+		"first":  "one",
+		"second": "updated",
+		"third":  "changed",
+		"fourth": "four",
+	} {
+		if got := adapted.Get(key); got != want {
+			t.Errorf("%s = %#v, want %q", key, got, want)
+		}
+	}
+
+	trackedBefore := slices.Clone(native.Get(contextAdapterTrackedKeysKey).([]string))
+	for _, key := range []string{contextAdapterStateKey, contextAdapterTrackedKeysKey, contextAdapterTimeoutStateKey} {
+		trackContextAdapterKey(native, key)
+	}
+	if trackedAfter := native.Get(contextAdapterTrackedKeysKey).([]string); !slices.Equal(trackedBefore, trackedAfter) {
+		t.Fatalf("reserved keys changed tracking metadata from %#v to %#v", trackedBefore, trackedAfter)
+	}
+}
+
+// TestContextAdapterJSONSupportsRawResponseWriters verifies JSON retains Echo's fallback lifecycle for custom writers.
+func TestContextAdapterJSONSupportsRawResponseWriters(t *testing.T) {
+	engine := echo.New()
+	recorder := httptest.NewRecorder()
+	native := engine.NewContext(httptest.NewRequest(http.MethodGet, "/json", nil), recorder)
+	native.SetResponse(recorder)
+	adapted := acquireContextAdapter(native)
+	response := adapted.Response()
+	if response.StatusCode() != 0 || response.Size() != 0 || response.Committed() {
+		t.Fatal("raw response writer unexpectedly exposed Echo response bookkeeping")
+	}
+
+	if err := adapted.JSON(http.StatusAccepted, map[string]bool{"ok": true}); err != nil {
+		t.Fatalf("JSON: %v", err)
+	}
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusAccepted)
+	}
+	if got := recorder.Body.String(); got != "{\"ok\":true}\n" {
+		t.Fatalf("body = %q, want encoded JSON", got)
+	}
+	if got := recorder.Header().Get(echo.HeaderContentType); got != echo.MIMEApplicationJSON {
+		t.Fatalf("Content-Type = %q, want %q", got, echo.MIMEApplicationJSON)
 	}
 }

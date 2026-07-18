@@ -411,7 +411,7 @@ func (c *contextAdapter) DisableReuse() {}
 // state is bridged and committed only through the Web Set and Get contract.
 func (c *contextAdapter) DetachedContext() (web.Context, func()) {
 	if c == nil {
-		return c, func() {}
+		return nil, func() {}
 	}
 
 	source := c.echoContext()
