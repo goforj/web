@@ -273,6 +273,28 @@ adapter.Echo().IPExtractor = echo.ExtractIPDirect()
 
 Behind a trusted proxy, configure `echo.ExtractIPFromXFFHeader` or `echo.ExtractIPFromRealIPHeader` with trust options that match the deployment, and ensure the edge proxy removes client-supplied forwarding headers before adding its own.
 
+## Performance
+
+<!-- bench:embed:start -->
+<p align="center">
+  <img src="docs/bench/framework_comparison.svg" alt="Go HTTP stack loopback and in-process performance comparison">
+</p>
+
+Whiskers in every panel show the observed sample minimum and maximum. The first panel measures single-core HTTP/1.1 loopback requests per second over a reused connection. The other panels measure in-process `ServeHTTP` operations per second, and their allocation figures cover the complete route and handler dispatch. Middleware details show the median paired latency added above the plaintext route measured in the same benchmark process. Each primary value is the median of 7 samples at `1s` with `GOMAXPROCS=1`.
+
+Bars are scaled independently within each panel, and small differences should not be treated as rankings. These are microbenchmarks and loopback ceilings, not production capacity forecasts.
+
+Measured with `go1.26.1` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.11-orbstack-00360-gc9bc4d96ac70`, revision `5f5ab63f3fa8`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:27890cc60975236d9e5263767b741d2ee125b99f4c1f59d8b8f1a542a8d8d512`. Dependencies: net/http go1.26.1, GoForj Web local checkout, Echo v5.1.0, Gin v1.12.0, Chi v5.3.1, Gorilla Mux v1.8.1, httprouter v1.3.0.
+
+Fiber is omitted because its `fasthttp` engine is not directly comparable in this shared `net/http` suite. See the [benchmark methodology](docs/bench/README.md) and [recorded sample rows](docs/bench/benchmarks_rows.json).
+
+Regenerate the measurement and image with:
+
+```sh
+make benchmark-svg
+```
+<!-- bench:embed:end -->
+
 ## API
 
 <!-- api:embed:start -->
@@ -1265,6 +1287,8 @@ router.GET("/healthz", func(c web.Context) error {
 #### <a id="webmiddleware-timeoutwithconfig"></a>webmiddleware.TimeoutWithConfig
 
 TimeoutWithConfig returns a response-timeout middleware with config.
+Timed work may run on an isolated native adapter context; request state that
+must cross the timeout boundary should use web.Context.Set and web.Context.Get.
 
 ```go
 router := echoweb.New().Router()

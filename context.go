@@ -6,6 +6,11 @@ import (
 )
 
 // Context is the app-facing HTTP context contract.
+//
+// A Context belongs to one handler invocation. Its request, response, and
+// key/value methods must not be called concurrently or retained after the
+// handler returns. The Context method returns the cancellation-safe standard
+// library context for work that needs to cross goroutine boundaries.
 type Context interface {
 	Context() context.Context
 	Method() string

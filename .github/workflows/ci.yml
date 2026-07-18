@@ -22,20 +22,22 @@ jobs:
           cache-dependency-path: |
             go.mod
             go.sum
+            docs/go.mod
+            docs/go.sum
             examples/go.mod
             examples/go.sum
 
       - name: Verify module files are tidy
         run: |
           go mod tidy -diff
-          cd examples
-          GOWORK=off go mod tidy -diff
+          (cd docs && GOWORK=off go mod tidy -diff)
+          (cd examples && GOWORK=off go mod tidy -diff)
 
       - name: Download dependencies
         run: |
           go mod download
-          cd examples
-          GOWORK=off go mod download
+          (cd docs && GOWORK=off go mod download)
+          (cd examples && GOWORK=off go mod download)
 
       - name: Run root tests
         run: go test ./... -v
@@ -44,6 +46,18 @@ jobs:
         run: |
           cd examples
           GOWORK=off go test ./... -v
+
+      - name: Verify documentation tooling
+        run: |
+          cd docs
+          GOWORK=off go test ./... -v
+          GOWORK=off go test -tags=benchrender ./... -v
+
+      - name: Verify benchmark rendering matches the committed snapshot
+        run: |
+          make benchmark-svg-verify
+          git diff --exit-code -- README.md docs/bench/benchmarks_rows.json docs/bench/framework_comparison.svg
+          test -z "$(git ls-files --others --exclude-standard -- docs/bench/benchmarks_rows.json docs/bench/framework_comparison.svg)"
 
   race:
     runs-on: ubuntu-latest
