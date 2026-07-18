@@ -471,11 +471,9 @@ func newGinHandler(scenario benchmarkScenario) http.Handler {
 		router.Use(
 			func(c *gin.Context) {
 				c.Set(benchmarkContextKey, benchmarkContextValue)
-				c.Next()
 			},
 			func(c *gin.Context) {
 				c.Header("X-Benchmark", benchmarkContextValue)
-				c.Next()
 			},
 			func(c *gin.Context) {
 				value, exists := c.Get(benchmarkContextKey)
@@ -483,7 +481,6 @@ func newGinHandler(scenario benchmarkScenario) http.Handler {
 					c.AbortWithStatus(http.StatusInternalServerError)
 					return
 				}
-				c.Next()
 			},
 		)
 		router.GET(benchmarkPath(scenario), func(c *gin.Context) {
