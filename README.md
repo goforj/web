@@ -273,6 +273,30 @@ adapter.Echo().IPExtractor = echo.ExtractIPDirect()
 
 Behind a trusted proxy, configure `echo.ExtractIPFromXFFHeader` or `echo.ExtractIPFromRealIPHeader` with trust options that match the deployment, and ensure the edge proxy removes client-supplied forwarding headers before adding its own.
 
+## Performance
+
+<!-- bench:embed:start -->
+<p align="center">
+  <img src="docs/bench/framework_comparison.svg" alt="Go HTTP stack loopback and in-process performance comparison">
+</p>
+
+> **Local benchmark preview:** This snapshot was measured from a dirty working tree and is not publication-ready.
+
+Whiskers in every panel show the observed sample minimum and maximum. The first panel measures single-core HTTP/1.1 loopback requests per second over a reused connection. The other panels measure in-process `ServeHTTP` operations per second, and their allocation figures cover the complete route and handler dispatch. Middleware details show the median paired latency added above the plaintext route measured in the same benchmark process. Each primary value is the median of 1 sample at `100ms` with `GOMAXPROCS=1`.
+
+Bars are scaled independently within each panel, and small differences should not be treated as rankings. These are microbenchmarks and loopback ceilings, not production capacity forecasts.
+
+Measured with `go1.26.1` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.11-orbstack-00360-gc9bc4d96ac70`, revision `537ffebf3f13 (dirty tree)`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:7374ef673f4de24b6e7218af5f0c12a0c0f6489ce5fffda723e8324e82e685fe`. Dependencies: net/http go1.26.1, GoForj Web local checkout, Echo v5.1.0, Gin v1.12.0, Chi v5.3.1, Gorilla Mux v1.8.1, httprouter v1.3.0.
+
+Fiber is omitted because its `fasthttp` engine is not directly comparable in this shared `net/http` suite. See the [benchmark methodology](docs/bench/README.md) and [recorded sample rows](docs/bench/benchmarks_rows.json).
+
+Regenerate the measurement and image with:
+
+```sh
+make benchmark-svg
+```
+<!-- bench:embed:end -->
+
 ## API
 
 <!-- api:embed:start -->
