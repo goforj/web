@@ -295,10 +295,22 @@ func TestContextAdapterNilReceiverGuards(t *testing.T) {
 		t.Fatalf("detached context = %#v, want nil", detached)
 	}
 	commit()
+	engine := echo.New()
+	source := engine.NewContext(
+		httptest.NewRequest(http.MethodGet, "/", nil),
+		httptest.NewRecorder(),
+	)
+	acquireContextAdapter(source).commitTo(nil)
 
 	var response *responseAdapter
+	if response.StatusCode() != 0 || response.Size() != 0 || response.Committed() {
+		t.Fatal("nil response unexpectedly exposed Echo response bookkeeping")
+	}
 	if native := response.Native(); native != nil {
 		t.Fatalf("native response = %#v, want nil", native)
+	}
+	if native, ok := UnwrapContext(nil); ok || native != nil {
+		t.Fatalf("UnwrapContext(nil) = (%#v, %v), want (nil, false)", native, ok)
 	}
 }
 

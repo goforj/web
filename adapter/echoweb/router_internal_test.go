@@ -51,6 +51,9 @@ func TestRouterHandlesEmptyAndInvalidMiddlewareState(t *testing.T) {
 	if got := (*routerAdapter)(nil).middlewareSnapshot(); got != nil {
 		t.Fatalf("nil middleware snapshot = %#v, want nil", got)
 	}
+	if got := (*routerAdapter)(nil).inheritedRouteMiddlewares(); got != nil {
+		t.Fatalf("nil inherited middleware = %#v, want nil", got)
+	}
 
 	var missing *rootMiddlewareContext
 	if err := router.invokeRootMiddlewareNext(missing); !errors.Is(err, echo.ErrInternalServerError) {
