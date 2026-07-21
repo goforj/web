@@ -270,12 +270,9 @@ func BenchmarkRunRepresentativeScalePersistentCacheHit(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	b.StopTimer()
-	for range b.N {
+	for iteration := 0; iteration < b.N; iteration++ {
 		clearRepresentativeScaleDecodedCache()
-		b.StartTimer()
 		manifest, runErr := RunCached(context.Background(), fixture.cachedOptions(), fixture.cachePath)
-		b.StopTimer()
 		if runErr != nil {
 			b.Fatalf("index unchanged representative-scale fixture: %v", runErr)
 		}
