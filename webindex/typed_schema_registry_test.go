@@ -925,3 +925,32 @@ func hasTypedDiagnostic(diagnostics []Diagnostic, code, severity string) bool {
 	}
 	return false
 }
+
+// TestTypedSchemaComponentMapReturnsDetachedSchemas verifies projection skips invalid components and cannot mutate registry state.
+func TestTypedSchemaComponentMapReturnsDetachedSchemas(t *testing.T) {
+	var empty *typedSchemaRegistry
+	if components := empty.componentSchemaMap(); components != nil {
+		t.Fatalf("nil registry component map = %#v", components)
+	}
+
+	registry := &typedSchemaRegistry{componentsByID: map[string]*typedSchemaComponent{
+		"valid": {
+			Identity: "example.com/sample.Record",
+			Name:     "SampleRecord",
+			Schema:   map[string]any{"type": "object", "required": []string{"id"}},
+		},
+		"nil component": nil,
+		"nil schema":    {Name: "Ignored"},
+	}}
+	components := registry.componentSchemaMap()
+	want := map[string]any{
+		"SampleRecord": map[string]any{"type": "object", "required": []string{"id"}},
+	}
+	if !reflect.DeepEqual(components, want) {
+		t.Fatalf("component schema map = %#v, want %#v", components, want)
+	}
+	components["SampleRecord"].(map[string]any)["type"] = "changed"
+	if registry.componentsByID["valid"].Schema["type"] != "object" {
+		t.Fatal("component schema map retained mutable registry data")
+	}
+}

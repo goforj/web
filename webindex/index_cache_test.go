@@ -225,6 +225,157 @@ func TestIndexCacheValueShapeRejectsUnsupportedAndMalformedState(t *testing.T) {
 	}
 }
 
+// TestRestoreIndexCacheManifestRejectsSemanticCorruption verifies valid framing and checksums cannot make inconsistent runtime-shape metadata authoritative.
+func TestRestoreIndexCacheManifestRejectsSemanticCorruption(t *testing.T) {
+	baseline := writeIndexCacheSemanticRestoreFixture(t)
+	tests := []struct {
+		name   string
+		mutate func(*testing.T, *indexCacheRecord)
+	}{
+		{name: "invalid manifest JSON", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.ManifestData = []byte("{")
+		}},
+		{name: "noncanonical manifest JSON", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.ManifestData = append(record.ManifestData, ' ')
+		}},
+		{name: "manifest version", mutate: func(t *testing.T, record *indexCacheRecord) {
+			rewriteIndexCacheManifestData(t, record, func(manifest *Manifest) { manifest.Version = "unexpected" })
+		}},
+		{name: "operation shape count", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations = nil
+		}},
+		{name: "schema shape count", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Schemas = nil
+		}},
+		{name: "middleware presence", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].MiddlewarePresent = false
+		}},
+		{name: "path parameter presence", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].PathParamsPresent = false
+		}},
+		{name: "query parameter presence", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].QueryParamsPresent = false
+		}},
+		{name: "header presence", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].HeadersPresent = false
+		}},
+		{name: "cookie presence", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].CookiesPresent = false
+		}},
+		{name: "response presence", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].ResponsesPresent = false
+		}},
+		{name: "response shape count", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].Responses = nil
+		}},
+		{name: "metadata tag presence", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].MetadataTagsPresent = false
+		}},
+		{name: "metadata absent", mutate: func(t *testing.T, record *indexCacheRecord) {
+			rewriteIndexCacheManifestData(t, record, func(manifest *Manifest) { manifest.Operations[0].Metadata = nil })
+		}},
+		{name: "middleware provenance presence", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].MiddlewareProvenancePresent = false
+		}},
+		{name: "body absent", mutate: func(t *testing.T, record *indexCacheRecord) {
+			rewriteIndexCacheManifestData(t, record, func(manifest *Manifest) { manifest.Operations[0].Inputs.Body = nil })
+		}},
+		{name: "body shape", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].Body[0].Kind = "unexpected"
+		}},
+		{name: "response shape", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Operations[0].Responses[0][0].Kind = "unexpected"
+		}},
+		{name: "schema shape", mutate: func(_ *testing.T, record *indexCacheRecord) {
+			record.Manifest.Schemas[0][0].Kind = "unexpected"
+		}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			baselineData, err := encodeIndexCacheRecord(baseline)
+			if err != nil {
+				t.Fatalf("encode semantic cache baseline: %v", err)
+			}
+			candidate, ok := decodeIndexCacheRecord(baselineData)
+			if !ok {
+				t.Fatal("decode semantic cache baseline")
+			}
+			test.mutate(t, &candidate)
+
+			framed, err := encodeIndexCacheRecord(candidate)
+			if err != nil {
+				t.Fatalf("encode checksum-valid semantic corruption: %v", err)
+			}
+			decoded, ok := decodeIndexCacheRecord(framed)
+			if !ok {
+				t.Fatal("semantic corruption did not retain valid framing and checksums")
+			}
+			if _, ok := restoreIndexCacheManifest(decoded); ok {
+				t.Fatal("semantically inconsistent cache manifest was accepted")
+			}
+		})
+	}
+}
+
+// TestRunCachedResolvesRelativeCacheWithoutArtifacts verifies cache-only callers receive exact hits without generating files or rewriting stable state.
+func TestRunCachedResolvesRelativeCacheWithoutArtifacts(t *testing.T) {
+	root, _ := writeTypedSchemaFixture(t)
+	relativeCachePath := filepath.Join(".webindex-cache", "api-index.bin")
+	absoluteCachePath := filepath.Join(root, relativeCachePath)
+	packageLoads := 0
+	countingLoader := func(config *packages.Config, patterns ...string) ([]*packages.Package, error) {
+		packageLoads++
+		return packages.Load(config, patterns...)
+	}
+	options := IndexOptions{Root: root}
+
+	first, err := run(context.Background(), options, relativeCachePath, countingLoader)
+	if err != nil {
+		t.Fatalf("run cache-only cold index: %v", err)
+	}
+	if packageLoads == 0 {
+		t.Fatal("cache-only cold index did not load typed packages")
+	}
+	coldPackageLoads := packageLoads
+	beforeData, ok := readIndexCacheData(absoluteCachePath)
+	if !ok {
+		t.Fatalf("relative cache path was not published beneath root: %s", absoluteCachePath)
+	}
+	record, ok := decodeIndexCacheRecord(beforeData)
+	if !ok {
+		t.Fatal("cache-only cold index did not publish a valid cache record")
+	}
+	if len(record.Artifacts) != 0 {
+		t.Fatalf("cache-only record retained %d generated artifacts, want none", len(record.Artifacts))
+	}
+	beforeInfo, err := os.Stat(absoluteCachePath)
+	if err != nil {
+		t.Fatalf("stat cache-only cold entry: %v", err)
+	}
+
+	second, err := run(context.Background(), options, relativeCachePath, countingLoader)
+	if err != nil {
+		t.Fatalf("run cache-only exact hit: %v", err)
+	}
+	if packageLoads != coldPackageLoads {
+		t.Fatalf("cache-only exact hit loaded typed packages %d additional times", packageLoads-coldPackageLoads)
+	}
+	if !reflect.DeepEqual(second, first) {
+		t.Fatal("cache-only exact hit changed the returned manifest")
+	}
+	afterData, ok := readIndexCacheData(absoluteCachePath)
+	if !ok || !bytes.Equal(afterData, beforeData) {
+		t.Fatal("cache-only exact hit changed persisted bytes")
+	}
+	afterInfo, err := os.Stat(absoluteCachePath)
+	if err != nil {
+		t.Fatalf("stat cache-only exact-hit entry: %v", err)
+	}
+	if !os.SameFile(beforeInfo, afterInfo) || !beforeInfo.ModTime().Equal(afterInfo.ModTime()) {
+		t.Fatal("cache-only exact hit replaced an unchanged cache entry")
+	}
+}
+
 // TestRunPersistentCacheRemapsArtifactsAndRecoversCorruption verifies GoForj staging paths reuse exact analysis while invalid entries safely rebuild.
 func TestRunPersistentCacheRemapsArtifactsAndRecoversCorruption(t *testing.T) {
 	root, handlerPath := writeTypedSchemaFixture(t)
@@ -524,7 +675,10 @@ func TestIndexCacheSemanticEpochsInvalidateAnalyzerChanges(t *testing.T) {
 		analyzer:        indexCacheAnalyzerEpoch,
 		typedDependency: indexCacheTypedDependencyEpoch,
 	}
-	buildIdentity := indexCacheAnalyzerBuildIdentity()
+	buildIdentity, buildIdentityAvailable := indexCacheAnalyzerBuildIdentity()
+	if !buildIdentityAvailable {
+		t.Fatal("executing analyzer build identity was unavailable")
+	}
 	var decodedBuildIdentity indexCacheBuildModuleIdentity
 	if err := json.Unmarshal([]byte(buildIdentity), &decodedBuildIdentity); err != nil || decodedBuildIdentity.Path != indexCacheAnalyzerModulePath {
 		t.Fatalf("executing analyzer build identity = %q, decoded=%#v err=%v", buildIdentity, decodedBuildIdentity, err)
@@ -840,7 +994,7 @@ func TestDecodeIndexCacheReaderReadsOnlySelectedSection(t *testing.T) {
 	}
 
 	exactReader := &indexCacheTrackingReader{data: encoded}
-	exactRecord, exactLayout, exact, ok := decodeIndexCacheReader(exactReader, int64(len(encoded)), record.InputHash, indexCacheMemoryEntry{})
+	exactRecord, exactLayout, exact, ok := decodeIndexCacheReader(exactReader, int64(len(encoded)), record.InputHash)
 	if !ok || !exact || exactRecord.InputHash != record.InputHash {
 		t.Fatalf("exact section read = valid %t, exact %t, input %q", ok, exact, exactRecord.InputHash)
 	}
@@ -849,7 +1003,7 @@ func TestDecodeIndexCacheReaderReadsOnlySelectedSection(t *testing.T) {
 	}
 
 	typedReader := &indexCacheTrackingReader{data: encoded}
-	changedRecord, changedLayout, exact, ok := decodeIndexCacheReader(typedReader, int64(len(encoded)), "changed-input", indexCacheMemoryEntry{})
+	changedRecord, changedLayout, exact, ok := decodeIndexCacheReader(typedReader, int64(len(encoded)), "changed-input")
 	if !ok || exact || !reflect.DeepEqual(changedRecord.TypedState, wantTypedState) {
 		t.Fatalf("changed-input section read = valid %t, exact %t, typed state %#v", ok, exact, changedRecord.TypedState)
 	}
@@ -858,67 +1012,8 @@ func TestDecodeIndexCacheReaderReadsOnlySelectedSection(t *testing.T) {
 	}
 }
 
-// TestDecodedIndexCacheMemoryBoundsCountAndEncodedBytes verifies long-lived processes retain only a small encoded-size-bounded working set.
-func TestDecodedIndexCacheMemoryBoundsCountAndEncodedBytes(t *testing.T) {
-	t.Run("entry count", func(t *testing.T) {
-		resetDecodedIndexCacheForTest(t)
-		record, _ := writeIndexCacheRecordFixture(t)
-		for index := 0; index < indexCacheMemoryCapacity; index++ {
-			rememberDecodedIndexCacheRecord("cache-"+intToString(index), indexCacheEnvelopeLayout{size: 1 << 20}, record)
-		}
-		decodedIndexCaches.promote("cache-0")
-		rememberDecodedIndexCacheRecord("cache-4", indexCacheEnvelopeLayout{size: 1 << 20}, record)
-
-		decodedIndexCaches.Lock()
-		defer decodedIndexCaches.Unlock()
-		if len(decodedIndexCaches.entries) != indexCacheMemoryCapacity {
-			t.Fatalf("retained entries = %d, want %d", len(decodedIndexCaches.entries), indexCacheMemoryCapacity)
-		}
-		for _, entry := range decodedIndexCaches.entries {
-			if entry.path == "cache-1" {
-				t.Fatal("least recently used entry survived count eviction")
-			}
-		}
-		backing := decodedIndexCaches.entries[:cap(decodedIndexCaches.entries)]
-		for index := len(decodedIndexCaches.entries); index < len(backing); index++ {
-			if backing[index].path != "" || backing[index].record.ManifestData != nil || backing[index].typedState != nil {
-				t.Fatalf("evicted entry %d remained reachable through the backing array", index)
-			}
-		}
-	})
-
-	t.Run("encoded byte budget", func(t *testing.T) {
-		resetDecodedIndexCacheForTest(t)
-		record, _ := writeIndexCacheRecordFixture(t)
-		rememberDecodedIndexCacheRecord("oldest", indexCacheEnvelopeLayout{size: 8 << 20}, record)
-		rememberDecodedIndexCacheRecord("newer", indexCacheEnvelopeLayout{size: 8 << 20}, record)
-		rememberDecodedIndexCacheRecord("newest", indexCacheEnvelopeLayout{size: 1 << 20}, record)
-
-		decodedIndexCaches.Lock()
-		defer decodedIndexCaches.Unlock()
-		if len(decodedIndexCaches.entries) != 2 {
-			t.Fatalf("encoded-size-bounded entries = %d, want 2", len(decodedIndexCaches.entries))
-		}
-		if decodedIndexCaches.entries[0].path != "newest" || decodedIndexCaches.entries[1].path != "newer" {
-			t.Fatalf("encoded-size eviction order = %q, %q", decodedIndexCaches.entries[0].path, decodedIndexCaches.entries[1].path)
-		}
-	})
-
-	t.Run("oversized entry", func(t *testing.T) {
-		resetDecodedIndexCacheForTest(t)
-		record, _ := writeIndexCacheRecordFixture(t)
-		rememberDecodedIndexCacheRecord("oversized", indexCacheEnvelopeLayout{size: indexCacheMemoryMaximumEncodedBytes + 1}, record)
-		decodedIndexCaches.Lock()
-		defer decodedIndexCaches.Unlock()
-		if len(decodedIndexCaches.entries) != 0 {
-			t.Fatalf("oversized decoded entry was retained: %#v", decodedIndexCaches.entries)
-		}
-	})
-}
-
-// TestReadDecodedIndexCacheRecordDropsCorruptRetainedState verifies process memory cannot hide or retain an externally corrupted exact section.
-func TestReadDecodedIndexCacheRecordDropsCorruptRetainedState(t *testing.T) {
-	resetDecodedIndexCacheForTest(t)
+// TestReadDecodedIndexCacheRecordRejectsExternalCorruption verifies each read validates current bytes from disk.
+func TestReadDecodedIndexCacheRecordRejectsExternalCorruption(t *testing.T) {
 	record, _ := writeIndexCacheRecordFixture(t)
 	record.TypedState = typedSchemaIncrementalCodecFixture()
 	encoded, err := encodeIndexCacheRecord(record)
@@ -944,11 +1039,6 @@ func TestReadDecodedIndexCacheRecordDropsCorruptRetainedState(t *testing.T) {
 	if _, ok := readDecodedIndexCacheRecord(cachePath, record.InputHash); ok {
 		t.Fatal("retained decoded state hid exact-section corruption")
 	}
-	decodedIndexCaches.Lock()
-	defer decodedIndexCaches.Unlock()
-	if len(decodedIndexCaches.entries) != 0 {
-		t.Fatal("corrupt retained state remained reachable in process memory")
-	}
 }
 
 // TestDecodeIndexCacheReaderIsolatesSectionCorruption verifies corruption invalidates a section when that section is selected.
@@ -966,26 +1056,25 @@ func TestDecodeIndexCacheReaderIsolatesSectionCorruption(t *testing.T) {
 
 	exactCorrupt := append([]byte(nil), encoded...)
 	exactCorrupt[layout.recordOffset] ^= 1
-	if _, _, _, valid := decodeIndexCacheReader(bytes.NewReader(exactCorrupt), int64(len(exactCorrupt)), record.InputHash, indexCacheMemoryEntry{}); valid {
+	if _, _, _, valid := decodeIndexCacheReader(bytes.NewReader(exactCorrupt), int64(len(exactCorrupt)), record.InputHash); valid {
 		t.Fatal("exact hit accepted corrupt exact content")
 	}
-	if changed, _, exact, valid := decodeIndexCacheReader(bytes.NewReader(exactCorrupt), int64(len(exactCorrupt)), "changed-input", indexCacheMemoryEntry{}); !valid || exact || changed.TypedState == nil {
+	if changed, _, exact, valid := decodeIndexCacheReader(bytes.NewReader(exactCorrupt), int64(len(exactCorrupt)), "changed-input"); !valid || exact || changed.TypedState == nil {
 		t.Fatalf("exact corruption invalidated independent typed state: valid=%t exact=%t", valid, exact)
 	}
 
 	typedCorrupt := append([]byte(nil), encoded...)
 	typedCorrupt[layout.typedOffset] ^= 1
-	if exactRecord, _, exact, valid := decodeIndexCacheReader(bytes.NewReader(typedCorrupt), int64(len(typedCorrupt)), record.InputHash, indexCacheMemoryEntry{}); !valid || !exact || exactRecord.InputHash != record.InputHash {
+	if exactRecord, _, exact, valid := decodeIndexCacheReader(bytes.NewReader(typedCorrupt), int64(len(typedCorrupt)), record.InputHash); !valid || !exact || exactRecord.InputHash != record.InputHash {
 		t.Fatalf("typed corruption invalidated independent exact state: valid=%t exact=%t", valid, exact)
 	}
-	if _, _, _, valid := decodeIndexCacheReader(bytes.NewReader(typedCorrupt), int64(len(typedCorrupt)), "changed-input", indexCacheMemoryEntry{}); valid {
+	if _, _, _, valid := decodeIndexCacheReader(bytes.NewReader(typedCorrupt), int64(len(typedCorrupt)), "changed-input"); valid {
 		t.Fatal("changed-input read accepted corrupt typed content")
 	}
 }
 
 // TestReadDecodedIndexCacheRecordDefersTypedState verifies exact hits retain raw incremental state until a later source miss needs it.
 func TestReadDecodedIndexCacheRecordDefersTypedState(t *testing.T) {
-	resetDecodedIndexCacheForTest(t)
 	record, _ := writeIndexCacheRecordFixture(t)
 	wantTypedState := typedSchemaIncrementalCodecFixture()
 	record.TypedState = wantTypedState
@@ -1017,7 +1106,6 @@ func TestReadDecodedIndexCacheRecordDefersTypedState(t *testing.T) {
 
 // TestReadDecodedIndexCacheRecordDefersTypedCorruption verifies malformed incremental state is isolated from exact artifacts and rejected when needed.
 func TestReadDecodedIndexCacheRecordDefersTypedCorruption(t *testing.T) {
-	resetDecodedIndexCacheForTest(t)
 	record, _ := writeIndexCacheRecordFixture(t)
 	exactPayload, err := json.Marshal(record)
 	if err != nil {
@@ -1212,20 +1300,6 @@ func indexCachePathForTest(options IndexOptions) string {
 	return options.OutPath + ".cache"
 }
 
-// resetDecodedIndexCacheForTest isolates process-memory cache behavior for one persistence test.
-func resetDecodedIndexCacheForTest(t *testing.T) {
-	t.Helper()
-	decodedIndexCaches.Lock()
-	previous := decodedIndexCaches.entries
-	decodedIndexCaches.entries = nil
-	decodedIndexCaches.Unlock()
-	t.Cleanup(func() {
-		decodedIndexCaches.Lock()
-		decodedIndexCaches.entries = previous
-		decodedIndexCaches.Unlock()
-	})
-}
-
 // appendIndexCacheTestFile preserves existing fixture bytes while making one explicit content change.
 func appendIndexCacheTestFile(t *testing.T, path string, suffix string) {
 	t.Helper()
@@ -1266,6 +1340,71 @@ func writeIndexCacheRecordFixture(t *testing.T) (indexCacheRecord, Manifest) {
 		t.Fatal("restore cache record fixture")
 	}
 	return record, restored
+}
+
+// writeIndexCacheSemanticRestoreFixture creates one manifest with every runtime-only shape needed by semantic corruption tests.
+func writeIndexCacheSemanticRestoreFixture(t *testing.T) indexCacheRecord {
+	t.Helper()
+	manifest := Manifest{
+		Version: ManifestVersion,
+		Operations: []Operation{{
+			ID:         "semantic-cache",
+			Method:     "post",
+			Path:       "/semantic-cache",
+			Metadata:   &OperationMetadata{Tags: []string{"cache"}},
+			Middleware: []string{"auth.Require"},
+			Inputs: InputShape{
+				PathParams:  []Parameter{{Name: "id", In: "path"}},
+				QueryParams: []Parameter{{Name: "query", In: "query"}},
+				Headers:     []Parameter{{Name: "X-Cache", In: "header"}},
+				Cookies:     []Parameter{{Name: "session", In: "cookie"}},
+				Body:        &BodyShape{Schema: map[string]any{"minimum": int64(1)}},
+			},
+			Outputs: OutputShape{Responses: []ResponseShape{{StatusCode: 200, Schema: map[string]any{"value": uint8(2)}}}},
+			middlewareProvenance: []middlewareProvenance{{
+				Expression: "auth.Require",
+				File:       "app/routes.go",
+				Function:   "ProvideRoutes",
+			}},
+		}},
+		Schemas:     []Schema{{Name: "Payload", Definition: map[string]any{"value": int16(3)}}},
+		Diagnostics: []Diagnostic{},
+	}
+	manifestArtifacts, err := encodeJSONArtifacts([]jsonArtifact{{path: "manifest", value: manifest}})
+	if err != nil {
+		t.Fatalf("encode semantic cache manifest: %v", err)
+	}
+	manifestShape, ok := captureIndexCacheManifestShape(manifest)
+	if !ok {
+		t.Fatal("capture semantic cache manifest shape")
+	}
+	record := indexCacheRecord{
+		Version:      indexCacheFormatVersion,
+		InputHash:    "semantic-input",
+		ManifestData: manifestArtifacts[0].data,
+		Manifest:     manifestShape,
+	}
+	if _, ok := restoreIndexCacheManifest(record); !ok {
+		t.Fatal("semantic cache baseline did not restore")
+	}
+	return record
+}
+
+// rewriteIndexCacheManifestData preserves canonical manifest bytes while changing one public semantic field.
+func rewriteIndexCacheManifestData(t *testing.T, record *indexCacheRecord, mutate func(*Manifest)) {
+	t.Helper()
+	decoder := json.NewDecoder(bytes.NewReader(record.ManifestData))
+	decoder.UseNumber()
+	var manifest Manifest
+	if err := decoder.Decode(&manifest); err != nil {
+		t.Fatalf("decode semantic cache manifest: %v", err)
+	}
+	mutate(&manifest)
+	encoded, err := encodeJSONArtifacts([]jsonArtifact{{path: "manifest", value: manifest}})
+	if err != nil {
+		t.Fatalf("re-encode semantic cache manifest: %v", err)
+	}
+	record.ManifestData = encoded[0].data
 }
 
 // frameIndexCacheTestPayload creates valid framing around an intentionally controlled payload.

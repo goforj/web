@@ -12,6 +12,76 @@ import (
 	"time"
 )
 
+// jsonCandidateFileStub records the staging lifecycle and injects one deterministic filesystem failure.
+type jsonCandidateFileStub struct {
+	failAt string
+	err    error
+	calls  []string
+}
+
+// Chmod preserves evidence that permission preparation precedes every byte write.
+func (file *jsonCandidateFileStub) Chmod(os.FileMode) error {
+	file.calls = append(file.calls, "chmod")
+	if file.failAt == "chmod" {
+		return file.err
+	}
+	return nil
+}
+
+// Write keeps content failures distinct from the later durability boundary.
+func (file *jsonCandidateFileStub) Write(data []byte) (int, error) {
+	file.calls = append(file.calls, "write")
+	if file.failAt == "write" {
+		return 0, file.err
+	}
+	return len(data), nil
+}
+
+// Sync makes a persistence failure independently observable to the test.
+func (file *jsonCandidateFileStub) Sync() error {
+	file.calls = append(file.calls, "sync")
+	if file.failAt == "sync" {
+		return file.err
+	}
+	return nil
+}
+
+// Close proves cleanup is attempted even when an earlier staging phase fails.
+func (file *jsonCandidateFileStub) Close() error {
+	file.calls = append(file.calls, "close")
+	if file.failAt == "close" {
+		return file.err
+	}
+	return nil
+}
+
+// TestWriteJSONCandidateReportsEveryDurabilityPhase verifies each staging failure is returned after the required candidate-close attempt.
+func TestWriteJSONCandidateReportsEveryDurabilityPhase(t *testing.T) {
+	failure := errors.New("injected candidate failure")
+	tests := []struct {
+		name      string
+		failAt    string
+		wantCalls string
+	}{
+		{name: "permissions", failAt: "chmod", wantCalls: "chmod,close"},
+		{name: "write", failAt: "write", wantCalls: "chmod,write,close"},
+		{name: "sync", failAt: "sync", wantCalls: "chmod,write,sync,close"},
+		{name: "close", failAt: "close", wantCalls: "chmod,write,sync,close"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			file := &jsonCandidateFileStub{failAt: test.failAt, err: failure}
+			err := writeJSONCandidate(file, "api_index.json", []byte("complete\n"))
+			if !errors.Is(err, failure) {
+				t.Fatalf("candidate %s failure = %v, want injected error", test.failAt, err)
+			}
+			if calls := strings.Join(file.calls, ","); calls != test.wantCalls {
+				t.Fatalf("candidate %s calls = %q, want %q", test.failAt, calls, test.wantCalls)
+			}
+		})
+	}
+}
+
 // TestPublishJSONArtifactsValidatesBeforeWriting protects the last coherent
 // artifact set when a later value cannot be serialized.
 func TestPublishJSONArtifactsValidatesBeforeWriting(t *testing.T) {
@@ -177,12 +247,10 @@ func TestPublishJSONArtifactsScavengesOnlyRecognizedRegularCandidates(t *testing
 	if err != nil || changed {
 		t.Fatalf("publish unchanged artifact during cleanup: changed=%t err=%v", changed, err)
 	}
-	for _, candidate := range []string{currentCandidate, legacyCandidate} {
-		if _, statErr := os.Lstat(candidate); !errors.Is(statErr, os.ErrNotExist) {
-			t.Fatalf("recognized orphan remains at %q: %v", candidate, statErr)
-		}
+	if _, statErr := os.Lstat(currentCandidate); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("marked orphan remains at %q: %v", currentCandidate, statErr)
 	}
-	for _, preserved := range []string{unrelated, directory, symlink} {
+	for _, preserved := range []string{legacyCandidate, unrelated, directory, symlink} {
 		if _, statErr := os.Lstat(preserved); statErr != nil {
 			t.Fatalf("non-candidate entry %q was removed: %v", preserved, statErr)
 		}
@@ -279,6 +347,69 @@ func TestPublishEncodedJSONArtifactsRollsBackRenameFailure(t *testing.T) {
 	}
 }
 
+// TestPublishEncodedJSONArtifactsRollsBackNewOutputs verifies a failed transaction removes outputs that did not exist before publication.
+func TestPublishEncodedJSONArtifactsRollsBackNewOutputs(t *testing.T) {
+	root := t.TempDir()
+	first := filepath.Join(root, "api_index.json")
+	second := filepath.Join(root, "openapi.json")
+	renameFailure := errors.New("injected rename failure")
+	renames := 0
+	changed, err := publishEncodedJSONArtifacts([]encodedJSONArtifact{
+		{path: first, data: []byte("new manifest\n")},
+		{path: second, data: []byte("new openapi\n")},
+	}, func(source string, destination string) error {
+		renames++
+		if renames == 2 {
+			return renameFailure
+		}
+		return os.Rename(source, destination)
+	})
+	if !errors.Is(err, renameFailure) || changed {
+		t.Fatalf("failed new-output transaction = changed:%t err:%v", changed, err)
+	}
+	for _, path := range []string{first, second} {
+		if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("new output %q survived rollback: %v", path, statErr)
+		}
+	}
+	assertNoArtifactCandidates(t, root)
+}
+
+// TestPublishEncodedJSONArtifactsReportsRollbackFailure verifies cleanup failures remain visible alongside the triggering publication error.
+func TestPublishEncodedJSONArtifactsReportsRollbackFailure(t *testing.T) {
+	root := t.TempDir()
+	first := filepath.Join(root, "api_index.json")
+	second := filepath.Join(root, "openapi.json")
+	renameFailure := errors.New("injected rename failure")
+	renames := 0
+	changed, err := publishEncodedJSONArtifacts([]encodedJSONArtifact{
+		{path: first, data: []byte("new manifest\n")},
+		{path: second, data: []byte("new openapi\n")},
+	}, func(source string, destination string) error {
+		renames++
+		if renames == 1 {
+			return os.Rename(source, destination)
+		}
+		if err := os.Remove(first); err != nil {
+			t.Fatalf("remove first output before injected rollback failure: %v", err)
+		}
+		if err := os.Mkdir(first, 0o755); err != nil {
+			t.Fatalf("replace first output with directory: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(first, "blocker"), []byte("retain directory"), 0o644); err != nil {
+			t.Fatalf("make rollback target non-empty: %v", err)
+		}
+		return renameFailure
+	})
+	if changed {
+		t.Fatal("failed rollback reported a completed publication")
+	}
+	if !errors.Is(err, renameFailure) || !strings.Contains(err.Error(), "rollback failed") {
+		t.Fatalf("combined publication failure = %v", err)
+	}
+	assertNoArtifactCandidates(t, root)
+}
+
 // TestPublishJSONArtifactsRejectsDuplicateCanonicalPaths verifies artifact roles cannot silently overwrite one another through relative path aliases.
 func TestPublishJSONArtifactsRejectsDuplicateCanonicalPaths(t *testing.T) {
 	root := t.TempDir()
@@ -358,19 +489,12 @@ func TestPublishJSONArtifactsRejectsDuplicatePhysicalPaths(t *testing.T) {
 // TestPublishJSONArtifactsLockWaitHonorsCancellation verifies a canceled build does not wait indefinitely behind another publisher.
 func TestPublishJSONArtifactsLockWaitHonorsCancellation(t *testing.T) {
 	root := t.TempDir()
-	lockPath := filepath.Join(root, artifactLockFilename)
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	lock, err := AcquireArtifactPublicationLock(context.Background(), filepath.Join(root, "held.json"))
 	if err != nil {
-		t.Fatalf("open lock fixture: %v", err)
-	}
-	locked, err := tryLockArtifactFile(lockFile)
-	if err != nil || !locked {
-		_ = lockFile.Close()
-		t.Fatalf("acquire lock fixture: locked=%t err=%v", locked, err)
+		t.Fatalf("acquire lock fixture: %v", err)
 	}
 	defer func() {
-		_ = unlockArtifactFile(lockFile)
-		_ = lockFile.Close()
+		_ = lock.Release()
 	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)

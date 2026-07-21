@@ -109,6 +109,7 @@ func Run(ctx context.Context, opts IndexOptions) (Manifest, error) {
 
 // RunCached indexes API metadata while reusing a content-validated analysis cache at cachePath.
 // Relative cache paths resolve from opts.Root. An empty path behaves like Run.
+// When the active build cannot be fingerprinted safely, RunCached falls back to a full run without persisting state.
 // @group Indexing
 func RunCached(ctx context.Context, opts IndexOptions, cachePath string) (Manifest, error) {
 	return run(ctx, opts, cachePath, nil)

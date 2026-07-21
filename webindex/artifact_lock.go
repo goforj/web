@@ -27,8 +27,14 @@ type ArtifactPublicationLock struct {
 // artifactDirectoryLock pairs the advisory file lock with the same-process guard advisory APIs cannot provide.
 type artifactDirectoryLock struct {
 	file         *os.File
+	fileLock     artifactFileLock
 	path         string
 	processLocal artifactProcessLock
+}
+
+// artifactFileLock carries platform-specific ownership that must remain live until directory publication finishes.
+type artifactFileLock struct {
+	guard *os.File
 }
 
 // artifactProcessLockEntry remains shared while waiters or holders still reference one canonical lock path.
@@ -110,10 +116,12 @@ func acquireArtifactDirectoryLocks(ctx context.Context, encoded []encodedJSONArt
 		if err := ctx.Err(); err != nil {
 			return nil, joinArtifactLockErrors(err, abandonArtifactDirectoryLock(pending, false), releaseArtifactDirectoryLocks(locks))
 		}
-		if err := acquireArtifactFileLock(ctx, file); err != nil {
+		fileLock, err := acquireArtifactFileLock(ctx, file)
+		if err != nil {
 			cause := fmt.Errorf("acquire artifact lock %q: %w", lockPath, err)
 			return nil, joinArtifactLockErrors(cause, abandonArtifactDirectoryLock(pending, false), releaseArtifactDirectoryLocks(locks))
 		}
+		pending.fileLock = fileLock
 		if err := ctx.Err(); err != nil {
 			return nil, joinArtifactLockErrors(err, abandonArtifactDirectoryLock(pending, true), releaseArtifactDirectoryLocks(locks))
 		}
@@ -127,7 +135,7 @@ func abandonArtifactDirectoryLock(lock artifactDirectoryLock, fileLocked bool) e
 	var releaseErrors []error
 	if lock.file != nil {
 		if fileLocked {
-			if err := unlockArtifactFile(lock.file); err != nil {
+			if err := unlockArtifactFile(lock.file, lock.fileLock); err != nil {
 				releaseErrors = append(releaseErrors, fmt.Errorf("unlock artifact lock %q: %w", lock.path, err))
 			}
 		}
@@ -253,17 +261,17 @@ func artifactDirectories(encoded []encodedJSONArtifact) ([]string, error) {
 }
 
 // acquireArtifactFileLock retries nonblocking OS locks so a canceled build does not wait behind another publisher indefinitely.
-func acquireArtifactFileLock(ctx context.Context, file *os.File) error {
+func acquireArtifactFileLock(ctx context.Context, file *os.File) (artifactFileLock, error) {
 	for {
 		if err := ctx.Err(); err != nil {
-			return err
+			return artifactFileLock{}, err
 		}
-		acquired, err := tryLockArtifactFile(file)
+		fileLock, acquired, err := tryLockArtifactFile(file)
 		if err != nil {
-			return err
+			return artifactFileLock{}, err
 		}
 		if acquired {
-			return nil
+			return fileLock, nil
 		}
 		timer := time.NewTimer(10 * time.Millisecond)
 		select {
@@ -271,7 +279,7 @@ func acquireArtifactFileLock(ctx context.Context, file *os.File) error {
 			if !timer.Stop() {
 				<-timer.C
 			}
-			return ctx.Err()
+			return artifactFileLock{}, ctx.Err()
 		case <-timer.C:
 		}
 	}
@@ -282,7 +290,7 @@ func releaseArtifactDirectoryLocks(locks []artifactDirectoryLock) error {
 	var releaseErrors []error
 	for index := len(locks) - 1; index >= 0; index-- {
 		lock := locks[index]
-		if err := unlockArtifactFile(lock.file); err != nil {
+		if err := unlockArtifactFile(lock.file, lock.fileLock); err != nil {
 			releaseErrors = append(releaseErrors, fmt.Errorf("unlock artifact lock %q: %w", lock.path, err))
 		}
 		if err := lock.file.Close(); err != nil {

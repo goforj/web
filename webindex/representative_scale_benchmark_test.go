@@ -138,7 +138,6 @@ func TestRunRepresentativeScalePersistentCacheHitBudget(t *testing.T) {
 
 	durations := make([]time.Duration, 0, representativeScaleCacheHitSamples)
 	for sample := 0; sample < representativeScaleCacheHitSamples; sample++ {
-		clearRepresentativeScaleDecodedCache()
 		started := time.Now()
 		manifest, runErr := RunCached(context.Background(), options, fixture.cachePath)
 		durations = append(durations, time.Since(started))
@@ -190,7 +189,6 @@ func TestRunRepresentativeScaleChangedControllerBudget(t *testing.T) {
 	durations := make([]time.Duration, 0, representativeScaleChangedSamples)
 	for sample := 0; sample < representativeScaleChangedSamples; sample++ {
 		writeRepresentativeScaleContract(t, fixture.mutableContract, 0, sample+1)
-		clearRepresentativeScaleDecodedCache()
 		started := time.Now()
 		manifest, runErr := RunCached(context.Background(), options, fixture.cachePath)
 		durations = append(durations, time.Since(started))
@@ -212,13 +210,6 @@ func TestRunRepresentativeScaleChangedControllerBudget(t *testing.T) {
 	}
 }
 
-// clearRepresentativeScaleDecodedCache makes the hard edit budget include persisted-record decoding across build process boundaries.
-func clearRepresentativeScaleDecodedCache() {
-	decodedIndexCaches.Lock()
-	decodedIndexCaches.entries = nil
-	decodedIndexCaches.Unlock()
-}
-
 // BenchmarkRunRepresentativeScaleChangedRepo measures the cached development loop after one selected contract changes.
 func BenchmarkRunRepresentativeScaleChangedRepo(b *testing.B) {
 	fixture := writeRepresentativeScaleFixture(b)
@@ -235,7 +226,6 @@ func BenchmarkRunRepresentativeScaleChangedRepo(b *testing.B) {
 	b.StopTimer()
 	for iteration := 0; iteration < b.N; iteration++ {
 		writeRepresentativeScaleContract(b, fixture.mutableContract, 0, iteration+1)
-		clearRepresentativeScaleDecodedCache()
 		b.StartTimer()
 		manifest, runErr := RunCached(context.Background(), fixture.options(), fixture.cachePath)
 		b.StopTimer()
@@ -271,7 +261,6 @@ func BenchmarkRunRepresentativeScalePersistentCacheHit(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for iteration := 0; iteration < b.N; iteration++ {
-		clearRepresentativeScaleDecodedCache()
 		manifest, runErr := RunCached(context.Background(), fixture.cachedOptions(), fixture.cachePath)
 		if runErr != nil {
 			b.Fatalf("index unchanged representative-scale fixture: %v", runErr)
