@@ -29,7 +29,7 @@ type typedJSONField struct {
 }
 
 // indexReachableComponents reserves final names from selected wire contracts before recursive schema construction creates references.
-func (r *typedSchemaRegistry) indexReachableComponents(loaded []*packages.Package, selected []typedSourceRange) {
+func (r *typedSchemaRegistry) indexReachableComponents(loaded []*packages.Package, selected typedSourceSelection) {
 	candidates := map[string]*types.Named{}
 	visited := map[string]struct{}{}
 	var visit func(types.Type, typedSourceRange)
@@ -87,17 +87,12 @@ func (r *typedSchemaRegistry) indexReachableComponents(loaded []*packages.Packag
 }
 
 // reachableContractExpressions uses exact selected call sites when available and retains package-level discovery for focused registry callers.
-func (r *typedSchemaRegistry) reachableContractExpressions(loaded []*packages.Package, selected []typedSourceRange) []typedExpression {
+func (r *typedSchemaRegistry) reachableContractExpressions(loaded []*packages.Package, selected typedSourceSelection) []typedExpression {
 	if selected != nil {
 		bySource := map[string]typedExpression{}
-		for _, source := range selected {
-			if expression, ok := r.expressions[typedSourceKey(source)]; ok {
-				bySource[typedSourceKey(expression.Source)] = expression
-			}
-			for key, expression := range r.expressions {
-				if expression.Source.File == source.File && expression.Source.StartOffset >= source.StartOffset && expression.Source.EndOffset <= source.EndOffset {
-					bySource[key] = expression
-				}
+		for key, expression := range r.expressions {
+			if selected.contains(expression.Source) {
+				bySource[key] = expression
 			}
 		}
 		keys := make([]string, 0, len(bySource))

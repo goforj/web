@@ -8,6 +8,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -31,6 +32,9 @@ type typedSourceRange struct {
 	EndOffset   int
 	Line        int
 }
+
+// typedSourceSelection indexes route-reachable contract ranges by physical source file.
+type typedSourceSelection map[string][]typedSourceRange
 
 // typedExpression records the checked type and provenance for one source expression.
 type typedExpression struct {
@@ -93,7 +97,7 @@ func loadTypedSchemaRegistry(ctx context.Context, opts typedSchemaLoadOptions) (
 		componentsByID: map[string]*typedSchemaComponent{},
 		diagnosticKeys: map[string]struct{}{},
 	}
-	patterns := typedPackagePatterns(opts.HandlerFiles)
+	patterns := typedPackagePatterns(registry.root, opts.HandlerFiles)
 	if len(patterns) == 0 {
 		return registry, nil
 	}
@@ -127,11 +131,12 @@ func loadTypedSchemaRegistry(ctx context.Context, opts typedSchemaLoadOptions) (
 		return nil, err
 	}
 	loaded = uniqueTypedPackages(loaded)
+	selection := newTypedSourceSelection(opts.ContractExpressions)
 	for _, pkg := range loaded {
 		registry.recordPackageErrors(pkg)
-		registry.indexPackageExpressions(pkg)
+		registry.indexPackageExpressions(pkg, selection)
 	}
-	registry.indexReachableComponents(loaded, opts.ContractExpressions)
+	registry.indexReachableComponents(loaded, selection)
 	registry.sortDiagnostics()
 	return registry, nil
 }
@@ -169,10 +174,15 @@ func handlerFilesNeedTypedSchemas(handlerFiles []string) bool {
 	return false
 }
 
-// typedPackagePatterns returns deterministic file queries because package paths may sit below nested internal directories.
-func typedPackagePatterns(handlerFiles []string) []string {
+// typedPackagePatterns batches handlers from the active module while preserving file-query fallbacks for paths the Go command cannot safely treat as literals.
+func typedPackagePatterns(root string, handlerFiles []string) []string {
 	seen := map[string]struct{}{}
 	patterns := make([]string, 0, len(handlerFiles))
+	rootModule := ""
+	if !strings.EqualFold(strings.TrimSpace(os.Getenv("GO111MODULE")), "off") {
+		rootModule = enclosingGoModule(root)
+	}
+	moduleByDirectory := map[string]string{}
 	for _, file := range handlerFiles {
 		if strings.TrimSpace(file) == "" {
 			continue
@@ -181,7 +191,16 @@ func typedPackagePatterns(handlerFiles []string) []string {
 		if err != nil {
 			continue
 		}
+		directory := filepath.Dir(canonical)
+		moduleRoot, exists := moduleByDirectory[directory]
+		if !exists {
+			moduleRoot = enclosingGoModule(directory)
+			moduleByDirectory[directory] = moduleRoot
+		}
 		pattern := "file=" + canonical
+		if rootModule != "" && moduleRoot == rootModule && !strings.Contains(filepath.ToSlash(directory), "...") {
+			pattern = directory
+		}
 		if _, exists := seen[pattern]; exists {
 			continue
 		}
@@ -190,6 +209,32 @@ func typedPackagePatterns(handlerFiles []string) []string {
 	}
 	sort.Strings(patterns)
 	return patterns
+}
+
+// enclosingGoModule finds the nearest valid module boundary so directory patterns never cross into an ad-hoc or nested module context.
+func enclosingGoModule(path string) string {
+	current, err := filepath.Abs(path)
+	if err != nil {
+		return ""
+	}
+	current = filepath.Clean(current)
+	for {
+		info, statErr := os.Stat(filepath.Join(current, "go.mod"))
+		if statErr == nil {
+			if info.Mode().IsRegular() {
+				return current
+			}
+			return ""
+		}
+		if !os.IsNotExist(statErr) {
+			return ""
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return ""
+		}
+		current = parent
+	}
 }
 
 // uniqueTypedPackages removes duplicate results produced when several handler files belong to the same package.
@@ -215,8 +260,75 @@ func uniqueTypedPackages(packagesList []*packages.Package) []*packages.Package {
 	return out
 }
 
+// newTypedSourceSelection groups ranges and removes redundant nested roots so each syntax node avoids scanning every contract call site.
+func newTypedSourceSelection(selected []typedSourceRange) typedSourceSelection {
+	if selected == nil {
+		return nil
+	}
+	selection := make(typedSourceSelection)
+	for _, source := range selected {
+		if source.File == "" || source.StartOffset < 0 || source.EndOffset <= source.StartOffset {
+			continue
+		}
+		selection[source.File] = append(selection[source.File], source)
+	}
+	for file, ranges := range selection {
+		sort.Slice(ranges, func(i, j int) bool {
+			if ranges[i].StartOffset == ranges[j].StartOffset {
+				return ranges[i].EndOffset > ranges[j].EndOffset
+			}
+			return ranges[i].StartOffset < ranges[j].StartOffset
+		})
+		reduced := ranges[:0]
+		for _, source := range ranges {
+			last := len(reduced) - 1
+			if last >= 0 && source.EndOffset <= reduced[last].EndOffset {
+				continue
+			}
+			reduced = append(reduced, source)
+		}
+		selection[file] = reduced
+	}
+	return selection
+}
+
+// contains reports whether a checked expression is wholly nested in a selected contract root.
+func (s typedSourceSelection) contains(source typedSourceRange) bool {
+	if s == nil {
+		return true
+	}
+	ranges := s[source.File]
+	index := sort.Search(len(ranges), func(index int) bool {
+		return ranges[index].EndOffset >= source.EndOffset
+	})
+	return index < len(ranges) && ranges[index].StartOffset <= source.StartOffset
+}
+
+// typedSourceRangesIntersect reports whether a syntax node may contain any selected expression.
+func typedSourceRangesIntersect(ranges []typedSourceRange, startOffset, endOffset int) bool {
+	index := sort.Search(len(ranges), func(index int) bool {
+		return ranges[index].EndOffset > startOffset
+	})
+	return index < len(ranges) && ranges[index].StartOffset < endOffset
+}
+
+// typedNodeOffsets returns physical offsets without repeatedly canonicalizing the same package filename.
+func typedNodeOffsets(file *token.File, node ast.Node) (int, int, bool) {
+	if file == nil || node == nil || node.Pos() == token.NoPos || node.End() == token.NoPos {
+		return 0, 0, false
+	}
+	startPosition := int(node.Pos())
+	endPosition := int(node.End())
+	fileStart := file.Base()
+	fileEnd := fileStart + file.Size()
+	if startPosition < fileStart || endPosition < startPosition || endPosition > fileEnd {
+		return 0, 0, false
+	}
+	return file.Offset(node.Pos()), file.Offset(node.End()), true
+}
+
 // indexPackageExpressions maps checked expressions by file byte range so the fast parser can use them without sharing a FileSet.
-func (r *typedSchemaRegistry) indexPackageExpressions(pkg *packages.Package) {
+func (r *typedSchemaRegistry) indexPackageExpressions(pkg *packages.Package, selected typedSourceSelection) {
 	if pkg == nil || pkg.Fset == nil || pkg.TypesInfo == nil {
 		return
 	}
@@ -224,7 +336,36 @@ func (r *typedSchemaRegistry) indexPackageExpressions(pkg *packages.Package) {
 		if file == nil {
 			continue
 		}
+		var selectedRanges []typedSourceRange
+		var tokenFile *token.File
+		if selected != nil {
+			fileSource, ok := typedRangeForNode(pkg.Fset, file)
+			if !ok {
+				continue
+			}
+			selectedRanges = selected[fileSource.File]
+			if len(selectedRanges) == 0 {
+				continue
+			}
+			tokenFile = pkg.Fset.File(file.Pos())
+			if tokenFile == nil {
+				continue
+			}
+		}
 		ast.Inspect(file, func(node ast.Node) bool {
+			if selected != nil && node != nil {
+				startOffset, endOffset, ok := typedNodeOffsets(tokenFile, node)
+				if !ok || !typedSourceRangesIntersect(selectedRanges, startOffset, endOffset) {
+					return false
+				}
+				if _, expression := node.(ast.Expr); expression && !selected.contains(typedSourceRange{
+					File:        selectedRanges[0].File,
+					StartOffset: startOffset,
+					EndOffset:   endOffset,
+				}) {
+					return true
+				}
+			}
 			expression, ok := node.(ast.Expr)
 			if !ok {
 				return true
@@ -276,6 +417,9 @@ func typedSourceKey(source typedSourceRange) string {
 
 // canonicalSourceFile normalizes paths so package loading and the fast parser agree on source identity.
 func canonicalSourceFile(path string) (string, error) {
+	if strings.IndexByte(path, 0) >= 0 {
+		return "", fmt.Errorf("source path contains a NUL byte")
+	}
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return "", err

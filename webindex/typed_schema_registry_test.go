@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -506,6 +507,46 @@ func TestTypedSchemaRegistryHonorsCancellation(t *testing.T) {
 	}
 }
 
+// TestTypedSchemaRegistryLoadsMultipleHandlerPackages verifies a single registry load retains checked contracts from every selected package directory.
+func TestTypedSchemaRegistryLoadsMultipleHandlerPackages(t *testing.T) {
+	const packageCount = 6
+	root, handlerFiles := writeMultiPackageTypedSchemaFixture(t, packageCount)
+	registry, err := loadTypedSchemaRegistry(context.Background(), typedSchemaLoadOptions{
+		Root:         root,
+		HandlerFiles: handlerFiles,
+	})
+	if err != nil {
+		t.Fatalf("load multi-package typed schema registry: %v", err)
+	}
+	if diagnostics := registry.diagnosticsSnapshot(); len(diagnostics) != 0 {
+		t.Fatalf("expected fully checked multi-package fixture, got %+v", diagnostics)
+	}
+
+	identities := make([]string, 0, len(handlerFiles))
+	for index, handlerFile := range handlerFiles {
+		fset, bindArgument, responseArgument := parseTypedHandlerExpressions(t, handlerFile, "Handle")
+		request, ok := registry.resolveExpression(fset, bindSchemaExpression(bindArgument))
+		if !ok {
+			t.Fatalf("resolve request expression for handler package %d", index)
+		}
+		response, ok := registry.resolveExpression(fset, responseArgument)
+		if !ok {
+			t.Fatalf("resolve response expression for handler package %d", index)
+		}
+		identity := fmt.Sprintf("example.com/typedmulti/handlers/h%02d.Payload", index)
+		if request.TypeIdentity != identity || response.TypeIdentity != identity {
+			t.Fatalf("handler package %d resolved identities request=%q response=%q, want %q", index, request.TypeIdentity, response.TypeIdentity, identity)
+		}
+		identities = append(identities, identity)
+	}
+	components := componentsByIdentity(registry.componentSnapshot())
+	for _, identity := range identities {
+		if _, exists := components[identity]; !exists {
+			t.Fatalf("missing component %q from %d loaded handler packages", identity, packageCount)
+		}
+	}
+}
+
 // BenchmarkTypedSchemaRegistryFocusedPackage tracks the cost of focused type loading separately from the fast route-discovery benchmark.
 func BenchmarkTypedSchemaRegistryFocusedPackage(b *testing.B) {
 	root, handlerFile := writeTypedSchemaFixture(b)
@@ -518,6 +559,58 @@ func BenchmarkTypedSchemaRegistryFocusedPackage(b *testing.B) {
 			b.Fatalf("load typed schema registry: %v", err)
 		}
 	}
+}
+
+// BenchmarkTypedSchemaRegistryMultiplePackages tracks the package-loader cost for an application with handlers distributed like a service-oriented project.
+func BenchmarkTypedSchemaRegistryMultiplePackages(b *testing.B) {
+	const packageCount = 14
+	root, handlerFiles := writeMultiPackageTypedSchemaFixture(b, packageCount)
+	b.ReportMetric(packageCount, "handler_pkgs")
+	b.ResetTimer()
+	for iteration := 0; iteration < b.N; iteration++ {
+		if _, err := loadTypedSchemaRegistry(context.Background(), typedSchemaLoadOptions{
+			Root:         root,
+			HandlerFiles: handlerFiles,
+		}); err != nil {
+			b.Fatalf("load multi-package typed schema registry: %v", err)
+		}
+	}
+}
+
+// writeMultiPackageTypedSchemaFixture creates independent handler roots so tests exercise the multi-pattern packages.Load path.
+func writeMultiPackageTypedSchemaFixture(t testing.TB, packageCount int) (string, []string) {
+	t.Helper()
+	root := t.TempDir()
+	webRoot := typedFixtureWebRoot(t)
+	files := map[string]string{
+		"go.mod": "module example.com/typedmulti\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+	}
+	handlerFiles := make([]string, 0, packageCount)
+	for index := 0; index < packageCount; index++ {
+		directory := fmt.Sprintf("handlers/h%02d", index)
+		relative := filepath.Join(directory, "handler.go")
+		files[relative] = fmt.Sprintf(`package h%02d
+
+import "github.com/goforj/web"
+
+// Payload is the package-local contract used by this fixture's handler.
+type Payload struct {
+	Value string `+"`json:\"value\" validate:\"required\"`"+`
+}
+
+// Handle binds and emits the package-local contract.
+func Handle(ctx web.Context) error {
+	request := Payload{}
+	if err := ctx.Bind(&request); err != nil {
+		return err
+	}
+	return ctx.JSON(200, request)
+}
+`, index)
+		handlerFiles = append(handlerFiles, filepath.Join(root, relative))
+	}
+	writeTypedFixtureFiles(t, root, files)
+	return root, handlerFiles
 }
 
 // writeTypedSchemaFixture creates a real temporary module with local replaces so go/packages sees the same module boundaries as generated Apps.
