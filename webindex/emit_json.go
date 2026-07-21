@@ -315,27 +315,13 @@ func matchesJSONArtifactTemporaryCandidate(name string, prefixes []string) bool 
 	return false
 }
 
-// isJSONArtifactTemporaryCandidate recognizes current marked candidates and numeric legacy names emitted by os.CreateTemp.
+// isJSONArtifactTemporaryCandidate recognizes only candidates carrying the publisher's provenance marker.
 func isJSONArtifactTemporaryCandidate(name string, prefix string) bool {
 	if !strings.HasPrefix(name, prefix) {
 		return false
 	}
 	random := strings.TrimPrefix(name, prefix)
-	if strings.HasSuffix(random, jsonArtifactTemporaryMarker) {
-		return strings.TrimSuffix(random, jsonArtifactTemporaryMarker) != ""
-	}
-	if random == "" {
-		return false
-	}
-	if len(random) > 10 {
-		return false
-	}
-	for _, character := range random {
-		if character < '0' || character > '9' {
-			return false
-		}
-	}
-	return true
+	return strings.HasSuffix(random, jsonArtifactTemporaryMarker) && strings.TrimSuffix(random, jsonArtifactTemporaryMarker) != ""
 }
 
 // writeJSONCandidate completes and syncs a candidate before it can replace a visible artifact.

@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -185,10 +184,11 @@ type indexCacheSemanticEpochs struct {
 
 // indexCacheBuildModuleIdentity retains stable module metadata without executable paths or build-machine details.
 type indexCacheBuildModuleIdentity struct {
-	Path        string                         `json:"path"`
-	Version     string                         `json:"version,omitempty"`
-	Sum         string                         `json:"sum,omitempty"`
-	Replacement *indexCacheBuildModuleIdentity `json:"replacement,omitempty"`
+	Path              string                         `json:"path"`
+	Version           string                         `json:"version,omitempty"`
+	Sum               string                         `json:"sum,omitempty"`
+	Replacement       *indexCacheBuildModuleIdentity `json:"replacement,omitempty"`
+	ExecutableBuildID string                         `json:"executable_build_id,omitempty"`
 }
 
 // indexCacheOptionIdentity includes every caller choice that can alter returned or published contract bytes.
@@ -461,9 +461,6 @@ func (cache *indexCacheSession) encodedArtifact(manifest Manifest, artifacts []e
 	data, err := encodeIndexCacheRecord(record)
 	if err != nil || len(data) > indexCacheMaximumSize {
 		return encodedJSONArtifact{}, false
-	}
-	if layout, ok := decodeIndexCacheEnvelopeLayout(bytes.NewReader(data), int64(len(data))); ok {
-		rememberDecodedIndexCacheRecord(cache.path, layout, record)
 	}
 	return encodedJSONArtifact{path: cache.path, data: data}, true
 }
@@ -1116,7 +1113,11 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 		analyzer:        indexCacheAnalyzerEpoch,
 		typedDependency: indexCacheTypedDependencyEpoch,
 	}
-	return indexCacheInputHashesForIdentity(ctx, root, options, epochs, indexCacheAnalyzerBuildIdentity())
+	analyzerBuildIdentity, cacheable := indexCacheAnalyzerBuildIdentity()
+	if !cacheable {
+		return indexCacheInputIdentities{}, false, nil
+	}
+	return indexCacheInputHashesForIdentity(ctx, root, options, epochs, analyzerBuildIdentity)
 }
 
 // indexCacheInputHashesForIdentity computes cache identities against explicit executable semantics and module build identity.
@@ -1275,40 +1276,6 @@ func indexCacheInputHashesForIdentity(ctx context.Context, root string, options 
 		inputFiles:    inputFiles,
 		goEnvironment: environmentValues,
 	}, true, nil
-}
-
-// indexCacheAnalyzerBuildIdentity returns the executing Web module version while leaving local source invalidation to the explicit semantic epoch.
-func indexCacheAnalyzerBuildIdentity() string {
-	module := debug.Module{Path: indexCacheAnalyzerModulePath}
-	if buildInfo, ok := debug.ReadBuildInfo(); ok {
-		if buildInfo.Main.Path == indexCacheAnalyzerModulePath {
-			module = buildInfo.Main
-		} else {
-			for _, dependency := range buildInfo.Deps {
-				if dependency.Path == indexCacheAnalyzerModulePath {
-					module = *dependency
-					break
-				}
-			}
-		}
-	}
-	identity := indexCacheBuildModuleIdentity{
-		Path:    module.Path,
-		Version: module.Version,
-		Sum:     module.Sum,
-	}
-	if module.Replace != nil {
-		identity.Replacement = &indexCacheBuildModuleIdentity{
-			Path:    module.Replace.Path,
-			Version: module.Replace.Version,
-			Sum:     module.Replace.Sum,
-		}
-	}
-	encoded, err := json.Marshal(identity)
-	if err != nil {
-		return indexCacheAnalyzerModulePath
-	}
-	return string(encoded)
 }
 
 // indexCacheGoEnvironment records the effective Go command environment instead of assuming process variables include go env -w settings.

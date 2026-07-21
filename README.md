@@ -490,6 +490,7 @@ fmt.Println(err == nil, manifest.Version != "")
 
 RunCached indexes API metadata while reusing a content-validated analysis cache at cachePath.
 Relative cache paths resolve from opts.Root. An empty path behaves like Run.
+When the active build cannot be fingerprinted safely, RunCached falls back to a full run without persisting state.
 
 ### Auth Middleware
 

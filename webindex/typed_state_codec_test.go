@@ -103,7 +103,7 @@ func TestTypedSchemaIncrementalCodecRejectsNilState(t *testing.T) {
 func typedSchemaIncrementalCodecFixture() *typedSchemaIncrementalState {
 	return &typedSchemaIncrementalState{
 		Version:            typedSchemaIncrementalStateVersion,
-		Root:               "/workspace/example",
+		Root:               "testdata/project",
 		DependencyIdentity: "0123456789abcdef",
 		BuildTags:          []string{"integration", "sqlite"},
 		GOARCH:             "amd64",
@@ -124,14 +124,14 @@ func typedSchemaIncrementalCodecFixture() *typedSchemaIncrementalState {
 					{Path: "net/http", Target: "net/http"},
 				},
 				Source: typedSchemaIncrementalSourceState{
-					Directory: "/workspace/example/handler",
+					Directory: "testdata/project/handler",
 					Files: []typedSchemaIncrementalFileState{
-						{Path: "/workspace/example/handler/first.go", ContentHash: "content-a", HeaderHash: "header-a"},
-						{Path: "/workspace/example/handler/second.go", ContentHash: "content-b", HeaderHash: "header-b"},
+						{Path: "testdata/project/handler/first.go", ContentHash: "content-a", HeaderHash: "header-a"},
+						{Path: "testdata/project/handler/second.go", ContentHash: "content-b", HeaderHash: "header-b"},
 					},
 					DirectoryFiles: []typedSchemaIncrementalHeaderState{
-						{Path: "/workspace/example/handler/first.go", HeaderHash: "header-a"},
-						{Path: "/workspace/example/handler/second_test.go", HeaderHash: "header-test"},
+						{Path: "testdata/project/handler/first.go", HeaderHash: "header-a"},
+						{Path: "testdata/project/handler/second_test.go", HeaderHash: "header-test"},
 					},
 				},
 				Artifact:           []byte{3, 4, 5, 0, 255},
@@ -140,11 +140,11 @@ func typedSchemaIncrementalCodecFixture() *typedSchemaIncrementalState {
 				Expressions: []typedSchemaIncrementalExpressionState{
 					{
 						Name:   "E000000",
-						Source: typedSourceRange{File: "/workspace/example/handler/first.go", StartOffset: 120, EndOffset: 145, Line: 9},
+						Source: typedSourceRange{File: "testdata/project/handler/first.go", StartOffset: 120, EndOffset: 145, Line: 9},
 					},
 					{
 						Name:     "E000001",
-						Source:   typedSourceRange{File: "/workspace/example/handler/first.go", StartOffset: -1, EndOffset: 201, Line: 14},
+						Source:   typedSourceRange{File: "testdata/project/handler/first.go", StartOffset: -1, EndOffset: 201, Line: 14},
 						Constant: &typedSchemaIncrementalConstantState{Kind: "String", Value: "ready"},
 					},
 				},
@@ -192,7 +192,7 @@ func typedSchemaIncrementalCodecFlagsOffset(t *testing.T, payload []byte) int {
 func typedSchemaIncrementalCodecPrefix() []byte {
 	payload := append([]byte(nil), []byte(typedSchemaIncrementalCodecMagic)...)
 	payload = binary.AppendVarint(payload, typedSchemaIncrementalStateVersion)
-	payload = typedSchemaIncrementalCodecAppendString(payload, "/workspace/example")
+	payload = typedSchemaIncrementalCodecAppendString(payload, "testdata/project")
 	payload = typedSchemaIncrementalCodecAppendString(payload, "dependency")
 	payload = binary.AppendUvarint(payload, 0)
 	payload = typedSchemaIncrementalCodecAppendString(payload, "amd64")

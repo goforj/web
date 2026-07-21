@@ -177,12 +177,10 @@ func TestPublishJSONArtifactsScavengesOnlyRecognizedRegularCandidates(t *testing
 	if err != nil || changed {
 		t.Fatalf("publish unchanged artifact during cleanup: changed=%t err=%v", changed, err)
 	}
-	for _, candidate := range []string{currentCandidate, legacyCandidate} {
-		if _, statErr := os.Lstat(candidate); !errors.Is(statErr, os.ErrNotExist) {
-			t.Fatalf("recognized orphan remains at %q: %v", candidate, statErr)
-		}
+	if _, statErr := os.Lstat(currentCandidate); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("marked orphan remains at %q: %v", currentCandidate, statErr)
 	}
-	for _, preserved := range []string{unrelated, directory, symlink} {
+	for _, preserved := range []string{legacyCandidate, unrelated, directory, symlink} {
 		if _, statErr := os.Lstat(preserved); statErr != nil {
 			t.Fatalf("non-candidate entry %q was removed: %v", preserved, statErr)
 		}
@@ -358,19 +356,12 @@ func TestPublishJSONArtifactsRejectsDuplicatePhysicalPaths(t *testing.T) {
 // TestPublishJSONArtifactsLockWaitHonorsCancellation verifies a canceled build does not wait indefinitely behind another publisher.
 func TestPublishJSONArtifactsLockWaitHonorsCancellation(t *testing.T) {
 	root := t.TempDir()
-	lockPath := filepath.Join(root, artifactLockFilename)
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	lock, err := AcquireArtifactPublicationLock(context.Background(), filepath.Join(root, "held.json"))
 	if err != nil {
-		t.Fatalf("open lock fixture: %v", err)
-	}
-	locked, err := tryLockArtifactFile(lockFile)
-	if err != nil || !locked {
-		_ = lockFile.Close()
-		t.Fatalf("acquire lock fixture: locked=%t err=%v", locked, err)
+		t.Fatalf("acquire lock fixture: %v", err)
 	}
 	defer func() {
-		_ = unlockArtifactFile(lockFile)
-		_ = lockFile.Close()
+		_ = lock.Release()
 	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)

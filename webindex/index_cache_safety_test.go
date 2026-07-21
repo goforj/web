@@ -316,7 +316,8 @@ func (c *Controller) Handle(ctx web.Context) error {
 	if err != nil || !cacheable {
 		t.Fatalf("fingerprint pinned environment: cacheable=%t err=%v", cacheable, err)
 	}
-	record, ok := readDecodedIndexCacheRecord(cachePath, inputHash)
+	// Incremental state is intentionally decoded only after an exact source miss.
+	record, ok := readDecodedIndexCacheRecord(cachePath, inputHash+"-source-edit")
 	if !ok || record.TypedState == nil {
 		t.Fatal("pinned environment run did not persist incremental type state")
 	}
