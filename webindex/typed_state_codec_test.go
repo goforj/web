@@ -3,7 +3,9 @@ package webindex
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -96,6 +98,126 @@ func TestTypedSchemaIncrementalCodecRejectsOversizedLengths(t *testing.T) {
 func TestTypedSchemaIncrementalCodecRejectsNilState(t *testing.T) {
 	if _, err := encodeTypedSchemaIncrementalState(nil); err == nil {
 		t.Fatal("nil typed state encoded without an error")
+	}
+}
+
+// TestTypedSchemaIncrementalEncoderRejectsResourceLimits verifies the writer cannot create payloads the cache or decoder must reject.
+func TestTypedSchemaIncrementalEncoderRejectsResourceLimits(t *testing.T) {
+	limitTests := []struct {
+		name  string
+		apply func(*typedSchemaIncrementalEncoder)
+	}{
+		{name: "raw bytes", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.raw([]byte{1}) }},
+		{name: "raw string", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.rawString("x") }},
+		{name: "octet", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.octet(1) }},
+		{name: "unsigned varint", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.unsigned(1) }},
+		{name: "signed varint", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.integer(1) }},
+	}
+	for _, test := range limitTests {
+		t.Run("payload limit "+test.name, func(t *testing.T) {
+			encoder := typedSchemaIncrementalEncoder{size: indexCacheMaximumSize}
+			test.apply(&encoder)
+			if encoder.err == nil || encoder.size != indexCacheMaximumSize {
+				t.Fatalf("encoder after overflow = size %d, err %v", encoder.size, encoder.err)
+			}
+		})
+	}
+
+	for _, length := range []int{-1, typedSchemaIncrementalCodecMaximumCollectionLength + 1} {
+		t.Run("collection length", func(t *testing.T) {
+			encoder := typedSchemaIncrementalEncoder{}
+			encoder.count(length, typedSchemaIncrementalCodecMaximumCollectionLength)
+			if encoder.err == nil {
+				t.Fatalf("encoder accepted collection length %d", length)
+			}
+		})
+	}
+
+	oversizedString := strings.Repeat("x", typedSchemaIncrementalCodecMaximumStringLength+1)
+	encoder := typedSchemaIncrementalEncoder{}
+	encoder.stringValue(oversizedString)
+	if encoder.err == nil {
+		t.Fatal("encoder accepted oversized string")
+	}
+	state := typedSchemaIncrementalCodecFixture()
+	state.Root = oversizedString
+	if _, err := encodeTypedSchemaIncrementalState(state); err == nil {
+		t.Fatal("state encoder accepted oversized root")
+	}
+
+	encoder = typedSchemaIncrementalEncoder{}
+	encoder.bytesValue(make([]byte, typedSchemaIncrementalArtifactLimit+1))
+	if encoder.err == nil {
+		t.Fatal("encoder accepted oversized artifact")
+	}
+}
+
+// TestTypedSchemaIncrementalEncoderPreservesFirstError verifies nested writes stop immediately after a resource violation.
+func TestTypedSchemaIncrementalEncoderPreservesFirstError(t *testing.T) {
+	sentinel := errors.New("first encoder error")
+	tests := []struct {
+		name  string
+		apply func(*typedSchemaIncrementalEncoder)
+	}{
+		{name: "raw bytes", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.raw([]byte("changed")) }},
+		{name: "raw string", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.rawString("changed") }},
+		{name: "octet", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.octet(1) }},
+		{name: "unsigned varint", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.unsigned(1) }},
+		{name: "signed varint", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.integer(1) }},
+		{name: "count", apply: func(encoder *typedSchemaIncrementalEncoder) { encoder.count(1, 1) }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			encoder := typedSchemaIncrementalEncoder{data: []byte("before"), size: len("before"), err: sentinel}
+			test.apply(&encoder)
+			if !errors.Is(encoder.err, sentinel) || encoder.size != len("before") || string(encoder.data) != "before" {
+				t.Fatalf("encoder mutated after first error: data=%q size=%d err=%v", encoder.data, encoder.size, encoder.err)
+			}
+		})
+	}
+}
+
+// TestTypedSchemaIncrementalDecoderRejectsAllocationAmplification verifies encoded counts and strings share one bounded allocation budget.
+func TestTypedSchemaIncrementalDecoderRejectsAllocationAmplification(t *testing.T) {
+	decoder := typedSchemaIncrementalDecoder{}
+	if decoder.reserve(-1, 1) || decoder.reserve(1, -1) {
+		t.Fatal("decoder accepted a negative allocation dimension")
+	}
+	decoder.reservedAllocation = typedSchemaIncrementalCodecMaximumAllocation
+	if decoder.reserve(1, 1) {
+		t.Fatal("decoder exceeded its aggregate allocation budget")
+	}
+
+	decoder = typedSchemaIncrementalDecoder{
+		data:               binary.AppendUvarint(nil, 1),
+		reservedAllocation: typedSchemaIncrementalCodecMaximumAllocation,
+	}
+	if _, ok := decoder.count(1, 0, 1); ok {
+		t.Fatal("decoder allocated a collection beyond its aggregate budget")
+	}
+
+	decoder = typedSchemaIncrementalDecoder{
+		data:               []byte{1, 'x'},
+		reservedAllocation: typedSchemaIncrementalCodecMaximumAllocation,
+	}
+	if _, ok := decoder.stringValue(); ok {
+		t.Fatal("decoder copied a string beyond its aggregate budget")
+	}
+}
+
+// TestTypedSchemaIncrementalDecoderRejectsMalformedUnsignedValues verifies nested lengths use canonical bounded varints too.
+func TestTypedSchemaIncrementalDecoderRejectsMalformedUnsignedValues(t *testing.T) {
+	for name, payload := range map[string][]byte{
+		"truncated":     {0x80},
+		"overflowing":   {0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02},
+		"non-canonical": {0x81, 0x00},
+	} {
+		t.Run(name, func(t *testing.T) {
+			decoder := typedSchemaIncrementalDecoder{data: payload}
+			if _, ok := decoder.unsigned(); ok || decoder.offset != 0 {
+				t.Fatalf("decoder accepted malformed unsigned value or advanced: ok=%t offset=%d", ok, decoder.offset)
+			}
+		})
 	}
 }
 

@@ -699,3 +699,73 @@ func TestIndexCacheGoFlagsCoveredRejectsFileBackedInputs(t *testing.T) {
 		t.Fatal("content-independent GOFLAGS unexpectedly disabled caching")
 	}
 }
+
+// TestIndexCachePublicationContextGuards verifies optional cache state, nil contexts, and cancellation stop publication at deterministic boundaries.
+func TestIndexCachePublicationContextGuards(t *testing.T) {
+	var noCache *indexCacheSession
+	if err := noCache.validatePublication(nil); err != nil {
+		t.Fatalf("validate without cache: %v", err)
+	}
+
+	root := t.TempDir()
+	writeTypedFixtureFiles(t, root, map[string]string{
+		"go.mod":  "module example.com/publication-context\n\ngo 1.25.0\n",
+		"main.go": "package publicationcontext\nconst Version = 1\n",
+	})
+	options := IndexOptions{Root: root}
+	inputHash, cacheable, err := indexCacheInputHash(context.Background(), root, options)
+	if err != nil || !cacheable {
+		t.Fatalf("fingerprint publication-context fixture: cacheable=%t err=%v", cacheable, err)
+	}
+	cache := &indexCacheSession{root: root, inputHash: inputHash, options: options}
+	if err := cache.validatePublication(nil); err != nil {
+		t.Fatalf("validate current inputs with nil context: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := cache.validatePublication(ctx); !errors.Is(err, context.Canceled) {
+		t.Fatalf("validate canceled cache: %v", err)
+	}
+
+	path := filepath.Join(t.TempDir(), "api.json")
+	validateCalled := false
+	changed, err := publishIndexCacheArtifactsValidated(ctx, []encodedJSONArtifact{{path: path, data: []byte("{}\n")}}, os.Rename, func(context.Context) error {
+		validateCalled = true
+		return nil
+	})
+	if !errors.Is(err, context.Canceled) || changed {
+		t.Fatalf("publish with canceled context: changed=%t err=%v", changed, err)
+	}
+	if validateCalled {
+		t.Fatal("canceled publication reached final validation")
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("canceled publication created an artifact: %v", err)
+	}
+
+	duplicate := []encodedJSONArtifact{{path: path, data: []byte("one")}, {path: path, data: []byte("two")}}
+	if changed, err := publishIndexCacheArtifactsValidated(context.Background(), duplicate, os.Rename, func(context.Context) error { return nil }); err == nil || changed {
+		t.Fatalf("duplicate publication paths: changed=%t err=%v", changed, err)
+	}
+}
+
+// TestIndexCacheSourceEntryCoveredRejectsDanglingSymlink verifies an unresolved link cannot be treated as a completely fingerprinted input.
+func TestIndexCacheSourceEntryCoveredRejectsDanglingSymlink(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "dangling.go")
+	if err := os.Symlink(filepath.Join(root, "missing.go"), path); err != nil {
+		t.Skipf("create dangling symlink: %v", err)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("read dangling symlink directory: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("dangling symlink entries = %d, want 1", len(entries))
+	}
+	covered, err := indexCacheSourceEntryCovered(path, entries[0])
+	if err == nil || covered {
+		t.Fatalf("dangling source link: covered=%t err=%v", covered, err)
+	}
+}

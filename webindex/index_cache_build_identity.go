@@ -44,7 +44,12 @@ func initializeIndexCacheAnalyzerBuildIdentity() (string, bool) {
 // indexCacheAnalyzerModule finds Web in build metadata without guessing when the module has been omitted.
 func indexCacheAnalyzerModule() (debug.Module, bool) {
 	buildInfo, ok := debug.ReadBuildInfo()
-	if !ok {
+	return indexCacheAnalyzerModuleFromBuildInfo(buildInfo, ok)
+}
+
+// indexCacheAnalyzerModuleFromBuildInfo selects Web from immutable build metadata without depending on the running process.
+func indexCacheAnalyzerModuleFromBuildInfo(buildInfo *debug.BuildInfo, available bool) (debug.Module, bool) {
+	if !available || buildInfo == nil {
 		return debug.Module{}, false
 	}
 	if buildInfo.Main.Path == indexCacheAnalyzerModulePath {
@@ -128,7 +133,11 @@ func readGoExecutableBuildID() (string, bool) {
 		return "", false
 	}
 	defer file.Close()
+	return readGoExecutableBuildIDFromFile(file)
+}
 
+// readGoExecutableBuildIDFromFile routes executable formats while keeping filesystem discovery outside the parser.
+func readGoExecutableBuildIDFromFile(file *os.File) (string, bool) {
 	data := make([]byte, goExecutableBuildIDReadSize)
 	read, err := io.ReadFull(file, data)
 	if err != nil && err != io.ErrUnexpectedEOF {

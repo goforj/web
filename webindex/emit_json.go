@@ -37,11 +37,12 @@ type preparedJSONArtifact struct {
 	changed        bool
 }
 
-// writeJSON preserves the original single-artifact API while using the same
-// changed-only atomic publication path as complete index runs.
-func writeJSON(path string, value any) error {
-	_, err := publishJSONArtifacts([]jsonArtifact{{path: path, value: value}})
-	return err
+// jsonCandidateFile keeps staging coupled to the ordered operations that make a candidate safe to publish.
+type jsonCandidateFile interface {
+	Chmod(os.FileMode) error
+	Write([]byte) (int, error)
+	Sync() error
+	Close() error
 }
 
 // publishJSONArtifacts encodes every artifact before touching the filesystem,
@@ -325,7 +326,7 @@ func isJSONArtifactTemporaryCandidate(name string, prefix string) bool {
 }
 
 // writeJSONCandidate completes and syncs a candidate before it can replace a visible artifact.
-func writeJSONCandidate(temporary *os.File, destination string, data []byte) error {
+func writeJSONCandidate(temporary jsonCandidateFile, destination string, data []byte) error {
 	if err := temporary.Chmod(0o644); err != nil {
 		_ = temporary.Close()
 		return fmt.Errorf("set temporary artifact permissions for %q: %w", destination, err)
@@ -369,10 +370,4 @@ func rollbackJSONArtifactsLocked(published []preparedJSONArtifact) error {
 		}
 	}
 	return errors.Join(rollbackErrors...)
-}
-
-// writeFileAtomicallyIfChanged avoids build churn and ensures readers observe
-// either the complete previous file or the complete replacement file.
-func writeFileAtomicallyIfChanged(path string, data []byte) (bool, error) {
-	return publishEncodedJSONArtifacts([]encodedJSONArtifact{{path: path, data: data}}, os.Rename)
 }

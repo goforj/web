@@ -307,3 +307,48 @@ func (c *Controller) ClosureOnly(ctx web.Context) error {
 		t.Fatalf("strict callback-only handler should fail honestly, got %T %v", err, err)
 	}
 }
+
+// TestDiagnosticsErrorFormatting verifies callers receive useful summaries for empty, singular, and plural diagnostic sets.
+func TestDiagnosticsErrorFormatting(t *testing.T) {
+	tests := []struct {
+		name        string
+		diagnostics []Diagnostic
+		want        string
+	}{
+		{name: "empty", want: "API index validation failed"},
+		{
+			name: "file and line",
+			diagnostics: []Diagnostic{{
+				Code:    "invalid_route",
+				File:    "app/routes.go",
+				Line:    12,
+				Message: "route cannot be indexed",
+			}},
+			want: "API index validation failed with 1 diagnostic; invalid_route at app/routes.go:12: route cannot be indexed",
+		},
+		{
+			name: "line without file",
+			diagnostics: []Diagnostic{
+				{Code: "first", Line: 7, Message: "first problem"},
+				{Code: "second", Message: "second problem"},
+			},
+			want: "API index validation failed with 2 diagnostics; first at line 7: first problem",
+		},
+		{
+			name: "file without line",
+			diagnostics: []Diagnostic{{
+				Code:    "invalid_file",
+				File:    "app/routes.go",
+				Message: "file cannot be indexed",
+			}},
+			want: "API index validation failed with 1 diagnostic; invalid_file at app/routes.go: file cannot be indexed",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := (&DiagnosticsError{Diagnostics: test.diagnostics}).Error(); got != test.want {
+				t.Fatalf("DiagnosticsError.Error() = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
