@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"hash"
 	"io"
 	"io/fs"
 	"math"
@@ -153,21 +152,31 @@ type indexCacheSession struct {
 	inputHash          string
 	dependencyIdentity string
 	options            IndexOptions
+	optionData         []byte
 	priorTypedState    *typedSchemaIncrementalState
 	sourceFiles        []indexCacheFileDigest
 	packageFiles       []indexCacheFileDigest
+	sourceRoots        []string
+	sourceDirectories  []indexCacheDirectorySnapshot
 	inputFiles         []indexCacheInputFile
+	embedStructure     []byte
+	goEnvironmentData  []byte
 	goEnvironment      map[string]string
 }
 
 // indexCacheInputIdentities separates the exact artifact key from the stable dependency key used across source edits.
 type indexCacheInputIdentities struct {
-	exact         string
-	dependency    string
-	sourceFiles   []indexCacheFileDigest
-	packageFiles  []indexCacheFileDigest
-	inputFiles    []indexCacheInputFile
-	goEnvironment map[string]string
+	exact             string
+	dependency        string
+	optionData        []byte
+	sourceFiles       []indexCacheFileDigest
+	packageFiles      []indexCacheFileDigest
+	sourceRoots       []string
+	sourceDirectories []indexCacheDirectorySnapshot
+	inputFiles        []indexCacheInputFile
+	embedStructure    []byte
+	goEnvironmentData []byte
+	goEnvironment     map[string]string
 }
 
 // indexCacheOptionIdentity includes every caller choice that can alter returned or published contract bytes.
@@ -187,6 +196,7 @@ type indexCacheFileDigest struct {
 	data     []byte
 	sum      [sha256.Size]byte
 	metadata indexCacheSourceMetadata
+	state    indexCacheFileState
 }
 
 // indexCacheInputFile retains optional configuration presence and bytes from the same read used by the cache fingerprint.
@@ -194,6 +204,13 @@ type indexCacheInputFile struct {
 	path    string
 	data    []byte
 	present bool
+	state   indexCacheFileState
+}
+
+// indexCacheDirectorySnapshot retains the generation of one visited source directory so unchanged trees need no second walk.
+type indexCacheDirectorySnapshot struct {
+	path  string
+	state indexCacheFileState
 }
 
 // newIndexCacheSession validates the destination and computes an exact content fingerprint when this project shape is cacheable.
@@ -230,9 +247,14 @@ func newIndexCacheSession(ctx context.Context, root string, options IndexOptions
 		inputHash:          identities.exact,
 		dependencyIdentity: identities.dependency,
 		options:            options,
+		optionData:         identities.optionData,
 		sourceFiles:        identities.sourceFiles,
 		packageFiles:       identities.packageFiles,
+		sourceRoots:        identities.sourceRoots,
+		sourceDirectories:  identities.sourceDirectories,
 		inputFiles:         identities.inputFiles,
+		embedStructure:     identities.embedStructure,
+		goEnvironmentData:  identities.goEnvironmentData,
 		goEnvironment:      identities.goEnvironment,
 	}, nil
 }
@@ -377,8 +399,7 @@ func (cache *indexCacheSession) inputStillCurrent(ctx context.Context) bool {
 	if cache == nil || ctx == nil || ctx.Err() != nil {
 		return false
 	}
-	currentHash, cacheable, err := indexCacheInputHash(ctx, cache.root, cache.options)
-	return err == nil && cacheable && currentHash == cache.inputHash
+	return cache.snapshotStillCurrent(ctx)
 }
 
 // readIndexCacheData rejects non-regular and oversized entries before allocating for their complete contents.
@@ -1124,15 +1145,7 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 	if err != nil {
 		return indexCacheInputIdentities{}, false, nil
 	}
-	optionData, err := json.Marshal(indexCacheOptionIdentity{
-		RouteCompositionPath: normalizedIndexCacheCompositionPath(root, options.RouteCompositionPath),
-		BuildTags:            normalizeSourceBuildTags(options.BuildTags),
-		Strict:               options.Strict,
-		ManifestArtifact:     options.OutPath != "",
-		DiagnosticsArtifact:  options.DiagnosticsPath != "",
-		OpenAPIArtifact:      options.OpenAPIPath != "",
-		OpenAPI:              options.OpenAPI,
-	})
+	optionData, err := indexCacheOptionData(root, options)
 	if err != nil {
 		return indexCacheInputIdentities{}, false, nil
 	}
@@ -1161,6 +1174,7 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 	}
 	inputFiles := make([]indexCacheInputFile, 0, len(moduleRoots)*2+2)
 	allFileDigests := make([]indexCacheFileDigest, 0, 128)
+	allDirectories := make([]indexCacheDirectorySnapshot, 0, 32)
 	var rootFileDigests []indexCacheFileDigest
 	for _, moduleRoot := range moduleRoots {
 		writeIndexCacheHashString(digest, moduleRoot)
@@ -1181,7 +1195,7 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 		writeIndexCacheInputFileState(digest, sumInput)
 		writeIndexCacheInputFileState(dependencyDigest, moduleInput)
 		writeIndexCacheInputFileState(dependencyDigest, sumInput)
-		paths, err := indexCacheSourcePaths(ctx, moduleRoot)
+		paths, directories, err := indexCacheSourcePaths(ctx, moduleRoot)
 		if err != nil {
 			if contextErr := ctx.Err(); contextErr != nil {
 				return indexCacheInputIdentities{}, false, contextErr
@@ -1199,6 +1213,7 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 			rootFileDigests = append([]indexCacheFileDigest(nil), fileDigests...)
 		}
 		allFileDigests = append(allFileDigests, fileDigests...)
+		allDirectories = append(allDirectories, directories...)
 		for _, fileDigest := range fileDigests {
 			writeIndexCacheHashString(digest, fileDigest.path)
 			writeIndexCacheHashBytes(digest, fileDigest.sum[:])
@@ -1210,7 +1225,7 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 	if !indexCacheLocalImportsCovered(root, moduleFile, allFileDigests, inputFiles) {
 		return indexCacheInputIdentities{}, false, nil
 	}
-	embedCacheable, err := writeIndexCacheEmbedStructure(ctx, digest, allFileDigests)
+	embedStructure, embedCacheable, err := indexCacheEmbedStructure(ctx, allFileDigests)
 	if err != nil {
 		if contextErr := ctx.Err(); contextErr != nil {
 			return indexCacheInputIdentities{}, false, contextErr
@@ -1220,6 +1235,7 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 	if !embedCacheable {
 		return indexCacheInputIdentities{}, false, nil
 	}
+	_, _ = digest.Write(embedStructure)
 	environmentInput, err := readIndexCacheInputFile(filepath.Join(root, ".env"))
 	if err != nil {
 		return indexCacheInputIdentities{}, false, nil
@@ -1235,13 +1251,31 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 		writeIndexCacheInputFileState(digest, compositionInput)
 	}
 	return indexCacheInputIdentities{
-		exact:         hex.EncodeToString(digest.Sum(nil)),
-		dependency:    hex.EncodeToString(dependencyDigest.Sum(nil)),
-		sourceFiles:   rootFileDigests,
-		packageFiles:  allFileDigests,
-		inputFiles:    inputFiles,
-		goEnvironment: environmentValues,
+		exact:             hex.EncodeToString(digest.Sum(nil)),
+		dependency:        hex.EncodeToString(dependencyDigest.Sum(nil)),
+		optionData:        optionData,
+		sourceFiles:       rootFileDigests,
+		packageFiles:      allFileDigests,
+		sourceRoots:       moduleRoots,
+		sourceDirectories: allDirectories,
+		inputFiles:        inputFiles,
+		embedStructure:    embedStructure,
+		goEnvironmentData: goEnvironment,
+		goEnvironment:     environmentValues,
 	}, true, nil
+}
+
+// indexCacheOptionData canonicalizes every caller choice that can change returned or published contract bytes.
+func indexCacheOptionData(root string, options IndexOptions) ([]byte, error) {
+	return json.Marshal(indexCacheOptionIdentity{
+		RouteCompositionPath: normalizedIndexCacheCompositionPath(root, options.RouteCompositionPath),
+		BuildTags:            normalizeSourceBuildTags(options.BuildTags),
+		Strict:               options.Strict,
+		ManifestArtifact:     options.OutPath != "",
+		DiagnosticsArtifact:  options.DiagnosticsPath != "",
+		OpenAPIArtifact:      options.OpenAPIPath != "",
+		OpenAPI:              options.OpenAPI,
+	})
 }
 
 // indexCacheGoEnvironment records the effective Go command environment instead of assuming process variables include go env -w settings.
@@ -1298,8 +1332,9 @@ func indexCacheModuleRoots(root string, moduleFile *modfile.File) ([]string, boo
 }
 
 // indexCacheSourcePaths follows the indexer's source-tree boundaries while including non-Go files that can affect local package types.
-func indexCacheSourcePaths(ctx context.Context, root string) ([]string, error) {
+func indexCacheSourcePaths(ctx context.Context, root string) ([]string, []indexCacheDirectorySnapshot, error) {
 	paths := make([]string, 0, 128)
+	directories := make([]indexCacheDirectorySnapshot, 0, 32)
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if contextErr := ctx.Err(); contextErr != nil {
 			return contextErr
@@ -1329,6 +1364,11 @@ func indexCacheSourcePaths(ctx context.Context, root string) ([]string, error) {
 			return errIndexCacheSourceTreeNotCovered
 		}
 		if entry.IsDir() {
+			info, infoErr := entry.Info()
+			if infoErr != nil {
+				return infoErr
+			}
+			directories = append(directories, indexCacheDirectorySnapshot{path: filepath.Clean(path), state: newIndexCacheFileState(info)})
 			if path == root {
 				return nil
 			}
@@ -1348,7 +1388,7 @@ func indexCacheSourcePaths(ctx context.Context, root string) ([]string, error) {
 		paths = append(paths, filepath.Clean(path))
 		return nil
 	})
-	return paths, err
+	return paths, directories, err
 }
 
 // indexCacheSourceExtension includes the source forms the Go command may use to derive package declarations and compiled types.
@@ -1379,7 +1419,7 @@ func indexCacheFileDigests(ctx context.Context, paths []string) ([]indexCacheFil
 				if ctx.Err() != nil {
 					continue
 				}
-				data, err := os.ReadFile(paths[index])
+				data, state, err := readIndexCacheFileSnapshot(paths[index])
 				if err != nil {
 					errorsByIndex[index] = err
 					continue
@@ -1389,6 +1429,7 @@ func indexCacheFileDigests(ctx context.Context, paths []string) ([]indexCacheFil
 					data:     data,
 					sum:      sha256.Sum256(data),
 					metadata: readIndexCacheSourceMetadata(paths[index], data),
+					state:    state,
 				}
 			}
 		}()
@@ -1415,7 +1456,7 @@ func indexCacheFileDigests(ctx context.Context, paths []string) ([]indexCacheFil
 // readIndexCacheInputFile retains one optional input exactly as it appeared when the generation fingerprint was formed.
 func readIndexCacheInputFile(path string) (indexCacheInputFile, error) {
 	input := indexCacheInputFile{path: filepath.Clean(path)}
-	data, err := os.ReadFile(input.path)
+	data, state, err := readIndexCacheFileSnapshot(input.path)
 	if os.IsNotExist(err) {
 		return input, nil
 	}
@@ -1424,11 +1465,12 @@ func readIndexCacheInputFile(path string) (indexCacheInputFile, error) {
 	}
 	input.data = data
 	input.present = true
+	input.state = state
 	return input, nil
 }
 
 // writeIndexCacheInputFileState distinguishes missing optional inputs from exact snapshotted bytes without rereading the filesystem.
-func writeIndexCacheInputFileState(digest hash.Hash, input indexCacheInputFile) {
+func writeIndexCacheInputFileState(digest io.Writer, input indexCacheInputFile) {
 	writeIndexCacheHashString(digest, input.path)
 	if !input.present {
 		writeIndexCacheHashString(digest, "missing")
@@ -1439,12 +1481,12 @@ func writeIndexCacheInputFileState(digest hash.Hash, input indexCacheInputFile) 
 }
 
 // writeIndexCacheHashString length-prefixes values so distinct path and option sequences cannot collide by concatenation.
-func writeIndexCacheHashString(digest hash.Hash, value string) {
+func writeIndexCacheHashString(digest io.Writer, value string) {
 	writeIndexCacheHashBytes(digest, []byte(value))
 }
 
 // writeIndexCacheHashBytes writes a fixed-width length before each payload to retain unambiguous fingerprint framing.
-func writeIndexCacheHashBytes(digest hash.Hash, value []byte) {
+func writeIndexCacheHashBytes(digest io.Writer, value []byte) {
 	var length [8]byte
 	binary.BigEndian.PutUint64(length[:], uint64(len(value)))
 	_, _ = digest.Write(length[:])

@@ -478,15 +478,211 @@ func TestValidateMissPublicationRejectsChangedInputs(t *testing.T) {
 		"main.go": "package cacherace\nconst Version = 1\n",
 	})
 	options := IndexOptions{Root: root}
-	inputHash, cacheable, err := indexCacheInputHash(context.Background(), root, options)
-	if err != nil || !cacheable {
-		t.Fatalf("fingerprint source-race fixture: cacheable=%t err=%v", cacheable, err)
+	cache, err := newIndexCacheSession(context.Background(), root, options, filepath.Join(t.TempDir(), "webindex.cache"))
+	if err != nil || cache == nil {
+		t.Fatalf("snapshot source-race fixture: cache=%#v err=%v", cache, err)
 	}
-	cache := &indexCacheSession{root: root, inputHash: inputHash, options: options}
 	appendIndexCacheTestFile(t, sourcePath, "const Changed = true\n")
 	if err := cache.validatePublication(context.Background()); !errors.Is(err, errIndexCacheInputsChanged) {
 		t.Fatalf("validate changed source snapshot: %v", err)
 	}
+}
+
+// TestIndexCacheSnapshotRejectsSameSizeSourceEditWithRestoredMtime proves size and caller-controlled timestamps never authorize stale output.
+func TestIndexCacheSnapshotRejectsSameSizeSourceEditWithRestoredMtime(t *testing.T) {
+	root, sourcePath, cache := writeIndexCachePublicationSnapshotFixture(t)
+	info, err := os.Stat(sourcePath)
+	if err != nil {
+		t.Fatalf("stat original source: %v", err)
+	}
+	original, err := os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatalf("read original source: %v", err)
+	}
+	changed := bytes.Replace(original, []byte("Version = 1"), []byte("Version = 2"), 1)
+	if bytes.Equal(original, changed) || len(original) != len(changed) {
+		t.Fatal("same-size source fixture did not change as expected")
+	}
+	if err := os.WriteFile(sourcePath, changed, 0o644); err != nil {
+		t.Fatalf("write same-size source edit: %v", err)
+	}
+	if err := os.Chtimes(sourcePath, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatalf("restore source mtime: %v", err)
+	}
+	if err := cache.validatePublication(context.Background()); !errors.Is(err, errIndexCacheInputsChanged) {
+		t.Fatalf("validate same-size source edit under %s: %v", root, err)
+	}
+}
+
+// TestIndexCacheSnapshotRejectsConfigurationAndOptionChanges verifies non-source inputs retain the original fingerprint semantics.
+func TestIndexCacheSnapshotRejectsConfigurationAndOptionChanges(t *testing.T) {
+	t.Run("same-size module edit with restored mtime", func(t *testing.T) {
+		root, _, cache := writeIndexCachePublicationSnapshotFixture(t)
+		modulePath := filepath.Join(root, "go.mod")
+		info, err := os.Stat(modulePath)
+		if err != nil {
+			t.Fatalf("stat original module: %v", err)
+		}
+		original, err := os.ReadFile(modulePath)
+		if err != nil {
+			t.Fatalf("read original module: %v", err)
+		}
+		changed := bytes.Replace(original, []byte("example.com/snapshot"), []byte("example.net/snapshot"), 1)
+		if bytes.Equal(original, changed) || len(original) != len(changed) {
+			t.Fatal("same-size module fixture did not change as expected")
+		}
+		if err := os.WriteFile(modulePath, changed, 0o644); err != nil {
+			t.Fatalf("write same-size module edit: %v", err)
+		}
+		if err := os.Chtimes(modulePath, info.ModTime(), info.ModTime()); err != nil {
+			t.Fatalf("restore module mtime: %v", err)
+		}
+		if err := cache.validatePublication(context.Background()); !errors.Is(err, errIndexCacheInputsChanged) {
+			t.Fatalf("validate same-size module edit: %v", err)
+		}
+	})
+
+	t.Run("retained option mutation", func(t *testing.T) {
+		root := t.TempDir()
+		writeTypedFixtureFiles(t, root, map[string]string{
+			"go.mod":  "module example.com/optionsnapshot\n\ngo 1.25.0\n",
+			"main.go": "package optionsnapshot\nconst Stable = true\n",
+		})
+		options := IndexOptions{Root: root, BuildTags: []string{"stable"}}
+		cache, err := newIndexCacheSession(context.Background(), root, options, filepath.Join(t.TempDir(), "webindex.cache"))
+		if err != nil || cache == nil {
+			t.Fatalf("capture option snapshot: cache=%#v err=%v", cache, err)
+		}
+		cache.options.BuildTags[0] = "changed"
+		if err := cache.validatePublication(context.Background()); !errors.Is(err, errIndexCacheInputsChanged) {
+			t.Fatalf("validate retained option mutation: %v", err)
+		}
+	})
+}
+
+// TestIndexCacheSnapshotRejectsAddedAndDeletedSources proves directory generations guard source-tree membership without an unchanged-tree walk.
+func TestIndexCacheSnapshotRejectsAddedAndDeletedSources(t *testing.T) {
+	t.Run("added", func(t *testing.T) {
+		root, _, cache := writeIndexCachePublicationSnapshotFixture(t)
+		if err := os.WriteFile(filepath.Join(root, "added.go"), []byte("package snapshot\nconst Added = true\n"), 0o644); err != nil {
+			t.Fatalf("add source file: %v", err)
+		}
+		if err := cache.validatePublication(context.Background()); !errors.Is(err, errIndexCacheInputsChanged) {
+			t.Fatalf("validate added source: %v", err)
+		}
+	})
+
+	t.Run("deleted", func(t *testing.T) {
+		_, sourcePath, cache := writeIndexCachePublicationSnapshotFixture(t)
+		if err := os.Remove(sourcePath); err != nil {
+			t.Fatalf("delete source file: %v", err)
+		}
+		if err := cache.validatePublication(context.Background()); !errors.Is(err, errIndexCacheInputsChanged) {
+			t.Fatalf("validate deleted source: %v", err)
+		}
+	})
+}
+
+// TestIndexCacheSnapshotFallsBackAfterMetadataChanges verifies metadata misses compare exact content and source membership instead of forcing false invalidations.
+func TestIndexCacheSnapshotFallsBackAfterMetadataChanges(t *testing.T) {
+	t.Run("identical source replacement", func(t *testing.T) {
+		_, sourcePath, cache := writeIndexCachePublicationSnapshotFixture(t)
+		data, err := os.ReadFile(sourcePath)
+		if err != nil {
+			t.Fatalf("read source replacement bytes: %v", err)
+		}
+		if err := os.Remove(sourcePath); err != nil {
+			t.Fatalf("remove source before replacement: %v", err)
+		}
+		if err := os.WriteFile(sourcePath, data, 0o644); err != nil {
+			t.Fatalf("write identical source replacement: %v", err)
+		}
+		if err := cache.validatePublication(context.Background()); err != nil {
+			t.Fatalf("validate identical source replacement: %v", err)
+		}
+	})
+
+	t.Run("unrelated directory entry", func(t *testing.T) {
+		root, _, cache := writeIndexCachePublicationSnapshotFixture(t)
+		if err := os.WriteFile(filepath.Join(root, "notes.txt"), []byte("not an indexing input\n"), 0o644); err != nil {
+			t.Fatalf("write unrelated file: %v", err)
+		}
+		if err := cache.validatePublication(context.Background()); err != nil {
+			t.Fatalf("validate unchanged source membership: %v", err)
+		}
+	})
+}
+
+// TestIndexCacheSnapshotTracksEmbedStructureButNotContent preserves the original contract-only embed fingerprint policy.
+func TestIndexCacheSnapshotTracksEmbedStructureButNotContent(t *testing.T) {
+	root := t.TempDir()
+	assetPath := filepath.Join(root, "assets", "first.txt")
+	writeTypedFixtureFiles(t, root, map[string]string{
+		"go.mod":           "module example.com/embedsnapshot\n\ngo 1.25.0\n",
+		"main.go":          "package embedsnapshot\nimport _ \"embed\"\n//go:embed assets/*.txt\nvar assets string\n",
+		"assets/first.txt": "first\n",
+	})
+	options := IndexOptions{Root: root}
+	cache, err := newIndexCacheSession(context.Background(), root, options, filepath.Join(t.TempDir(), "webindex.cache"))
+	if err != nil || cache == nil {
+		t.Fatalf("capture embed snapshot: cache=%#v err=%v", cache, err)
+	}
+	if err := os.WriteFile(assetPath, []byte("changed opaque content\n"), 0o644); err != nil {
+		t.Fatalf("change embedded content: %v", err)
+	}
+	if err := cache.validatePublication(context.Background()); err != nil {
+		t.Fatalf("embedded content-only edit changed contract snapshot: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "assets", "second.txt"), []byte("second\n"), 0o644); err != nil {
+		t.Fatalf("add embedded path: %v", err)
+	}
+	if err := cache.validatePublication(context.Background()); !errors.Is(err, errIndexCacheInputsChanged) {
+		t.Fatalf("validate added embedded path: %v", err)
+	}
+}
+
+// TestIndexCacheSnapshotRejectsEffectiveGoEnvironmentChange verifies the fast validator still observes go env -w inputs.
+func TestIndexCacheSnapshotRejectsEffectiveGoEnvironmentChange(t *testing.T) {
+	root := t.TempDir()
+	writeTypedFixtureFiles(t, root, map[string]string{
+		"go.mod":  "module example.com/environmentsnapshot\n\ngo 1.25.0\n",
+		"main.go": "package environmentsnapshot\nconst Stable = true\n",
+	})
+	goEnvironmentPath := filepath.Join(t.TempDir(), "go.env")
+	if err := os.WriteFile(goEnvironmentPath, []byte("GOFLAGS=\n"), 0o644); err != nil {
+		t.Fatalf("write original Go environment: %v", err)
+	}
+	unsetIndexCacheTestEnvironment(t, "GOFLAGS")
+	t.Setenv("GOENV", goEnvironmentPath)
+	t.Setenv("GOWORK", "off")
+	options := IndexOptions{Root: root}
+	cache, err := newIndexCacheSession(context.Background(), root, options, filepath.Join(t.TempDir(), "webindex.cache"))
+	if err != nil || cache == nil {
+		t.Fatalf("capture Go environment snapshot: cache=%#v err=%v", cache, err)
+	}
+	if err := os.WriteFile(goEnvironmentPath, []byte("GOFLAGS=-tags=changed\n"), 0o644); err != nil {
+		t.Fatalf("change Go environment: %v", err)
+	}
+	if err := cache.validatePublication(context.Background()); !errors.Is(err, errIndexCacheInputsChanged) {
+		t.Fatalf("validate changed Go environment: %v", err)
+	}
+}
+
+// writeIndexCachePublicationSnapshotFixture captures a complete cache session for publication-boundary safety tests.
+func writeIndexCachePublicationSnapshotFixture(t *testing.T) (string, string, *indexCacheSession) {
+	t.Helper()
+	root := t.TempDir()
+	sourcePath := filepath.Join(root, "main.go")
+	writeTypedFixtureFiles(t, root, map[string]string{
+		"go.mod":  "module example.com/snapshot\n\ngo 1.25.0\n",
+		"main.go": "package snapshot\nconst Version = 1\n",
+	})
+	options := IndexOptions{Root: root}
+	cache, err := newIndexCacheSession(context.Background(), root, options, filepath.Join(t.TempDir(), "webindex.cache"))
+	if err != nil || cache == nil {
+		t.Fatalf("capture publication snapshot: cache=%#v err=%v", cache, err)
+	}
+	return root, sourcePath, cache
 }
 
 // TestPublishIndexCacheArtifactsRevalidatesAfterLockWait verifies an older publisher cannot overwrite newer output after waiting behind its directory lock.
@@ -498,11 +694,10 @@ func TestPublishIndexCacheArtifactsRevalidatesAfterLockWait(t *testing.T) {
 		"main.go": "package lockedrace\nconst Version = 1\n",
 	})
 	options := IndexOptions{Root: root}
-	inputHash, cacheable, err := indexCacheInputHash(context.Background(), root, options)
-	if err != nil || !cacheable {
-		t.Fatalf("fingerprint lock-race fixture: cacheable=%t err=%v", cacheable, err)
+	cache, err := newIndexCacheSession(context.Background(), root, options, filepath.Join(t.TempDir(), "webindex.cache"))
+	if err != nil || cache == nil {
+		t.Fatalf("snapshot lock-race fixture: cache=%#v err=%v", cache, err)
 	}
-	cache := &indexCacheSession{root: root, inputHash: inputHash, options: options}
 	artifactPath := filepath.Join(t.TempDir(), "api.json")
 	artifacts := []encodedJSONArtifact{{path: artifactPath, data: []byte("{\"version\":1}\n")}}
 	locks, err := acquireArtifactDirectoryLocks(context.Background(), artifacts)
@@ -535,11 +730,10 @@ func TestPublishIndexCacheArtifactsRevalidatesAfterStaging(t *testing.T) {
 		"main.go": "package stagingrace\nconst Version = 1\n",
 	})
 	options := IndexOptions{Root: root}
-	inputHash, cacheable, err := indexCacheInputHash(context.Background(), root, options)
-	if err != nil || !cacheable {
-		t.Fatalf("fingerprint staging-race fixture: cacheable=%t err=%v", cacheable, err)
+	cache, err := newIndexCacheSession(context.Background(), root, options, filepath.Join(t.TempDir(), "webindex.cache"))
+	if err != nil || cache == nil {
+		t.Fatalf("snapshot staging-race fixture: cache=%#v err=%v", cache, err)
 	}
-	cache := &indexCacheSession{root: root, inputHash: inputHash, options: options}
 	artifactDirectory := t.TempDir()
 	artifactPath := filepath.Join(artifactDirectory, "api.json")
 	artifacts := []encodedJSONArtifact{{path: artifactPath, data: []byte("{\"version\":1}\n")}}

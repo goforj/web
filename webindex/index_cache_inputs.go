@@ -5,7 +5,7 @@ import (
 	"context"
 	"go/scanner"
 	"go/token"
-	"hash"
+	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -365,17 +365,18 @@ func indexCacheImportCrossesIgnoredDirectory(relativeImportPath string) bool {
 	return false
 }
 
-// writeIndexCacheEmbedStructure fingerprints path membership and file kinds because embedded bytes do not affect static API contracts.
-func writeIndexCacheEmbedStructure(ctx context.Context, digest hash.Hash, files []indexCacheFileDigest) (bool, error) {
+// indexCacheEmbedStructure serializes path membership and file kinds because embedded bytes do not affect static API contracts.
+func indexCacheEmbedStructure(ctx context.Context, files []indexCacheFileDigest) ([]byte, bool, error) {
+	var structure bytes.Buffer
 	targets := make([]indexCacheEmbedTarget, 0)
 	for _, file := range files {
 		if !file.metadata.valid {
-			return false, nil
+			return nil, false, nil
 		}
 		for _, pattern := range file.metadata.embedPatterns {
 			target, ok := indexCacheEmbedPatternTarget(filepath.Dir(file.path), pattern)
 			if !ok {
-				return false, nil
+				return nil, false, nil
 			}
 			targets = append(targets, target)
 		}
@@ -389,11 +390,11 @@ func writeIndexCacheEmbedStructure(ctx context.Context, digest hash.Hash, files 
 			continue
 		}
 		lastPath = target.path
-		if err := writeIndexCacheStructuralPath(ctx, digest, target.path); err != nil {
-			return false, err
+		if err := writeIndexCacheStructuralPath(ctx, &structure, target.path); err != nil {
+			return nil, false, err
 		}
 	}
-	return true, nil
+	return structure.Bytes(), true, nil
 }
 
 // indexCacheEmbedPatternTarget returns the literal directory prefix that contains every possible pattern match.
@@ -449,7 +450,7 @@ func firstIndexCacheGlobMeta(patternValue string) int {
 }
 
 // writeIndexCacheStructuralPath records only filesystem shape because embed content is opaque to static indexing.
-func writeIndexCacheStructuralPath(ctx context.Context, digest hash.Hash, targetPath string) error {
+func writeIndexCacheStructuralPath(ctx context.Context, digest io.Writer, targetPath string) error {
 	writeIndexCacheHashString(digest, "embed-structure-v1")
 	writeIndexCacheHashString(digest, filepath.Clean(targetPath))
 	info, err := os.Lstat(targetPath)
@@ -499,7 +500,7 @@ func indexCacheEmbedVCSDirectory(name string) bool {
 }
 
 // writeIndexCacheStructuralEntry records names, modes, and link destinations while intentionally excluding regular-file bytes.
-func writeIndexCacheStructuralEntry(digest hash.Hash, entryPath string, relative string, info fs.FileInfo) error {
+func writeIndexCacheStructuralEntry(digest io.Writer, entryPath string, relative string, info fs.FileInfo) error {
 	writeIndexCacheHashString(digest, relative)
 	writeIndexCacheHashString(digest, info.Mode().String())
 	if info.Mode()&fs.ModeSymlink == 0 {
