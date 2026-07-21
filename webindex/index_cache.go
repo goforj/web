@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,8 +26,14 @@ import (
 )
 
 const (
-	// indexCacheFormatVersion invalidates persisted analysis whenever its inputs or representation change.
+	// indexCacheFormatVersion invalidates persisted analysis whenever its binary representation changes.
 	indexCacheFormatVersion = 5
+	// indexCacheAnalyzerEpoch must change with analyzer semantics, including local development replacements whose module version remains devel.
+	indexCacheAnalyzerEpoch = "goforj-webindex-analysis-v1"
+	// indexCacheAnalyzerModulePath identifies the executing analyzer in Go build metadata.
+	indexCacheAnalyzerModulePath = "github.com/goforj/web"
+	// indexCacheTypedDependencyEpoch invalidates incremental state whenever the dependency model changes without changing analyzer output semantics.
+	indexCacheTypedDependencyEpoch = "goforj-webindex-typed-dependencies-v1"
 	// indexCacheMaximumSize bounds memory consumed by a corrupt or unexpectedly large cache entry.
 	indexCacheMaximumSize = 64 << 20
 	// indexCacheMagic separates this binary cache from generated JSON artifacts and future formats.
@@ -168,6 +175,20 @@ type indexCacheInputIdentities struct {
 	packageFiles  []indexCacheFileDigest
 	inputFiles    []indexCacheInputFile
 	goEnvironment map[string]string
+}
+
+// indexCacheSemanticEpochs makes executable analyzer semantics an explicit input independently of the project being analyzed.
+type indexCacheSemanticEpochs struct {
+	analyzer        string
+	typedDependency string
+}
+
+// indexCacheBuildModuleIdentity retains stable module metadata without executable paths or build-machine details.
+type indexCacheBuildModuleIdentity struct {
+	Path        string                         `json:"path"`
+	Version     string                         `json:"version,omitempty"`
+	Sum         string                         `json:"sum,omitempty"`
+	Replacement *indexCacheBuildModuleIdentity `json:"replacement,omitempty"`
 }
 
 // indexCacheOptionIdentity includes every caller choice that can alter returned or published contract bytes.
@@ -1091,6 +1112,15 @@ func indexCacheInputHash(ctx context.Context, root string, options IndexOptions)
 
 // indexCacheInputHashes computes exact artifact and stable dependency identities from one environment and source scan.
 func indexCacheInputHashes(ctx context.Context, root string, options IndexOptions) (indexCacheInputIdentities, bool, error) {
+	epochs := indexCacheSemanticEpochs{
+		analyzer:        indexCacheAnalyzerEpoch,
+		typedDependency: indexCacheTypedDependencyEpoch,
+	}
+	return indexCacheInputHashesForIdentity(ctx, root, options, epochs, indexCacheAnalyzerBuildIdentity())
+}
+
+// indexCacheInputHashesForIdentity computes cache identities against explicit executable semantics and module build identity.
+func indexCacheInputHashesForIdentity(ctx context.Context, root string, options IndexOptions, epochs indexCacheSemanticEpochs, analyzerBuildIdentity string) (indexCacheInputIdentities, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return indexCacheInputIdentities{}, false, err
 	}
@@ -1138,14 +1168,17 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 	}
 
 	digest := sha256.New()
-	writeIndexCacheHashString(digest, "goforj-webindex-analysis-v1")
+	writeIndexCacheHashString(digest, epochs.analyzer)
+	writeIndexCacheHashString(digest, analyzerBuildIdentity)
 	writeIndexCacheHashString(digest, ManifestVersion)
 	writeIndexCacheHashString(digest, runtime.Version())
 	writeIndexCacheHashString(digest, filepath.Clean(root))
 	writeIndexCacheHashBytes(digest, goEnvironment)
 	writeIndexCacheHashBytes(digest, optionData)
 	dependencyDigest := sha256.New()
-	writeIndexCacheHashString(dependencyDigest, "goforj-webindex-typed-dependencies-v1")
+	writeIndexCacheHashString(dependencyDigest, epochs.analyzer)
+	writeIndexCacheHashString(dependencyDigest, analyzerBuildIdentity)
+	writeIndexCacheHashString(dependencyDigest, epochs.typedDependency)
 	writeIndexCacheHashString(dependencyDigest, runtime.Version())
 	writeIndexCacheHashString(dependencyDigest, filepath.Clean(root))
 	writeIndexCacheHashBytes(dependencyDigest, goEnvironment)
@@ -1242,6 +1275,40 @@ func indexCacheInputHashes(ctx context.Context, root string, options IndexOption
 		inputFiles:    inputFiles,
 		goEnvironment: environmentValues,
 	}, true, nil
+}
+
+// indexCacheAnalyzerBuildIdentity returns the executing Web module version while leaving local source invalidation to the explicit semantic epoch.
+func indexCacheAnalyzerBuildIdentity() string {
+	module := debug.Module{Path: indexCacheAnalyzerModulePath}
+	if buildInfo, ok := debug.ReadBuildInfo(); ok {
+		if buildInfo.Main.Path == indexCacheAnalyzerModulePath {
+			module = buildInfo.Main
+		} else {
+			for _, dependency := range buildInfo.Deps {
+				if dependency.Path == indexCacheAnalyzerModulePath {
+					module = *dependency
+					break
+				}
+			}
+		}
+	}
+	identity := indexCacheBuildModuleIdentity{
+		Path:    module.Path,
+		Version: module.Version,
+		Sum:     module.Sum,
+	}
+	if module.Replace != nil {
+		identity.Replacement = &indexCacheBuildModuleIdentity{
+			Path:    module.Replace.Path,
+			Version: module.Replace.Version,
+			Sum:     module.Replace.Sum,
+		}
+	}
+	encoded, err := json.Marshal(identity)
+	if err != nil {
+		return indexCacheAnalyzerModulePath
+	}
+	return string(encoded)
 }
 
 // indexCacheGoEnvironment records the effective Go command environment instead of assuming process variables include go env -w settings.

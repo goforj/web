@@ -103,6 +103,135 @@ func TestPublishJSONArtifactsUsesCompleteAtomicFiles(t *testing.T) {
 	}
 }
 
+// TestPublishJSONArtifactsScavengesCrashedCandidates verifies the next lock holder removes a fully staged file abandoned by process death.
+func TestPublishJSONArtifactsScavengesCrashedCandidates(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "api_index.json")
+	command := exec.Command(os.Args[0], "-test.run=^TestArtifactPublicationCrashSubprocessHelper$")
+	command.Env = append(os.Environ(), "WEBINDEX_ARTIFACT_CRASH_PATH="+path)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("run crashing artifact publisher: %v\n%s", err, output)
+	}
+	candidates, err := filepath.Glob(filepath.Join(root, ".api_index.json.tmp-*"))
+	if err != nil {
+		t.Fatalf("find crashed artifact candidate: %v", err)
+	}
+	if len(candidates) != 1 {
+		t.Fatalf("crashing publisher left %d candidates, want 1: %v", len(candidates), candidates)
+	}
+	changed, err := publishEncodedJSONArtifacts([]encodedJSONArtifact{{path: path, data: []byte("final\n")}}, os.Rename)
+	if err != nil || !changed {
+		t.Fatalf("publish after process crash: changed=%t err=%v", changed, err)
+	}
+	assertNoArtifactCandidates(t, root)
+	contents, err := os.ReadFile(path)
+	if err != nil || string(contents) != "final\n" {
+		t.Fatalf("read post-crash artifact: contents=%q err=%v", contents, err)
+	}
+}
+
+// TestArtifactPublicationCrashSubprocessHelper exits after durable staging so the parent can exercise crash scavenging.
+func TestArtifactPublicationCrashSubprocessHelper(t *testing.T) {
+	path := os.Getenv("WEBINDEX_ARTIFACT_CRASH_PATH")
+	if path == "" {
+		t.Skip("subprocess helper")
+	}
+	encoded := []encodedJSONArtifact{{path: path, data: []byte("abandoned\n")}}
+	_, err := publishIndexCacheArtifactsValidated(context.Background(), encoded, os.Rename, func(context.Context) error {
+		os.Exit(0)
+		return nil
+	})
+	t.Fatalf("crash helper returned instead of exiting: %v", err)
+}
+
+// TestPublishJSONArtifactsScavengesOnlyRecognizedRegularCandidates verifies cleanup cannot follow links or remove unrelated prefix-sharing entries.
+func TestPublishJSONArtifactsScavengesOnlyRecognizedRegularCandidates(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "api_index.json")
+	if err := os.WriteFile(path, []byte("same\n"), 0o644); err != nil {
+		t.Fatalf("write stable artifact: %v", err)
+	}
+	prefix := filepath.Join(root, jsonArtifactTemporaryPrefix(path))
+	currentCandidate := prefix + "current" + jsonArtifactTemporaryMarker
+	legacyCandidate := prefix + "123456"
+	unrelated := prefix + "notes"
+	directory := prefix + "789"
+	symlink := prefix + "linked" + jsonArtifactTemporaryMarker
+	for candidate, contents := range map[string]string{
+		currentCandidate: "current orphan",
+		legacyCandidate:  "legacy orphan",
+		unrelated:        "user data",
+	} {
+		if err := os.WriteFile(candidate, []byte(contents), 0o644); err != nil {
+			t.Fatalf("write cleanup fixture %q: %v", candidate, err)
+		}
+	}
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatalf("create candidate-shaped directory: %v", err)
+	}
+	if err := os.Symlink(unrelated, symlink); err != nil {
+		t.Skipf("create candidate-shaped symlink: %v", err)
+	}
+
+	changed, err := publishEncodedJSONArtifacts([]encodedJSONArtifact{{path: path, data: []byte("same\n")}}, os.Rename)
+	if err != nil || changed {
+		t.Fatalf("publish unchanged artifact during cleanup: changed=%t err=%v", changed, err)
+	}
+	for _, candidate := range []string{currentCandidate, legacyCandidate} {
+		if _, statErr := os.Lstat(candidate); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("recognized orphan remains at %q: %v", candidate, statErr)
+		}
+	}
+	for _, preserved := range []string{unrelated, directory, symlink} {
+		if _, statErr := os.Lstat(preserved); statErr != nil {
+			t.Fatalf("non-candidate entry %q was removed: %v", preserved, statErr)
+		}
+	}
+}
+
+// TestPublishJSONArtifactsScavengesAfterLockWait verifies a waiter never removes candidates before it owns the directory transaction.
+func TestPublishJSONArtifactsScavengesAfterLockWait(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "api_index.json")
+	orphan := filepath.Join(root, jsonArtifactTemporaryPrefix(path)+"orphan"+jsonArtifactTemporaryMarker)
+	if err := os.WriteFile(orphan, []byte("orphan"), 0o644); err != nil {
+		t.Fatalf("write lock-wait orphan: %v", err)
+	}
+	lock, err := AcquireArtifactPublicationLock(context.Background(), path)
+	if err != nil {
+		t.Fatalf("hold artifact publication lock: %v", err)
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, publishErr := publishEncodedJSONArtifacts([]encodedJSONArtifact{{path: path, data: []byte("published\n")}}, os.Rename)
+		result <- publishErr
+	}()
+	select {
+	case publishErr := <-result:
+		_ = lock.Release()
+		t.Fatalf("waiting publisher bypassed held lock: %v", publishErr)
+	case <-time.After(100 * time.Millisecond):
+	}
+	if _, err := os.Stat(orphan); err != nil {
+		_ = lock.Release()
+		t.Fatalf("waiter scavenged before lock ownership: %v", err)
+	}
+	if err := lock.Release(); err != nil {
+		t.Fatalf("release artifact publication lock: %v", err)
+	}
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("publish after lock wait: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("publisher did not resume after lock release")
+	}
+	if _, err := os.Stat(orphan); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("orphan survived completed locked publication: %v", err)
+	}
+}
+
 // TestPublishEncodedJSONArtifactsRollsBackRenameFailure verifies a late filesystem error cannot expose a mixed artifact generation.
 func TestPublishEncodedJSONArtifactsRollsBackRenameFailure(t *testing.T) {
 	root := t.TempDir()

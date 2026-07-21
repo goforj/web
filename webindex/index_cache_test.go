@@ -517,6 +517,61 @@ func TestIndexCacheInputHashesSeparateSourceAndDependencyChanges(t *testing.T) {
 	}
 }
 
+// TestIndexCacheSemanticEpochsInvalidateAnalyzerChanges verifies executable analyzer semantics participate in both exact and incremental identities.
+func TestIndexCacheSemanticEpochsInvalidateAnalyzerChanges(t *testing.T) {
+	root, options := writeIndexCacheInputFixture(t)
+	current := indexCacheSemanticEpochs{
+		analyzer:        indexCacheAnalyzerEpoch,
+		typedDependency: indexCacheTypedDependencyEpoch,
+	}
+	buildIdentity := indexCacheAnalyzerBuildIdentity()
+	var decodedBuildIdentity indexCacheBuildModuleIdentity
+	if err := json.Unmarshal([]byte(buildIdentity), &decodedBuildIdentity); err != nil || decodedBuildIdentity.Path != indexCacheAnalyzerModulePath {
+		t.Fatalf("executing analyzer build identity = %q, decoded=%#v err=%v", buildIdentity, decodedBuildIdentity, err)
+	}
+	baseline, cacheable, err := indexCacheInputHashesForIdentity(context.Background(), root, options, current, buildIdentity)
+	if err != nil || !cacheable {
+		t.Fatalf("fingerprint current analyzer epochs: cacheable=%t err=%v", cacheable, err)
+	}
+	defaults, cacheable, err := indexCacheInputHashes(context.Background(), root, options)
+	if err != nil || !cacheable || defaults.exact != baseline.exact || defaults.dependency != baseline.dependency {
+		t.Fatalf("default analyzer identity diverged: cacheable=%t exact=%t dependency=%t err=%v", cacheable, defaults.exact == baseline.exact, defaults.dependency == baseline.dependency, err)
+	}
+	changedAnalyzer := current
+	changedAnalyzer.analyzer += ".changed"
+	analyzerResult, cacheable, err := indexCacheInputHashesForIdentity(context.Background(), root, options, changedAnalyzer, buildIdentity)
+	if err != nil || !cacheable {
+		t.Fatalf("fingerprint changed analyzer epoch: cacheable=%t err=%v", cacheable, err)
+	}
+	if analyzerResult.exact == baseline.exact {
+		t.Fatal("analyzer epoch change did not invalidate exact artifacts")
+	}
+	if analyzerResult.dependency == baseline.dependency {
+		t.Fatal("analyzer epoch change did not invalidate incremental typed state")
+	}
+
+	changedDependencies := current
+	changedDependencies.typedDependency += ".changed"
+	dependencyResult, cacheable, err := indexCacheInputHashesForIdentity(context.Background(), root, options, changedDependencies, buildIdentity)
+	if err != nil || !cacheable {
+		t.Fatalf("fingerprint changed dependency epoch: cacheable=%t err=%v", cacheable, err)
+	}
+	if dependencyResult.exact != baseline.exact {
+		t.Fatal("dependency-only epoch change invalidated exact analyzer output")
+	}
+	if dependencyResult.dependency == baseline.dependency {
+		t.Fatal("dependency-only epoch change reused incremental typed state")
+	}
+
+	buildResult, cacheable, err := indexCacheInputHashesForIdentity(context.Background(), root, options, current, buildIdentity+".changed")
+	if err != nil || !cacheable {
+		t.Fatalf("fingerprint changed analyzer build identity: cacheable=%t err=%v", cacheable, err)
+	}
+	if buildResult.exact == baseline.exact || buildResult.dependency == baseline.dependency {
+		t.Fatal("executing Web module change did not invalidate exact and incremental identities")
+	}
+}
+
 // TestIndexCacheInputHashTracksLocalReplacementSource verifies unpublished sibling modules cannot produce stale cache hits.
 func TestIndexCacheInputHashTracksLocalReplacementSource(t *testing.T) {
 	parent := t.TempDir()
@@ -800,6 +855,99 @@ func TestDecodeIndexCacheReaderReadsOnlySelectedSection(t *testing.T) {
 	}
 	if typedReader.overlaps(changedLayout.recordOffset, changedLayout.recordLength) {
 		t.Fatal("changed-input cache read consumed the exact artifact section")
+	}
+}
+
+// TestDecodedIndexCacheMemoryBoundsCountAndEncodedBytes verifies long-lived processes retain only a small encoded-size-bounded working set.
+func TestDecodedIndexCacheMemoryBoundsCountAndEncodedBytes(t *testing.T) {
+	t.Run("entry count", func(t *testing.T) {
+		resetDecodedIndexCacheForTest(t)
+		record, _ := writeIndexCacheRecordFixture(t)
+		for index := 0; index < indexCacheMemoryCapacity; index++ {
+			rememberDecodedIndexCacheRecord("cache-"+intToString(index), indexCacheEnvelopeLayout{size: 1 << 20}, record)
+		}
+		decodedIndexCaches.promote("cache-0")
+		rememberDecodedIndexCacheRecord("cache-4", indexCacheEnvelopeLayout{size: 1 << 20}, record)
+
+		decodedIndexCaches.Lock()
+		defer decodedIndexCaches.Unlock()
+		if len(decodedIndexCaches.entries) != indexCacheMemoryCapacity {
+			t.Fatalf("retained entries = %d, want %d", len(decodedIndexCaches.entries), indexCacheMemoryCapacity)
+		}
+		for _, entry := range decodedIndexCaches.entries {
+			if entry.path == "cache-1" {
+				t.Fatal("least recently used entry survived count eviction")
+			}
+		}
+		backing := decodedIndexCaches.entries[:cap(decodedIndexCaches.entries)]
+		for index := len(decodedIndexCaches.entries); index < len(backing); index++ {
+			if backing[index].path != "" || backing[index].record.ManifestData != nil || backing[index].typedState != nil {
+				t.Fatalf("evicted entry %d remained reachable through the backing array", index)
+			}
+		}
+	})
+
+	t.Run("encoded byte budget", func(t *testing.T) {
+		resetDecodedIndexCacheForTest(t)
+		record, _ := writeIndexCacheRecordFixture(t)
+		rememberDecodedIndexCacheRecord("oldest", indexCacheEnvelopeLayout{size: 8 << 20}, record)
+		rememberDecodedIndexCacheRecord("newer", indexCacheEnvelopeLayout{size: 8 << 20}, record)
+		rememberDecodedIndexCacheRecord("newest", indexCacheEnvelopeLayout{size: 1 << 20}, record)
+
+		decodedIndexCaches.Lock()
+		defer decodedIndexCaches.Unlock()
+		if len(decodedIndexCaches.entries) != 2 {
+			t.Fatalf("encoded-size-bounded entries = %d, want 2", len(decodedIndexCaches.entries))
+		}
+		if decodedIndexCaches.entries[0].path != "newest" || decodedIndexCaches.entries[1].path != "newer" {
+			t.Fatalf("encoded-size eviction order = %q, %q", decodedIndexCaches.entries[0].path, decodedIndexCaches.entries[1].path)
+		}
+	})
+
+	t.Run("oversized entry", func(t *testing.T) {
+		resetDecodedIndexCacheForTest(t)
+		record, _ := writeIndexCacheRecordFixture(t)
+		rememberDecodedIndexCacheRecord("oversized", indexCacheEnvelopeLayout{size: indexCacheMemoryMaximumEncodedBytes + 1}, record)
+		decodedIndexCaches.Lock()
+		defer decodedIndexCaches.Unlock()
+		if len(decodedIndexCaches.entries) != 0 {
+			t.Fatalf("oversized decoded entry was retained: %#v", decodedIndexCaches.entries)
+		}
+	})
+}
+
+// TestReadDecodedIndexCacheRecordDropsCorruptRetainedState verifies process memory cannot hide or retain an externally corrupted exact section.
+func TestReadDecodedIndexCacheRecordDropsCorruptRetainedState(t *testing.T) {
+	resetDecodedIndexCacheForTest(t)
+	record, _ := writeIndexCacheRecordFixture(t)
+	record.TypedState = typedSchemaIncrementalCodecFixture()
+	encoded, err := encodeIndexCacheRecord(record)
+	if err != nil {
+		t.Fatalf("encode retained corruption fixture: %v", err)
+	}
+	layout, ok := decodeIndexCacheEnvelopeLayout(bytes.NewReader(encoded), int64(len(encoded)))
+	if !ok {
+		t.Fatal("decode retained corruption layout")
+	}
+	cachePath := filepath.Join(t.TempDir(), "webindex.cache")
+	if err := os.WriteFile(cachePath, encoded, 0o644); err != nil {
+		t.Fatalf("write retained corruption fixture: %v", err)
+	}
+	if _, ok := readDecodedIndexCacheRecord(cachePath, record.InputHash); !ok {
+		t.Fatal("prime decoded cache memory")
+	}
+	corrupt := append([]byte(nil), encoded...)
+	corrupt[layout.recordOffset] ^= 1
+	if err := os.WriteFile(cachePath, corrupt, 0o644); err != nil {
+		t.Fatalf("corrupt retained cache record: %v", err)
+	}
+	if _, ok := readDecodedIndexCacheRecord(cachePath, record.InputHash); ok {
+		t.Fatal("retained decoded state hid exact-section corruption")
+	}
+	decodedIndexCaches.Lock()
+	defer decodedIndexCaches.Unlock()
+	if len(decodedIndexCaches.entries) != 0 {
+		t.Fatal("corrupt retained state remained reachable in process memory")
 	}
 }
 

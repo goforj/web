@@ -8,6 +8,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+)
+
+const (
+	// jsonArtifactTemporaryMarker distinguishes current publisher candidates from unrelated files that share the legacy prefix.
+	jsonArtifactTemporaryMarker = ".webindex-candidate"
 )
 
 // jsonArtifact keeps each value bound to its destination until the complete set has encoded successfully.
@@ -95,6 +101,9 @@ func publishEncodedJSONArtifactsLockedValidated(ctx context.Context, encoded []e
 		ctx = context.Background()
 	}
 	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if err := scavengeJSONArtifactCandidates(encoded); err != nil {
 		return false, err
 	}
 	prepared := make([]preparedJSONArtifact, 0, len(encoded))
@@ -200,7 +209,7 @@ func encodeJSONArtifacts(artifacts []jsonArtifact) ([]encodedJSONArtifact, error
 	return encoded, nil
 }
 
-// prepareJSONArtifact writes a same-directory candidate while retaining enough state to roll back a later publication failure.
+// prepareJSONArtifact writes a same-directory candidate while its caller owns the directory lock and retains enough state to roll back failure.
 func prepareJSONArtifact(artifact encodedJSONArtifact) (preparedJSONArtifact, error) {
 	prepared := preparedJSONArtifact{path: artifact.path}
 	existing, err := os.ReadFile(artifact.path)
@@ -218,7 +227,7 @@ func prepareJSONArtifact(artifact encodedJSONArtifact) (preparedJSONArtifact, er
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return preparedJSONArtifact{}, fmt.Errorf("create artifact directory %q: %w", dir, err)
 	}
-	temporary, err := os.CreateTemp(dir, "."+filepath.Base(artifact.path)+".tmp-*")
+	temporary, err := os.CreateTemp(dir, jsonArtifactTemporaryPattern(artifact.path))
 	if err != nil {
 		return preparedJSONArtifact{}, fmt.Errorf("create temporary artifact for %q: %w", artifact.path, err)
 	}
@@ -229,6 +238,104 @@ func prepareJSONArtifact(artifact encodedJSONArtifact) (preparedJSONArtifact, er
 		return preparedJSONArtifact{}, err
 	}
 	return prepared, nil
+}
+
+// jsonArtifactTemporaryPattern reserves a recognizable suffix so future crash leftovers can be distinguished from ordinary files.
+func jsonArtifactTemporaryPattern(path string) string {
+	return jsonArtifactTemporaryPrefix(path) + "*" + jsonArtifactTemporaryMarker
+}
+
+// jsonArtifactTemporaryPrefix keeps every candidate tied to exactly one destination basename.
+func jsonArtifactTemporaryPrefix(path string) string {
+	return "." + filepath.Base(path) + ".tmp-"
+}
+
+// scavengeJSONArtifactCandidates removes candidates abandoned by crashed publishers with at most one directory scan per artifact set.
+func scavengeJSONArtifactCandidates(artifacts []encodedJSONArtifact) error {
+	type artifactDirectoryCandidates struct {
+		directory string
+		prefixes  []string
+	}
+	directoryIndexes := make(map[string]int, len(artifacts))
+	directories := make([]artifactDirectoryCandidates, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		if artifact.path == "" {
+			continue
+		}
+		directory := filepath.Clean(filepath.Dir(artifact.path))
+		index, exists := directoryIndexes[directory]
+		if !exists {
+			index = len(directories)
+			directoryIndexes[directory] = index
+			directories = append(directories, artifactDirectoryCandidates{directory: directory})
+		}
+		directories[index].prefixes = append(directories[index].prefixes, jsonArtifactTemporaryPrefix(artifact.path))
+	}
+	var cleanupErrors []error
+	for _, candidates := range directories {
+		entries, err := os.ReadDir(candidates.directory)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("inspect temporary artifacts in %q: %w", candidates.directory, err))
+			continue
+		}
+		for _, entry := range entries {
+			if !matchesJSONArtifactTemporaryCandidate(entry.Name(), candidates.prefixes) {
+				continue
+			}
+			info, infoErr := entry.Info()
+			if os.IsNotExist(infoErr) {
+				continue
+			}
+			candidatePath := filepath.Join(candidates.directory, entry.Name())
+			if infoErr != nil {
+				cleanupErrors = append(cleanupErrors, fmt.Errorf("inspect temporary artifact %q: %w", candidatePath, infoErr))
+				continue
+			}
+			if !info.Mode().IsRegular() {
+				continue
+			}
+			if removeErr := os.Remove(candidatePath); removeErr != nil && !os.IsNotExist(removeErr) {
+				cleanupErrors = append(cleanupErrors, fmt.Errorf("remove temporary artifact %q: %w", candidatePath, removeErr))
+			}
+		}
+	}
+	return errors.Join(cleanupErrors...)
+}
+
+// matchesJSONArtifactTemporaryCandidate reports whether a name belongs to any artifact in one locked directory transaction.
+func matchesJSONArtifactTemporaryCandidate(name string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if isJSONArtifactTemporaryCandidate(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// isJSONArtifactTemporaryCandidate recognizes current marked candidates and numeric legacy names emitted by os.CreateTemp.
+func isJSONArtifactTemporaryCandidate(name string, prefix string) bool {
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	random := strings.TrimPrefix(name, prefix)
+	if strings.HasSuffix(random, jsonArtifactTemporaryMarker) {
+		return strings.TrimSuffix(random, jsonArtifactTemporaryMarker) != ""
+	}
+	if random == "" {
+		return false
+	}
+	if len(random) > 10 {
+		return false
+	}
+	for _, character := range random {
+		if character < '0' || character > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // writeJSONCandidate completes and syncs a candidate before it can replace a visible artifact.
