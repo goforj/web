@@ -252,6 +252,41 @@ func BenchmarkRunRepresentativeScaleChangedRepo(b *testing.B) {
 	b.ReportMetric(representativeScaleTotalLines, "go_lines")
 }
 
+// BenchmarkRunRepresentativeScalePersistentCacheHit measures a fresh-process-equivalent exact cache hit.
+func BenchmarkRunRepresentativeScalePersistentCacheHit(b *testing.B) {
+	fixture := writeRepresentativeScaleFixture(b)
+	assertRepresentativeScaleSourceShape(b, measureRepresentativeScaleSources(b, fixture.root))
+	manifest, err := RunCached(context.Background(), fixture.cachedOptions(), fixture.cachePath)
+	if err != nil {
+		b.Fatalf("warm representative-scale fixture: %v", err)
+	}
+	assertRepresentativeScaleManifest(b, manifest)
+	readRepresentativeScaleArtifacts(b, fixture)
+	cacheData := readRepresentativeScaleFile(b, fixture.cachePath)
+	layout, ok := decodeIndexCacheEnvelopeLayout(bytes.NewReader(cacheData), int64(len(cacheData)))
+	if !ok {
+		b.Fatal("decode representative-scale cache layout")
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for iteration := 0; iteration < b.N; iteration++ {
+		clearRepresentativeScaleDecodedCache()
+		manifest, runErr := RunCached(context.Background(), fixture.cachedOptions(), fixture.cachePath)
+		if runErr != nil {
+			b.Fatalf("index unchanged representative-scale fixture: %v", runErr)
+		}
+		assertRepresentativeScaleManifest(b, manifest)
+	}
+	b.ReportMetric(representativeScaleHandlerPackages, "handler_pkgs")
+	b.ReportMetric(representativeScaleOperations, "operations")
+	b.ReportMetric(representativeScaleSchemas, "schemas")
+	b.ReportMetric(representativeScaleTotalFiles, "go_files")
+	b.ReportMetric(representativeScaleTotalLines, "go_lines")
+	b.ReportMetric(float64(layout.recordLength), "exact_B")
+	b.ReportMetric(float64(layout.typedLength), "typed_B")
+}
+
 // options requests the same three artifacts produced by application indexing.
 func (fixture representativeScaleFixture) options() IndexOptions {
 	return IndexOptions{

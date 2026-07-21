@@ -1,7 +1,6 @@
 package webindex
 
 import (
-	"crypto/sha256"
 	"io"
 	"os"
 	"sync"
@@ -10,17 +9,14 @@ import (
 const (
 	// indexCacheMemoryCapacity bounds retained decoded records for long-lived development processes.
 	indexCacheMemoryCapacity = 4
-	// indexCacheVerificationBufferSize keeps content validation allocation-light without retaining another complete cache payload.
-	indexCacheVerificationBufferSize = 32 << 10
 )
 
-// indexCacheMemoryEntry retains an immutable decoded record behind the exact bytes published to disk.
+// indexCacheMemoryEntry retains decoded sections behind the checksummed layout published to disk.
 type indexCacheMemoryEntry struct {
-	path         string
-	size         int64
-	digest       [sha256.Size]byte
-	record       indexCacheRecord
-	typedPayload []byte
+	path       string
+	layout     indexCacheEnvelopeLayout
+	record     indexCacheRecord
+	typedState *typedSchemaIncrementalState
 }
 
 // indexCacheMemoryState is a small move-to-front cache because one watcher normally revisits a single project path.
@@ -31,45 +27,72 @@ type indexCacheMemoryState struct {
 
 var decodedIndexCaches indexCacheMemoryState
 
-// readDecodedIndexCacheRecord reuses decoded state and otherwise decodes only the section required by the current input identity.
+// readDecodedIndexCacheRecord validates only the section required by the current input identity.
 func readDecodedIndexCacheRecord(path string, inputHash string) (indexCacheRecord, bool) {
-	if entry, exists := decodedIndexCaches.entry(path); exists {
-		matches, err := indexCacheFileMatchesMemoryEntry(path, entry)
-		if err == nil && matches {
-			record := entry.record
-			if record.InputHash != inputHash && record.TypedState == nil {
-				typedState, ok := decodeIndexCacheTypedState(entry.typedPayload)
-				if !ok {
-					return indexCacheRecord{}, false
-				}
-				record.TypedState = typedState
-				decodedIndexCaches.retainTypedState(path, entry.digest, typedState)
-			}
+	file, err := os.Open(path)
+	if err != nil {
+		return indexCacheRecord{}, false
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil || !info.Mode().IsRegular() || info.Size() > indexCacheMaximumSize {
+		return indexCacheRecord{}, false
+	}
+	entry, _ := decodedIndexCaches.entry(path)
+	record, layout, exact, ok := decodeIndexCacheReader(file, info.Size(), inputHash, entry)
+	if !ok {
+		return indexCacheRecord{}, false
+	}
+	if exact {
+		if entry.path == path && entry.layout == layout {
 			decodedIndexCaches.promote(path)
-			return record, true
+		} else {
+			rememberDecodedIndexCacheRecord(path, layout, record)
 		}
+		return record, true
 	}
-	data, ok := readIndexCacheData(path)
-	if !ok {
-		return indexCacheRecord{}, false
+	if entry.path == path && entry.layout == layout && entry.typedState == nil {
+		decodedIndexCaches.retainTypedState(path, layout, record.TypedState)
 	}
-	envelope, ok := decodeIndexCacheEnvelope(data)
-	if !ok {
-		return indexCacheRecord{}, false
-	}
-	if envelope.inputHash != inputHash {
-		typedState, typedOK := decodeIndexCacheTypedState(envelope.typed)
-		if !typedOK {
-			return indexCacheRecord{}, false
-		}
-		return indexCacheRecord{Version: indexCacheFormatVersion, InputHash: envelope.inputHash, TypedState: typedState}, true
-	}
-	record, ok := decodeIndexCacheExactRecord(envelope.record, envelope.inputHash)
-	if !ok {
-		return indexCacheRecord{}, false
-	}
-	rememberDecodedIndexCacheRecord(path, data, record, envelope.typed)
 	return record, true
+}
+
+// decodeIndexCacheReader validates one persisted section while leaving the unrelated section unread.
+func decodeIndexCacheReader(reader io.ReaderAt, size int64, inputHash string, entry indexCacheMemoryEntry) (indexCacheRecord, indexCacheEnvelopeLayout, bool, bool) {
+	layout, ok := decodeIndexCacheEnvelopeLayout(reader, size)
+	if !ok {
+		return indexCacheRecord{}, indexCacheEnvelopeLayout{}, false, false
+	}
+	if layout.inputHash != inputHash {
+		typedPayload, valid := readIndexCacheEnvelopeSection(reader, layout.typedOffset, layout.typedLength, layout.typedDigest)
+		if !valid {
+			return indexCacheRecord{}, indexCacheEnvelopeLayout{}, false, false
+		}
+		var typedState *typedSchemaIncrementalState
+		if entry.layout == layout && entry.typedState != nil {
+			typedState = entry.typedState
+		} else {
+			typedState, valid = decodeIndexCacheTypedState(typedPayload)
+			if !valid {
+				return indexCacheRecord{}, indexCacheEnvelopeLayout{}, false, false
+			}
+		}
+		return indexCacheRecord{Version: indexCacheFormatVersion, InputHash: layout.inputHash, TypedState: typedState}, layout, false, true
+	}
+	recordPayload, ok := readIndexCacheEnvelopeSection(reader, layout.recordOffset, layout.recordLength, layout.recordDigest)
+	if !ok {
+		return indexCacheRecord{}, indexCacheEnvelopeLayout{}, false, false
+	}
+	if entry.layout == layout {
+		record := entry.record
+		record.TypedState = entry.typedState
+		return record, layout, true, true
+	}
+	record, ok := decodeIndexCacheExactRecord(recordPayload, layout.inputHash)
+	if !ok {
+		return indexCacheRecord{}, indexCacheEnvelopeLayout{}, false, false
+	}
+	return record, layout, true, true
 }
 
 // entry snapshots one immutable memory entry without holding the lock during filesystem work.
@@ -98,29 +121,29 @@ func (state *indexCacheMemoryState) promote(path string) {
 	}
 }
 
-// retainTypedState replaces raw state only when the cache entry decoded by this caller is still current.
-func (state *indexCacheMemoryState) retainTypedState(path string, digest [sha256.Size]byte, typedState *typedSchemaIncrementalState) {
+// retainTypedState keeps decoded incremental state only when the layout observed by this caller is still current.
+func (state *indexCacheMemoryState) retainTypedState(path string, layout indexCacheEnvelopeLayout, typedState *typedSchemaIncrementalState) {
 	state.Lock()
 	defer state.Unlock()
 	for index := range state.entries {
 		entry := &state.entries[index]
-		if entry.path != path || entry.digest != digest {
+		if entry.path != path || entry.layout != layout {
 			continue
 		}
-		entry.record.TypedState = typedState
-		entry.typedPayload = nil
+		entry.typedState = typedState
 		return
 	}
 }
 
 // rememberDecodedIndexCacheRecord replaces one path and evicts the least recently used decoded record.
-func rememberDecodedIndexCacheRecord(path string, data []byte, record indexCacheRecord, typedPayload []byte) {
+func rememberDecodedIndexCacheRecord(path string, layout indexCacheEnvelopeLayout, record indexCacheRecord) {
+	typedState := record.TypedState
+	record.TypedState = nil
 	entry := indexCacheMemoryEntry{
-		path:         path,
-		size:         int64(len(data)),
-		digest:       sha256.Sum256(data),
-		record:       record,
-		typedPayload: typedPayload,
+		path:       path,
+		layout:     layout,
+		record:     record,
+		typedState: typedState,
 	}
 	decodedIndexCaches.Lock()
 	defer decodedIndexCaches.Unlock()
@@ -140,25 +163,4 @@ func rememberDecodedIndexCacheRecord(path string, data []byte, record indexCache
 		entries = entries[:indexCacheMemoryCapacity]
 	}
 	decodedIndexCaches.entries = entries
-}
-
-// indexCacheFileMatchesMemoryEntry hashes disk bytes so process-local reuse cannot hide external replacement or corruption.
-func indexCacheFileMatchesMemoryEntry(path string, entry indexCacheMemoryEntry) (bool, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return false, err
-	}
-	defer file.Close()
-	info, err := file.Stat()
-	if err != nil || !info.Mode().IsRegular() || info.Size() != entry.size || info.Size() > indexCacheMaximumSize {
-		return false, err
-	}
-	digest := sha256.New()
-	written, err := io.CopyBuffer(digest, file, make([]byte, indexCacheVerificationBufferSize))
-	if err != nil || written != entry.size {
-		return false, err
-	}
-	var actual [sha256.Size]byte
-	digest.Sum(actual[:0])
-	return actual == entry.digest, nil
 }

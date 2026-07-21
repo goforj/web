@@ -3,7 +3,7 @@ package webindex
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"math"
 	"os"
@@ -14,6 +14,36 @@ import (
 
 	"golang.org/x/tools/go/packages"
 )
+
+// indexCacheReadRange records one random-access read for section-isolation assertions.
+type indexCacheReadRange struct {
+	offset int64
+	length int64
+}
+
+// indexCacheTrackingReader records which cache ranges a decoder actually consumes.
+type indexCacheTrackingReader struct {
+	data  []byte
+	reads []indexCacheReadRange
+}
+
+// ReadAt records the requested range before delegating to an immutable byte reader.
+func (reader *indexCacheTrackingReader) ReadAt(buffer []byte, offset int64) (int, error) {
+	reader.reads = append(reader.reads, indexCacheReadRange{offset: offset, length: int64(len(buffer))})
+	return bytes.NewReader(reader.data).ReadAt(buffer, offset)
+}
+
+// overlaps reports whether any observed read touched the requested half-open section.
+func (reader *indexCacheTrackingReader) overlaps(offset int64, length int64) bool {
+	end := offset + length
+	for _, observed := range reader.reads {
+		observedEnd := observed.offset + observed.length
+		if observed.offset < end && offset < observedEnd {
+			return true
+		}
+	}
+	return false
+}
 
 // TestIndexCacheRecordRoundTripPreservesManifestContract verifies canonical JSON, exact numbers, and private projection evidence survive persistence.
 func TestIndexCacheRecordRoundTripPreservesManifestContract(t *testing.T) {
@@ -672,11 +702,11 @@ func TestReadIndexCacheDataRejectsOversizedAndNonRegularEntries(t *testing.T) {
 // TestDecodeIndexCacheRecordRejectsInvalidFramingAndPayload verifies every malformed cache class becomes a safe miss.
 func TestDecodeIndexCacheRecordRejectsInvalidFramingAndPayload(t *testing.T) {
 	record, _ := writeIndexCacheRecordFixture(t)
+	record.TypedState = typedSchemaIncrementalCodecFixture()
 	encoded, err := encodeIndexCacheRecord(record)
 	if err != nil {
 		t.Fatalf("encode cache record fixture: %v", err)
 	}
-	headerLength := len(indexCacheMagic) + sha256.Size*2 + 1
 	envelope, ok := decodeIndexCacheEnvelope(encoded)
 	if !ok {
 		t.Fatal("decode cache envelope fixture")
@@ -686,25 +716,40 @@ func TestDecodeIndexCacheRecordRejectsInvalidFramingAndPayload(t *testing.T) {
 		name string
 		data func() []byte
 	}{
-		{name: "truncated", data: func() []byte { return encoded[:len(indexCacheMagic)] }},
+		{name: "truncated", data: func() []byte { return encoded[:indexCacheEnvelopeFixedHeaderBytes-1] }},
 		{name: "magic", data: func() []byte {
 			data := append([]byte(nil), encoded...)
 			data[0] ^= 0xff
 			return data
 		}},
-		{name: "separator", data: func() []byte {
+		{name: "empty input identity", data: func() []byte {
 			data := append([]byte(nil), encoded...)
-			data[headerLength-1] = '!'
+			binary.BigEndian.PutUint32(data[len(indexCacheMagic):len(indexCacheMagic)+4], 0)
 			return data
 		}},
-		{name: "checksum encoding", data: func() []byte {
+		{name: "empty exact section", data: func() []byte {
 			data := append([]byte(nil), encoded...)
-			data[len(indexCacheMagic)] = 'z'
+			binary.BigEndian.PutUint32(data[len(indexCacheMagic)+4:len(indexCacheMagic)+8], 0)
 			return data
 		}},
-		{name: "checksum mismatch", data: func() []byte {
+		{name: "declared size mismatch", data: func() []byte {
 			data := append([]byte(nil), encoded...)
-			data[len(data)-1] ^= 1
+			binary.BigEndian.PutUint32(data[len(indexCacheMagic)+8:len(indexCacheMagic)+12], uint32(envelope.typedLength+1))
+			return data
+		}},
+		{name: "metadata checksum mismatch", data: func() []byte {
+			data := append([]byte(nil), encoded...)
+			data[indexCacheEnvelopeFixedHeaderBytes-1] ^= 1
+			return data
+		}},
+		{name: "exact checksum mismatch", data: func() []byte {
+			data := append([]byte(nil), encoded...)
+			data[envelope.recordOffset] ^= 1
+			return data
+		}},
+		{name: "typed checksum mismatch", data: func() []byte {
+			data := append([]byte(nil), encoded...)
+			data[envelope.typedOffset] ^= 1
 			return data
 		}},
 		{name: "malformed JSON", data: func() []byte { return frameIndexCacheTestPayload([]byte("{")) }},
@@ -719,6 +764,74 @@ func TestDecodeIndexCacheRecordRejectsInvalidFramingAndPayload(t *testing.T) {
 				t.Fatal("invalid cache record was accepted")
 			}
 		})
+	}
+}
+
+// TestDecodeIndexCacheReaderReadsOnlySelectedSection verifies fresh processes never consume an unrelated cache payload.
+func TestDecodeIndexCacheReaderReadsOnlySelectedSection(t *testing.T) {
+	record, _ := writeIndexCacheRecordFixture(t)
+	wantTypedState := typedSchemaIncrementalCodecFixture()
+	typedPayload, err := encodeTypedSchemaIncrementalState(wantTypedState)
+	if err != nil {
+		t.Fatalf("encode typed-state fixture: %v", err)
+	}
+	exactPayload, err := json.Marshal(record)
+	if err != nil {
+		t.Fatalf("encode exact-record fixture: %v", err)
+	}
+	encoded, err := frameIndexCacheEnvelope(record.InputHash, exactPayload, typedPayload)
+	if err != nil {
+		t.Fatalf("frame section-isolation fixture: %v", err)
+	}
+
+	exactReader := &indexCacheTrackingReader{data: encoded}
+	exactRecord, exactLayout, exact, ok := decodeIndexCacheReader(exactReader, int64(len(encoded)), record.InputHash, indexCacheMemoryEntry{})
+	if !ok || !exact || exactRecord.InputHash != record.InputHash {
+		t.Fatalf("exact section read = valid %t, exact %t, input %q", ok, exact, exactRecord.InputHash)
+	}
+	if exactReader.overlaps(exactLayout.typedOffset, exactLayout.typedLength) {
+		t.Fatal("exact cache hit read the incremental typed section")
+	}
+
+	typedReader := &indexCacheTrackingReader{data: encoded}
+	changedRecord, changedLayout, exact, ok := decodeIndexCacheReader(typedReader, int64(len(encoded)), "changed-input", indexCacheMemoryEntry{})
+	if !ok || exact || !reflect.DeepEqual(changedRecord.TypedState, wantTypedState) {
+		t.Fatalf("changed-input section read = valid %t, exact %t, typed state %#v", ok, exact, changedRecord.TypedState)
+	}
+	if typedReader.overlaps(changedLayout.recordOffset, changedLayout.recordLength) {
+		t.Fatal("changed-input cache read consumed the exact artifact section")
+	}
+}
+
+// TestDecodeIndexCacheReaderIsolatesSectionCorruption verifies corruption invalidates a section when that section is selected.
+func TestDecodeIndexCacheReaderIsolatesSectionCorruption(t *testing.T) {
+	record, _ := writeIndexCacheRecordFixture(t)
+	record.TypedState = typedSchemaIncrementalCodecFixture()
+	encoded, err := encodeIndexCacheRecord(record)
+	if err != nil {
+		t.Fatalf("encode corruption-isolation fixture: %v", err)
+	}
+	layout, ok := decodeIndexCacheEnvelopeLayout(bytes.NewReader(encoded), int64(len(encoded)))
+	if !ok {
+		t.Fatal("decode corruption-isolation layout")
+	}
+
+	exactCorrupt := append([]byte(nil), encoded...)
+	exactCorrupt[layout.recordOffset] ^= 1
+	if _, _, _, valid := decodeIndexCacheReader(bytes.NewReader(exactCorrupt), int64(len(exactCorrupt)), record.InputHash, indexCacheMemoryEntry{}); valid {
+		t.Fatal("exact hit accepted corrupt exact content")
+	}
+	if changed, _, exact, valid := decodeIndexCacheReader(bytes.NewReader(exactCorrupt), int64(len(exactCorrupt)), "changed-input", indexCacheMemoryEntry{}); !valid || exact || changed.TypedState == nil {
+		t.Fatalf("exact corruption invalidated independent typed state: valid=%t exact=%t", valid, exact)
+	}
+
+	typedCorrupt := append([]byte(nil), encoded...)
+	typedCorrupt[layout.typedOffset] ^= 1
+	if exactRecord, _, exact, valid := decodeIndexCacheReader(bytes.NewReader(typedCorrupt), int64(len(typedCorrupt)), record.InputHash, indexCacheMemoryEntry{}); !valid || !exact || exactRecord.InputHash != record.InputHash {
+		t.Fatalf("typed corruption invalidated independent exact state: valid=%t exact=%t", valid, exact)
+	}
+	if _, _, _, valid := decodeIndexCacheReader(bytes.NewReader(typedCorrupt), int64(len(typedCorrupt)), "changed-input", indexCacheMemoryEntry{}); valid {
+		t.Fatal("changed-input read accepted corrupt typed content")
 	}
 }
 
