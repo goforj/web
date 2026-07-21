@@ -98,10 +98,15 @@ func isSliceTypeExpression(expression ast.Expr) bool {
 
 // newRouteScope resolves the selected app's composition file before discovery so route methods from other app entrypoints cannot leak into its API index.
 func newRouteScope(root string, compositionPath string, parsed []*parsedFile) (routeScope, error) {
+	return newRouteScopeWithModulePath(root, compositionPath, parsed, modulePathFromRoot(root))
+}
+
+// newRouteScopeWithModulePath binds cache-backed route identity to the snapshotted main module directive.
+func newRouteScopeWithModulePath(root string, compositionPath string, parsed []*parsedFile, modulePath string) (routeScope, error) {
 	root = filepath.Clean(root)
 	scope := routeScope{
 		root:       root,
-		modulePath: modulePathFromRoot(root),
+		modulePath: modulePath,
 	}
 	if compositionPath == "" {
 		return scope, nil
@@ -756,6 +761,11 @@ func modulePathFromRoot(root string) string {
 	if err != nil {
 		return ""
 	}
+	return modulePathFromData(contents)
+}
+
+// modulePathFromData reads only the module directive from an immutable go.mod snapshot.
+func modulePathFromData(contents []byte) string {
 	for _, line := range strings.Split(string(contents), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) >= 2 && fields[0] == "module" {

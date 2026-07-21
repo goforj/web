@@ -86,6 +86,11 @@ func publishEncodedJSONArtifactsContext(ctx context.Context, encoded []encodedJS
 
 // publishEncodedJSONArtifactsLocked performs the transaction while its caller owns every directory lock for the output set.
 func publishEncodedJSONArtifactsLocked(ctx context.Context, encoded []encodedJSONArtifact, rename func(string, string) error) (bool, error) {
+	return publishEncodedJSONArtifactsLockedValidated(ctx, encoded, rename, nil)
+}
+
+// publishEncodedJSONArtifactsLockedValidated performs a final optional freshness check after every candidate is durable but before the first visible rename.
+func publishEncodedJSONArtifactsLockedValidated(ctx context.Context, encoded []encodedJSONArtifact, rename func(string, string) error, validate func(context.Context) error) (bool, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -110,6 +115,11 @@ func publishEncodedJSONArtifactsLocked(ctx context.Context, encoded []encodedJSO
 		}
 	}
 	defer cleanupPreparedJSONArtifacts(prepared)
+	if validate != nil {
+		if err := validate(ctx); err != nil {
+			return false, err
+		}
+	}
 
 	published := make([]preparedJSONArtifact, 0, len(prepared))
 	for _, artifact := range prepared {
@@ -143,20 +153,31 @@ func publishEncodedJSONArtifactsLocked(ctx context.Context, encoded []encodedJSO
 
 // validateEncodedJSONArtifactPaths rejects one physical destination serving multiple artifact roles before lock files or candidates are created.
 func validateEncodedJSONArtifactPaths(encoded []encodedJSONArtifact) error {
-	seen := make(map[string]string, len(encoded))
+	type artifactIdentity struct {
+		path     string
+		original string
+		info     os.FileInfo
+	}
+	seen := make([]artifactIdentity, 0, len(encoded))
 	for _, artifact := range encoded {
 		if artifact.path == "" {
 			continue
 		}
-		absolute, err := filepath.Abs(filepath.Clean(artifact.path))
+		canonical, err := canonicalIndexCachePath(filepath.Clean(artifact.path))
 		if err != nil {
 			return fmt.Errorf("resolve JSON artifact path %q: %w", artifact.path, err)
 		}
-		canonical := filepath.Clean(absolute)
-		if previous, exists := seen[canonical]; exists {
-			return fmt.Errorf("JSON artifact paths %q and %q resolve to the same destination %q", previous, artifact.path, canonical)
+		info, statErr := os.Stat(canonical)
+		if statErr != nil && !os.IsNotExist(statErr) {
+			return fmt.Errorf("inspect JSON artifact path %q: %w", artifact.path, statErr)
 		}
-		seen[canonical] = artifact.path
+		for _, previous := range seen {
+			sameFile := info != nil && previous.info != nil && os.SameFile(info, previous.info)
+			if indexCachePathsEqual(canonical, previous.path) || sameFile {
+				return fmt.Errorf("JSON artifact paths %q and %q resolve to the same destination %q", previous.original, artifact.path, canonical)
+			}
+		}
+		seen = append(seen, artifactIdentity{path: canonical, original: artifact.path, info: info})
 	}
 	return nil
 }

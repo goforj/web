@@ -172,6 +172,60 @@ func TestPublishJSONArtifactsRejectsDuplicateCanonicalPaths(t *testing.T) {
 	}
 }
 
+// TestPublishJSONArtifactsRejectsDuplicatePhysicalPaths verifies symlink and case aliases cannot assign multiple roles to one output.
+func TestPublishJSONArtifactsRejectsDuplicatePhysicalPaths(t *testing.T) {
+	t.Run("symlinked directory", func(t *testing.T) {
+		parent := t.TempDir()
+		realDirectory := filepath.Join(parent, "real")
+		if err := os.Mkdir(realDirectory, 0o755); err != nil {
+			t.Fatalf("create artifact directory: %v", err)
+		}
+		aliasDirectory := filepath.Join(parent, "alias")
+		if err := os.Symlink(realDirectory, aliasDirectory); err != nil {
+			t.Skipf("create artifact directory alias: %v", err)
+		}
+		realPath := filepath.Join(realDirectory, "api_index.json")
+		aliasPath := filepath.Join(aliasDirectory, "api_index.json")
+		changed, err := publishJSONArtifacts([]jsonArtifact{
+			{path: realPath, value: map[string]any{"kind": "manifest"}},
+			{path: aliasPath, value: map[string]any{"kind": "diagnostics"}},
+		})
+		if err == nil || !strings.Contains(err.Error(), "same destination") {
+			t.Fatalf("expected symlinked destination error, got changed=%t err=%v", changed, err)
+		}
+		if changed {
+			t.Fatal("symlinked destination validation must happen before publication")
+		}
+		if _, statErr := os.Stat(realPath); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("symlinked destination created an artifact: %v", statErr)
+		}
+		if _, statErr := os.Stat(filepath.Join(realDirectory, artifactLockFilename)); !errors.Is(statErr, os.ErrNotExist) {
+			t.Fatalf("symlinked destination created a lock file: %v", statErr)
+		}
+	})
+
+	t.Run("case-only path", func(t *testing.T) {
+		root := t.TempDir()
+		upperPath := filepath.Join(root, "API_INDEX.json")
+		lowerPath := filepath.Join(root, "api_index.JSON")
+		changed, err := publishJSONArtifacts([]jsonArtifact{
+			{path: upperPath, value: map[string]any{"kind": "manifest"}},
+			{path: lowerPath, value: map[string]any{"kind": "diagnostics"}},
+		})
+		if err == nil || !strings.Contains(err.Error(), "same destination") {
+			t.Fatalf("expected case-only destination error, got changed=%t err=%v", changed, err)
+		}
+		if changed {
+			t.Fatal("case-only destination validation must happen before publication")
+		}
+		for _, path := range []string{upperPath, lowerPath} {
+			if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+				t.Fatalf("case-only destination created an artifact: %v", statErr)
+			}
+		}
+	})
+}
+
 // TestPublishJSONArtifactsLockWaitHonorsCancellation verifies a canceled build does not wait indefinitely behind another publisher.
 func TestPublishJSONArtifactsLockWaitHonorsCancellation(t *testing.T) {
 	root := t.TempDir()

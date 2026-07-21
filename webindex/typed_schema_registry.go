@@ -23,7 +23,14 @@ type typedSchemaLoadOptions struct {
 	HandlerFiles        []string
 	ContractExpressions []typedSourceRange
 	BuildTags           []string
+	loadPackages        typedPackageLoader
+	capturePackages     func([]*packages.Package)
+	sourceOverlay       map[string][]byte
+	goEnvironment       map[string]string
 }
+
+// typedPackageLoader loads the focused package set through either the production Go driver or a scoped test observer.
+type typedPackageLoader func(config *packages.Config, patterns ...string) ([]*packages.Package, error)
 
 // typedSourceRange identifies an expression across independently parsed syntax trees.
 type typedSourceRange struct {
@@ -112,9 +119,12 @@ func loadTypedSchemaRegistry(ctx context.Context, opts typedSchemaLoadOptions) (
 		Context:    ctx,
 		Dir:        registry.root,
 		BuildFlags: sourceBuildFlags(opts.BuildTags),
+		Overlay:    opts.sourceOverlay,
+		Env:        pinnedSourceBuildEnvironment(opts.goEnvironment),
 		Mode: packages.NeedName |
 			packages.NeedFiles |
 			packages.NeedCompiledGoFiles |
+			packages.NeedExportFile |
 			packages.NeedSyntax |
 			packages.NeedTypes |
 			packages.NeedTypesInfo |
@@ -123,7 +133,11 @@ func loadTypedSchemaRegistry(ctx context.Context, opts typedSchemaLoadOptions) (
 			packages.NeedModule,
 		Tests: false,
 	}
-	loaded, err := packages.Load(config, patterns...)
+	loadPackages := opts.loadPackages
+	if loadPackages == nil {
+		loadPackages = packages.Load
+	}
+	loaded, err := loadPackages(config, patterns...)
 	if err != nil {
 		return nil, fmt.Errorf("load handler packages for typed schemas: %w", err)
 	}
@@ -131,6 +145,9 @@ func loadTypedSchemaRegistry(ctx context.Context, opts typedSchemaLoadOptions) (
 		return nil, err
 	}
 	loaded = uniqueTypedPackages(loaded)
+	if opts.capturePackages != nil {
+		opts.capturePackages(append([]*packages.Package(nil), loaded...))
+	}
 	selection := newTypedSourceSelection(opts.ContractExpressions)
 	for _, pkg := range loaded {
 		registry.recordPackageErrors(pkg)

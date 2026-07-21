@@ -155,8 +155,24 @@ func joinArtifactLockErrors(cause error, cleanupErrors ...error) error {
 
 // acquireArtifactProcessLock serializes goroutines before advisory locking because process-associated lock implementations cannot protect same-process publishers.
 func acquireArtifactProcessLock(ctx context.Context, path string) (artifactProcessLock, error) {
+	canonicalPath, err := canonicalIndexCachePath(path)
+	if err != nil {
+		return artifactProcessLock{}, err
+	}
+	directoryInfo, _ := os.Stat(filepath.Dir(canonicalPath))
 	artifactProcessLocks.Lock()
+	path = canonicalPath
 	entry := artifactProcessLocks.entries[path]
+	if entry == nil && directoryInfo != nil {
+		for existingPath, existingEntry := range artifactProcessLocks.entries {
+			existingInfo, statErr := os.Stat(filepath.Dir(existingPath))
+			if statErr == nil && os.SameFile(directoryInfo, existingInfo) {
+				path = existingPath
+				entry = existingEntry
+				break
+			}
+		}
+	}
 	if entry == nil {
 		entry = &artifactProcessLockEntry{semaphore: make(chan struct{}, 1)}
 		entry.semaphore <- struct{}{}
@@ -190,9 +206,13 @@ func releaseArtifactProcessLock(lock artifactProcessLock) {
 	artifactProcessLocks.Unlock()
 }
 
-// artifactDirectories returns absolute unique parents so relative aliases participate in the same locking protocol.
+// artifactDirectories returns physically unique parents so symlink and case aliases cannot acquire the same lock twice.
 func artifactDirectories(encoded []encodedJSONArtifact) ([]string, error) {
-	seen := make(map[string]struct{}, len(encoded))
+	type directoryIdentity struct {
+		path string
+		info os.FileInfo
+	}
+	identities := make([]directoryIdentity, 0, len(encoded))
 	for _, artifact := range encoded {
 		if artifact.path == "" {
 			continue
@@ -201,11 +221,32 @@ func artifactDirectories(encoded []encodedJSONArtifact) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("resolve artifact directory for %q: %w", artifact.path, err)
 		}
-		seen[filepath.Clean(absolute)] = struct{}{}
+		absolute = filepath.Clean(absolute)
+		if err := os.MkdirAll(absolute, 0o755); err != nil {
+			return nil, fmt.Errorf("create artifact directory %q: %w", absolute, err)
+		}
+		canonical, err := canonicalIndexCachePath(absolute)
+		if err != nil {
+			return nil, fmt.Errorf("canonicalize artifact directory %q: %w", absolute, err)
+		}
+		info, err := os.Stat(canonical)
+		if err != nil {
+			return nil, fmt.Errorf("inspect artifact directory %q: %w", canonical, err)
+		}
+		duplicate := false
+		for _, existing := range identities {
+			if canonical == existing.path || os.SameFile(info, existing.info) {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			identities = append(identities, directoryIdentity{path: canonical, info: info})
+		}
 	}
-	directories := make([]string, 0, len(seen))
-	for directory := range seen {
-		directories = append(directories, directory)
+	directories := make([]string, 0, len(identities))
+	for _, identity := range identities {
+		directories = append(directories, identity.path)
 	}
 	sort.Strings(directories)
 	return directories, nil

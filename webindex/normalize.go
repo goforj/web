@@ -18,9 +18,8 @@ type handlerResolution struct {
 }
 
 // normalize converts scoped routes with the same handler resolution used to select packages for focused type loading.
-func normalize(routes []discoveredRoute, handlers []discoveredHandler, prefixes []string, mapping routerMapping, fset *token.FileSet, registry *typedSchemaRegistry) ([]Operation, []Diagnostic) {
+func normalize(routes []discoveredRoute, handlersByName map[string][]discoveredHandler, prefixes []string, mapping routerMapping, fset *token.FileSet, registry *typedSchemaRegistry) ([]Operation, []Diagnostic) {
 	diag := make([]Diagnostic, 0)
-	handlerByName := indexHandlersByName(handlers)
 
 	effectivePrefix := ""
 	if len(prefixes) == 1 {
@@ -80,7 +79,7 @@ func normalize(routes []discoveredRoute, handlers []discoveredHandler, prefixes 
 		routeMiddlewareSource := middlewareSource{File: r.File, Function: r.EnclosingFunction, Receiver: r.Provider.Receiver}
 		op.Middleware, op.middlewareProvenance = mergeMiddlewares(groupMiddlewares, groupMiddlewareSource, r.MiddlewareExprs, routeMiddlewareSource)
 
-		resolution := resolveHandlerForRoute(r, handlerByName)
+		resolution := resolveHandlerForRoute(r, handlersByName)
 		if !resolution.Found {
 			diag = append(diag, Diagnostic{
 				Severity:  "warn",
@@ -243,8 +242,7 @@ func resolveHandlerForRoute(route discoveredRoute, handlersByName map[string][]d
 }
 
 // selectedHandlerFiles returns only handler packages reachable from scoped HTTP routes, excluding inactive Apps and WebSockets.
-func selectedHandlerFiles(routes []discoveredRoute, handlers []discoveredHandler) []string {
-	handlersByName := indexHandlersByName(handlers)
+func selectedHandlerFiles(routes []discoveredRoute, handlersByName map[string][]discoveredHandler) []string {
 	seen := map[string]struct{}{}
 	files := make([]string, 0)
 	for _, route := range routes {
@@ -266,12 +264,11 @@ func selectedHandlerFiles(routes []discoveredRoute, handlers []discoveredHandler
 }
 
 // selectedHandlerContractExpressions returns exact Bind targets and JSON values reached through resolved HTTP handlers.
-func selectedHandlerContractExpressions(routes []discoveredRoute, handlers []discoveredHandler, fset *token.FileSet) []typedSourceRange {
+func selectedHandlerContractExpressions(routes []discoveredRoute, handlersByName map[string][]discoveredHandler, fset *token.FileSet) []typedSourceRange {
 	ranges := make([]typedSourceRange, 0)
 	if fset == nil {
 		return ranges
 	}
-	handlersByName := indexHandlersByName(handlers)
 	seen := map[string]struct{}{}
 	for _, route := range routes {
 		if normalizeMethodExpr(route.MethodExpr) == "getws" {

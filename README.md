@@ -223,21 +223,21 @@ router.GET("/users", func(c web.Context) error {
 Set `RouteCompositionPath` to the source file that assembles the application route groups. Scoping the index to that composition keeps unrelated fixtures and unused providers out of the published contract.
 
 ```go
-manifest, err := webindex.Run(context.Background(), webindex.IndexOptions{
+manifest, err := webindex.RunCached(context.Background(), webindex.IndexOptions{
 	Root:                 ".",
 	RouteCompositionPath: "internal/http/routes.go",
 	OutPath:              "build/webindex.json",
 	DiagnosticsPath:      "build/webindex.diagnostics.json",
 	OpenAPIPath:           "build/openapi.json",
 	Strict:                true,
-})
+}, "build/webindex.cache")
 if err != nil {
 	log.Fatal(err)
 }
 log.Printf("indexed %d operations", len(manifest.Operations))
 ```
 
-`Strict` promotes unresolved source evidence into an error instead of publishing an ambiguous contract. The returned manifest still contains structured diagnostics for reporting.
+`RunCached` reuses a content-validated analysis snapshot while artifact publication remains changed-only; use `Run` when persistent caching is unnecessary. `Strict` promotes unresolved source evidence into an error instead of publishing an ambiguous contract. The returned manifest still contains structured diagnostics for reporting.
 
 ### Add a WebSocket route
 
@@ -303,7 +303,7 @@ make benchmark-svg
 | Group | Functions |
 |------:|:-----------|
 | **Adapter** | [Adapter.Echo](#echoweb-adapter-echo) · [Adapter.Router](#echoweb-adapter-router) · [Adapter.ServeHTTP](#echoweb-adapter-servehttp) · [New](#echoweb-new) · [NewServer](#echoweb-newserver) · [Server.Router](#echoweb-server-router) · [Server.Serve](#echoweb-server-serve) · [Server.ServeHTTP](#echoweb-server-servehttp) · [UnwrapContext](#echoweb-unwrapcontext) · [UnwrapWebSocketConn](#echoweb-unwrapwebsocketconn) · [Wrap](#echoweb-wrap) |
-| **Indexing** | [Run](#webindex-run) |
+| **Indexing** | [Run](#webindex-run) · [RunCached](#webindex-runcached) |
 | **Middleware<br>Auth** | [BasicAuth](#webmiddleware-basicauth) · [BasicAuthWithConfig](#webmiddleware-basicauthwithconfig) · [CSRF](#webmiddleware-csrf) · [CSRFWithConfig](#webmiddleware-csrfwithconfig) · [CreateExtractors](#webmiddleware-createextractors) · [KeyAuth](#webmiddleware-keyauth) · [KeyAuthWithConfig](#webmiddleware-keyauthwithconfig) |
 | **Middleware<br>Compression** | [Compress](#webmiddleware-compress) · [Decompress](#webmiddleware-decompress) · [DecompressWithConfig](#webmiddleware-decompresswithconfig) · [Gzip](#webmiddleware-gzip) · [GzipWithConfig](#webmiddleware-gzipwithconfig) |
 | **Middleware<br>Method Override** | [MethodFromForm](#webmiddleware-methodfromform) · [MethodFromHeader](#webmiddleware-methodfromheader) · [MethodFromQuery](#webmiddleware-methodfromquery) · [MethodOverride](#webmiddleware-methodoverride) · [MethodOverrideWithConfig](#webmiddleware-methodoverridewithconfig) |
@@ -485,6 +485,11 @@ manifest, err := webindex.Run(context.Background(), webindex.IndexOptions{
 fmt.Println(err == nil, manifest.Version != "")
 // true true
 ```
+
+#### <a id="webindex-runcached"></a>webindex.RunCached
+
+RunCached indexes API metadata while reusing a content-validated analysis cache at cachePath.
+Relative cache paths resolve from opts.Root. An empty path behaves like Run.
 
 ### Auth Middleware
 

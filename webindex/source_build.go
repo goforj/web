@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/build"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -41,25 +42,69 @@ func MatchActiveSourceFile(directory string, name string, buildTags ...string) (
 
 // activeSourceBuildContext mirrors the environment used by go/packages so syntax discovery cannot index files excluded from the current build.
 func activeSourceBuildContext(buildTags ...string) build.Context {
+	return activeSourceBuildContextWithEnvironment(nil, buildTags...)
+}
+
+// activeSourceBuildContextWithEnvironment uses a captured go env snapshot when cache-backed indexing must not observe later process configuration changes.
+func activeSourceBuildContextWithEnvironment(environment map[string]string, buildTags ...string) build.Context {
 	buildContext := build.Default
-	if value := strings.TrimSpace(os.Getenv("GOOS")); value != "" {
+	if value := strings.TrimSpace(sourceBuildEnvironmentValue(environment, "GOOS")); value != "" {
 		buildContext.GOOS = value
 	}
-	if value := strings.TrimSpace(os.Getenv("GOARCH")); value != "" {
+	if value := strings.TrimSpace(sourceBuildEnvironmentValue(environment, "GOARCH")); value != "" {
 		buildContext.GOARCH = value
 	}
-	if value := strings.TrimSpace(os.Getenv("CGO_ENABLED")); value != "" {
+	if value := strings.TrimSpace(sourceBuildEnvironmentValue(environment, "CGO_ENABLED")); value != "" {
 		enabled, err := strconv.ParseBool(value)
 		if err == nil {
 			buildContext.CgoEnabled = enabled
 		}
 	}
-	effectiveTags := goFlagsBuildTags(os.Getenv("GOFLAGS"))
+	effectiveTags := goFlagsBuildTags(sourceBuildEnvironmentValue(environment, "GOFLAGS"))
 	if explicitTags := normalizeSourceBuildTags(buildTags); len(explicitTags) > 0 {
 		effectiveTags = explicitTags
 	}
 	buildContext.BuildTags = dedupeSortedStrings(append(buildContext.BuildTags, effectiveTags...))
 	return buildContext
+}
+
+// sourceBuildEnvironmentValue falls back to the live process only for non-cached callers that have no immutable environment snapshot.
+func sourceBuildEnvironmentValue(environment map[string]string, name string) string {
+	if environment != nil {
+		return environment[name]
+	}
+	return os.Getenv(name)
+}
+
+// pinnedSourceBuildEnvironment disables later GOENV reads while preserving non-Go process settings needed to launch the toolchain.
+func pinnedSourceBuildEnvironment(environment map[string]string) []string {
+	if environment == nil {
+		return nil
+	}
+	values := make(map[string]string, len(os.Environ())+len(environment)+1)
+	for _, entry := range os.Environ() {
+		name, value, ok := strings.Cut(entry, "=")
+		if ok {
+			values[name] = value
+		}
+	}
+	for name, value := range environment {
+		values[name] = value
+	}
+	delete(values, "GOGCCFLAGS")
+	values["GOENV"] = "off"
+	values["GOPACKAGESDRIVER"] = "off"
+	values["GOWORK"] = "off"
+	names := make([]string, 0, len(values))
+	for name := range values {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	result := make([]string, 0, len(names))
+	for _, name := range names {
+		result = append(result, name+"="+values[name])
+	}
+	return result
 }
 
 // sourceBuildFlags returns the explicit go command flags needed to keep focused type loading aligned with syntax discovery.

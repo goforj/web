@@ -2,20 +2,26 @@ package webindex
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/parser"
 	"go/printer"
 	"go/scanner"
 	"go/token"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/goforj/str"
+	"golang.org/x/tools/go/packages"
 )
 
 // IndexOptions controls API index generation behavior.
@@ -67,6 +73,24 @@ type parsedFile struct {
 	File        *ast.File
 }
 
+// sourceParseResult retains each worker result at its walk-order position so concurrent parsing cannot perturb artifact order.
+type sourceParseResult struct {
+	parsed      *parsedFile
+	diagnostics []Diagnostic
+	tokenFile   *token.File
+}
+
+// sourceParseInput keeps immutable bytes and a deterministic token base together across parser workers.
+type sourceParseInput struct {
+	path   string
+	data   []byte
+	base   int
+	active bool
+}
+
+// maxSourceParserWorkers uses cached immutable source snapshots in parallel while bounding uncached filesystem work on large hosts.
+const maxSourceParserWorkers = 16
+
 // Run indexes API metadata from source and writes artifacts.
 // @group Indexing
 // Example:
@@ -80,6 +104,18 @@ type parsedFile struct {
 //
 //	// true true
 func Run(ctx context.Context, opts IndexOptions) (Manifest, error) {
+	return run(ctx, opts, "", nil)
+}
+
+// RunCached indexes API metadata while reusing a content-validated analysis cache at cachePath.
+// Relative cache paths resolve from opts.Root. An empty path behaves like Run.
+// @group Indexing
+func RunCached(ctx context.Context, opts IndexOptions, cachePath string) (Manifest, error) {
+	return run(ctx, opts, cachePath, nil)
+}
+
+// run keeps cache selection and package-loading observation scoped to one invocation so parallel callers cannot affect each other.
+func run(ctx context.Context, opts IndexOptions, cachePath string, loadPackages typedPackageLoader) (Manifest, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -97,15 +133,28 @@ func Run(ctx context.Context, opts IndexOptions) (Manifest, error) {
 	if err != nil {
 		return Manifest{}, err
 	}
+	cache, err := newIndexCacheSession(ctx, root, opts, cachePath)
+	if err != nil {
+		return Manifest{}, err
+	}
+	if manifest, artifacts, hit := cache.load(ctx); hit {
+		if invalid := publicationBlockingDiagnostics(manifest.Diagnostics, opts.Strict); len(invalid) > 0 {
+			return manifest, &DiagnosticsError{Diagnostics: invalid}
+		}
+		if _, err := publishIndexCacheArtifacts(ctx, cache, artifacts); err != nil {
+			return Manifest{}, fmt.Errorf("publish cached API index artifacts: %w", err)
+		}
+		return manifest, nil
+	}
 
-	parsed, fset, parseDiagnostics, err := parseGoFiles(ctx, root, opts.SkipDir, opts.BuildTags...)
+	parsed, fset, parseDiagnostics, err := parseGoFilesFromSnapshotWithEnvironment(ctx, root, opts.SkipDir, cacheSourceFiles(cache), cacheGoEnvironment(cache), opts.BuildTags...)
 	if err != nil {
 		return Manifest{}, err
 	}
 	if err := ctx.Err(); err != nil {
 		return Manifest{}, err
 	}
-	if selectedDiagnostics := selectedCompositionParseDiagnostics(root, opts.RouteCompositionPath, parseDiagnostics); len(selectedDiagnostics) > 0 {
+	if selectedDiagnostics := selectedCompositionParseDiagnostics(root, opts.RouteCompositionPath, parseDiagnostics, cache); len(selectedDiagnostics) > 0 {
 		manifest := Manifest{Version: ManifestVersion, Diagnostics: append([]Diagnostic(nil), parseDiagnostics...)}
 		selectedByLocation := map[string]Diagnostic{}
 		for _, diagnostic := range selectedDiagnostics {
@@ -121,24 +170,75 @@ func Run(ctx context.Context, opts IndexOptions) (Manifest, error) {
 		return manifest, &DiagnosticsError{Diagnostics: selectedDiagnostics}
 	}
 
-	scope, err := newRouteScope(root, opts.RouteCompositionPath, parsed)
+	scope, err := newRouteScopeWithModulePath(root, opts.RouteCompositionPath, parsed, cacheModulePath(cache, root))
 	if err != nil {
 		return Manifest{}, err
 	}
 	routes, handlers, prefixes, mapping := discoverRoutesAndHandlers(fset, parsed, scope)
-	typedSchemas, err := loadTypedSchemaRegistry(ctx, typedSchemaLoadOptions{
-		Root:                root,
-		HandlerFiles:        selectedHandlerFiles(routes, handlers),
-		ContractExpressions: selectedHandlerContractExpressions(routes, handlers, fset),
-		BuildTags:           opts.BuildTags,
-	})
-	if err != nil {
-		return Manifest{}, err
+	handlersByName := indexHandlersByName(handlers)
+	handlerFiles := selectedHandlerFiles(routes, handlersByName)
+	contractExpressions := selectedHandlerContractExpressions(routes, handlersByName, fset)
+	sourceOverlay := cachePackageOverlay(cache)
+	var typedSchemas *typedSchemaRegistry
+	var typedState *typedSchemaIncrementalState
+	if cache != nil && cache.priorTypedState != nil {
+		incremental, handled, incrementalErr := loadTypedSchemaRegistryIncremental(ctx, typedSchemaIncrementalRequest{
+			Root:                root,
+			DependencyIdentity:  cache.dependencyIdentity,
+			BuildTags:           opts.BuildTags,
+			GoEnvironment:       cache.goEnvironment,
+			GoVersion:           cacheGoVersion(cache, root),
+			ParsedFiles:         parsed,
+			FileSet:             fset,
+			HandlerFiles:        handlerFiles,
+			ContractExpressions: contractExpressions,
+			SourceSnapshot:      sourceOverlay,
+		}, cache.priorTypedState)
+		if incrementalErr != nil {
+			return Manifest{}, incrementalErr
+		}
+		if handled {
+			typedSchemas = incremental.Registry
+			typedState = incremental.State
+		}
+	}
+	if typedSchemas == nil {
+		var loadedPackages []*packages.Package
+		typedSchemas, err = loadTypedSchemaRegistry(ctx, typedSchemaLoadOptions{
+			Root:                root,
+			HandlerFiles:        handlerFiles,
+			ContractExpressions: contractExpressions,
+			BuildTags:           opts.BuildTags,
+			loadPackages:        loadPackages,
+			capturePackages: func(loaded []*packages.Package) {
+				loadedPackages = loaded
+			},
+			sourceOverlay: sourceOverlay,
+			goEnvironment: cacheGoEnvironment(cache),
+		})
+		if err != nil {
+			return Manifest{}, err
+		}
+		if cache != nil {
+			moduleSnapshots, snapshotsValid := typedSchemaModuleSnapshotsFromInputs(root, cache.inputFiles)
+			if !snapshotsValid || !typedSchemaLoadedPackagesMatchSnapshot(root, loadedPackages, sourceOverlay, moduleSnapshots) {
+				return Manifest{}, errIndexCacheInputsChanged
+			}
+		}
+		if cache != nil && len(loadedPackages) > 0 {
+			capturedState, supported, captureErr := buildTypedSchemaIncrementalStateWithEnvironment(ctx, root, cache.dependencyIdentity, opts.BuildTags, loadedPackages, sourceOverlay, cache.goEnvironment, cacheGoVersion(cache, root))
+			if captureErr != nil {
+				return Manifest{}, captureErr
+			}
+			if supported {
+				typedState = capturedState
+			}
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return Manifest{}, err
 	}
-	ops, diagnostics := normalize(routes, handlers, prefixes, mapping, fset, typedSchemas)
+	ops, diagnostics := normalize(routes, handlersByName, prefixes, mapping, fset, typedSchemas)
 	diagnostics = append(diagnostics, mapping.Diagnostics...)
 	diagnostics = append(diagnostics, scope.diagnostics...)
 	diagnostics = append(parseDiagnostics, diagnostics...)
@@ -166,7 +266,7 @@ func Run(ctx context.Context, opts IndexOptions) (Manifest, error) {
 	if opts.OpenAPIPath != "" {
 		openAPIOptions := opts.OpenAPI
 		if strings.TrimSpace(openAPIOptions.Info.Title) == "" {
-			openAPIOptions.Info.Title = openAPITitleFromRoot(root)
+			openAPIOptions.Info.Title = cacheOpenAPITitle(cache, root)
 		}
 		document, projectionErr := ProjectOpenAPI(manifest, openAPIOptions)
 		if projectionErr != nil {
@@ -174,7 +274,18 @@ func Run(ctx context.Context, opts IndexOptions) (Manifest, error) {
 		}
 		artifacts = append(artifacts, jsonArtifact{path: opts.OpenAPIPath, value: document})
 	}
-	if _, err := publishJSONArtifactsContext(ctx, artifacts); err != nil {
+	encodedArtifacts, err := encodeJSONArtifacts(artifacts)
+	if err != nil {
+		return Manifest{}, fmt.Errorf("publish API index artifacts: %w", err)
+	}
+	publicationArtifacts := encodedArtifacts
+	// Parse-diagnostic generations stay uncached because source metadata intentionally skips lexing files that cannot contain imports or embed directives.
+	if len(parseDiagnostics) == 0 {
+		if cacheArtifact, ok := cache.encodedArtifact(manifest, encodedArtifacts, typedState); ok {
+			publicationArtifacts = append(append([]encodedJSONArtifact(nil), encodedArtifacts...), cacheArtifact)
+		}
+	}
+	if _, err := publishIndexCacheArtifacts(ctx, cache, publicationArtifacts); err != nil {
 		return Manifest{}, fmt.Errorf("publish API index artifacts: %w", err)
 	}
 
@@ -182,7 +293,7 @@ func Run(ctx context.Context, opts IndexOptions) (Manifest, error) {
 }
 
 // selectedCompositionParseDiagnostics promotes parse failures in the requested composition file because indexing cannot safely fall back to an unscoped API.
-func selectedCompositionParseDiagnostics(root string, compositionPath string, diagnostics []Diagnostic) []Diagnostic {
+func selectedCompositionParseDiagnostics(root string, compositionPath string, diagnostics []Diagnostic, cache *indexCacheSession) []Diagnostic {
 	if strings.TrimSpace(compositionPath) == "" {
 		return nil
 	}
@@ -191,8 +302,14 @@ func selectedCompositionParseDiagnostics(root string, compositionPath string, di
 		candidate = filepath.Join(root, candidate)
 	}
 	candidate = filepath.Clean(candidate)
-	if _, err := os.Stat(candidate); err != nil {
-		return nil
+	if cache != nil {
+		if !indexCacheInputFilePresent(cache.inputFiles, candidate) {
+			return nil
+		}
+	} else {
+		if _, err := os.Stat(candidate); err != nil {
+			return nil
+		}
 	}
 	relative := relativeSourcePath(root, candidate)
 	selected := make([]Diagnostic, 0)
@@ -219,19 +336,128 @@ func parseGoFilesWithSet(root string, skipDirs ...func(path string, name string)
 
 // parseGoFiles records recoverable syntax failures instead of silently dropping source files from the index.
 func parseGoFiles(ctx context.Context, root string, skipDir func(path string, name string) bool, buildTags ...string) ([]*parsedFile, *token.FileSet, []Diagnostic, error) {
+	return parseGoFilesFromSnapshot(ctx, root, skipDir, nil, buildTags...)
+}
+
+// parseGoFilesFromSnapshot reuses bytes already read for the cache fingerprint so one miss observes a single source snapshot.
+func parseGoFilesFromSnapshot(ctx context.Context, root string, skipDir func(path string, name string) bool, sourceFiles []indexCacheFileDigest, buildTags ...string) ([]*parsedFile, *token.FileSet, []Diagnostic, error) {
+	return parseGoFilesFromSnapshotWithEnvironment(ctx, root, skipDir, sourceFiles, nil, buildTags...)
+}
+
+// parseGoFilesFromSnapshotWithEnvironment keeps source selection on the captured Go environment used by cache-backed package loading.
+func parseGoFilesFromSnapshotWithEnvironment(ctx context.Context, root string, skipDir func(path string, name string) bool, sourceFiles []indexCacheFileDigest, environment map[string]string, buildTags ...string) ([]*parsedFile, *token.FileSet, []Diagnostic, error) {
 	fset := token.NewFileSet()
-	parsed := make([]*parsedFile, 0, 128)
+	paths := make([]string, 0, 128)
+	sourceData := make(map[string][]byte, len(sourceFiles))
+	if sourceFiles == nil {
+		err := walkSourceTree(ctx, root, skipDir, func(path string, d fs.DirEntry) error {
+			base := d.Name()
+			if !strings.HasSuffix(base, ".go") || strings.HasSuffix(base, "_test.go") {
+				return nil
+			}
+			paths = append(paths, path)
+			return nil
+		})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+	} else {
+		for _, sourceFile := range sourceFiles {
+			base := filepath.Base(sourceFile.path)
+			if !strings.HasSuffix(base, ".go") || strings.HasSuffix(base, "_test.go") {
+				continue
+			}
+			paths = append(paths, sourceFile.path)
+			sourceData[sourceFile.path] = sourceFile.data
+		}
+	}
+	results := parseSourcePaths(ctx, root, paths, fset, activeSourceBuildContextWithEnvironment(environment, buildTags...), sourceData)
+	parsed := make([]*parsedFile, 0, len(results))
 	diagnostics := make([]Diagnostic, 0)
-	buildContext := activeSourceBuildContext(buildTags...)
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	for _, result := range results {
+		if result.parsed != nil {
+			parsed = append(parsed, result.parsed)
+		}
+		diagnostics = append(diagnostics, result.diagnostics...)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, nil, err
+	}
+	return parsed, fset, diagnostics, nil
+}
+
+// cacheSourceFiles returns the initial content snapshot only when persistence is active for this run.
+func cacheSourceFiles(cache *indexCacheSession) []indexCacheFileDigest {
+	if cache == nil {
+		return nil
+	}
+	return cache.sourceFiles
+}
+
+// cacheGoEnvironment returns the immutable effective Go configuration only when persistence is active.
+func cacheGoEnvironment(cache *indexCacheSession) map[string]string {
+	if cache == nil {
+		return nil
+	}
+	return cache.goEnvironment
+}
+
+// cachePackageOverlay binds focused package loading to the same bytes used for the initial cache fingerprint.
+func cachePackageOverlay(cache *indexCacheSession) map[string][]byte {
+	if cache == nil {
+		return nil
+	}
+	overlay := make(map[string][]byte, len(cache.packageFiles)+len(cache.inputFiles))
+	for _, sourceFile := range cache.packageFiles {
+		if filepath.Ext(sourceFile.path) == ".go" {
+			overlay[sourceFile.path] = sourceFile.data
+		}
+	}
+	for _, input := range cache.inputFiles {
+		name := filepath.Base(input.path)
+		if name != "go.mod" && name != "go.sum" {
+			continue
+		}
+		overlay[input.path] = input.data
+	}
+	return overlay
+}
+
+// cacheModulePath derives route identity from the same main-module bytes used by the cache fingerprint.
+func cacheModulePath(cache *indexCacheSession, root string) string {
+	if cache == nil {
+		return modulePathFromRoot(root)
+	}
+	data, ok := indexCacheInputFileData(cache.inputFiles, filepath.Join(root, "go.mod"))
+	if !ok {
+		return ""
+	}
+	return modulePathFromData(data)
+}
+
+// cacheGoVersion derives go/types language semantics from the same main-module bytes used by the cache fingerprint.
+func cacheGoVersion(cache *indexCacheSession, root string) string {
+	if cache == nil {
+		return typedSchemaIncrementalGoVersion(root)
+	}
+	data, ok := indexCacheInputFileData(cache.inputFiles, filepath.Join(root, "go.mod"))
+	if !ok {
+		return ""
+	}
+	return typedSchemaIncrementalGoVersionFromData(data)
+}
+
+// walkSourceTree applies the indexer's directory and nested-module boundaries once so parsing and cache validation see the same project surface.
+func walkSourceTree(ctx context.Context, root string, skipDir func(path string, name string) bool, visit func(path string, entry fs.DirEntry) error) error {
+	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if contextErr := ctx.Err(); contextErr != nil {
 			return contextErr
 		}
-		if err != nil {
-			return err
+		if walkErr != nil {
+			return walkErr
 		}
-		base := d.Name()
-		if d.IsDir() {
+		base := entry.Name()
+		if entry.IsDir() {
 			if path != root && skipDir != nil && skipDir(path, base) {
 				return filepath.SkipDir
 			}
@@ -249,38 +475,129 @@ func parseGoFiles(ctx context.Context, root string, skipDir func(path string, na
 			}
 			return nil
 		}
-		if !strings.HasSuffix(base, ".go") || strings.HasSuffix(base, "_test.go") {
-			return nil
-		}
-		matchesBuild, matchErr := buildContext.MatchFile(filepath.Dir(path), base)
-		if matchErr != nil {
-			diagnostics = append(diagnostics, Diagnostic{
-				Severity: "warn",
-				Code:     "build_constraint_error",
-				Message:  matchErr.Error(),
-				File:     relativeSourcePath(root, path),
-			})
-			return nil
-		}
-		if !matchesBuild {
-			return nil
-		}
-		file, parseErr := parser.ParseFile(fset, path, nil, parser.ParseComments)
-		if parseErr != nil {
-			diagnostics = append(diagnostics, parseErrorDiagnostics(root, path, parseErr)...)
-			return nil
-		}
-		parsed = append(parsed, &parsedFile{
-			Path:        path,
-			PackageName: file.Name.Name,
-			File:        file,
-		})
-		return nil
+		return visit(path, entry)
 	})
-	if err != nil {
-		return nil, nil, nil, err
+}
+
+// parseSourcePaths bounds parallelism by available CPUs because parsing is CPU-heavy after the filesystem cache is warm.
+func parseSourcePaths(ctx context.Context, root string, paths []string, fset *token.FileSet, buildContext build.Context, snapshots ...map[string][]byte) []sourceParseResult {
+	results := make([]sourceParseResult, len(paths))
+	inputs := make([]sourceParseInput, len(paths))
+	var sourceData map[string][]byte
+	if len(snapshots) > 0 {
+		sourceData = snapshots[0]
 	}
-	return parsed, fset, diagnostics, nil
+	workerCount := min(runtime.GOMAXPROCS(0), maxSourceParserWorkers, len(paths))
+	if workerCount == 0 {
+		return results
+	}
+
+	loadJobs := make(chan int)
+	var workers sync.WaitGroup
+	workers.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer workers.Done()
+			for index := range loadJobs {
+				if ctx.Err() != nil {
+					continue
+				}
+				path := paths[index]
+				data, found := sourceData[path]
+				matchContext := buildContext
+				if found {
+					matchContext.OpenFile = func(name string) (io.ReadCloser, error) {
+						if filepath.Clean(name) != filepath.Clean(path) {
+							return nil, os.ErrNotExist
+						}
+						return io.NopCloser(bytes.NewReader(data)), nil
+					}
+				}
+				matchesBuild, matchErr := matchContext.MatchFile(filepath.Dir(path), filepath.Base(path))
+				if matchErr != nil {
+					results[index].diagnostics = []Diagnostic{{
+						Severity: "warn",
+						Code:     "build_constraint_error",
+						Message:  matchErr.Error(),
+						File:     relativeSourcePath(root, path),
+					}}
+					continue
+				}
+				if !matchesBuild {
+					continue
+				}
+				if !found {
+					var readErr error
+					data, readErr = os.ReadFile(path)
+					if readErr != nil {
+						results[index].diagnostics = parseErrorDiagnostics(root, path, readErr)
+						continue
+					}
+				}
+				inputs[index] = sourceParseInput{path: path, data: data, active: true}
+			}
+		}()
+	}
+	for index := range paths {
+		if ctx.Err() != nil {
+			break
+		}
+		loadJobs <- index
+	}
+	close(loadJobs)
+	workers.Wait()
+
+	nextBase := 1
+	for index := range inputs {
+		if !inputs[index].active {
+			continue
+		}
+		inputs[index].base = nextBase
+		nextBase += len(inputs[index].data) + 1
+	}
+
+	parseJobs := make(chan int)
+	workers.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer workers.Done()
+			for index := range parseJobs {
+				if ctx.Err() != nil || !inputs[index].active {
+					continue
+				}
+				input := inputs[index]
+				workerFileSet := token.NewFileSet()
+				if input.base > 1 {
+					workerFileSet.AddFile("", 1, input.base-2)
+				}
+				file, parseErr := parser.ParseFile(workerFileSet, input.path, input.data, parser.ParseComments)
+				if parseErr != nil {
+					results[index].diagnostics = parseErrorDiagnostics(root, input.path, parseErr)
+					continue
+				}
+				results[index].parsed = &parsedFile{
+					Path:        input.path,
+					PackageName: file.Name.Name,
+					File:        file,
+				}
+				results[index].tokenFile = workerFileSet.File(file.Pos())
+			}
+		}()
+	}
+	for index := range inputs {
+		if ctx.Err() != nil {
+			break
+		}
+		parseJobs <- index
+	}
+	close(parseJobs)
+	workers.Wait()
+	for _, result := range results {
+		if result.tokenFile != nil {
+			fset.AddExistingFiles(result.tokenFile)
+		}
+	}
+	return results
 }
 
 // parseErrorDiagnostics retains each parser location while removing machine-specific root paths from output.
@@ -397,16 +714,32 @@ func openAPITitleFromRoot(root string) string {
 	return "Forj Generated API"
 }
 
+// cacheOpenAPITitle prevents an APP_NAME edit during indexing from changing a generation formed from an earlier fingerprint.
+func cacheOpenAPITitle(cache *indexCacheSession, root string) string {
+	if cache == nil {
+		return openAPITitleFromRoot(root)
+	}
+	data, present := indexCacheInputFileData(cache.inputFiles, filepath.Join(root, ".env"))
+	if present {
+		if name := appNameFromDotEnvData(data); name != "" {
+			return name
+		}
+	}
+	return "Forj Generated API"
+}
+
 // appNameFromDotEnv reads only APP_NAME so indexing never takes ownership of general runtime environment loading.
 func appNameFromDotEnv(root string) string {
-	path := filepath.Join(root, ".env")
-	f, err := os.Open(path)
+	data, err := os.ReadFile(filepath.Join(root, ".env"))
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
+	return appNameFromDotEnvData(data)
+}
 
-	scanner := bufio.NewScanner(f)
+// appNameFromDotEnvData reads only APP_NAME from immutable environment-file bytes.
+func appNameFromDotEnvData(data []byte) string {
+	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
