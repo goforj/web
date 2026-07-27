@@ -11,7 +11,7 @@
     "benchmark_time": "1s",
     "repository_revision": "07fbcb90c743",
     "repository_dirty": false,
-    "benchmark_input_fingerprint": "sha256:e60df1b40baf9fda820de339c3920367faacea80fdd47b235628691298e1a4be",
+    "benchmark_input_fingerprint": "sha256:e0bc4ee1182815f973c31c2bb571f3381750335af043730bc406839bdfd34814",
     "build_settings": [
       {
         "name": "CGO_ENABLED",

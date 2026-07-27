@@ -1149,14 +1149,14 @@ func renderBenchmarkSVG(snapshot benchmarkSnapshot) ([]byte, error) {
 		description += " This is an unpublished local preview measured from a dirty working tree."
 	}
 	fmt.Fprintf(&svg, "<desc id=\"description\">%s</desc>\n", escapeSVG(description))
-	fmt.Fprintf(&svg, `<rect width="%d" height="%d" rx="24" fill="#08111f"/>`+"\n", width, height)
-	svg.WriteString(`<text x="52" y="61" fill="#f8fafc" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="32" font-weight="700">Go HTTP stack performance</text>` + "\n")
-	svg.WriteString(`<text x="52" y="94" fill="#9fb1c8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16">Equivalent endpoint work using idiomatic APIs · medians with observed ranges · not a ranking</text>` + "\n")
+	fmt.Fprintf(&svg, `<rect width="%d" height="%d" rx="8" fill="#1A1620"/>`+"\n", width, height)
+	svg.WriteString(`<text x="52" y="61" fill="#FFFFFF" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="32" font-weight="700" letter-spacing="-1.2">Go HTTP stack performance</text>` + "\n")
+	svg.WriteString(`<text x="52" y="94" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="16">Equivalent endpoint work using idiomatic APIs · medians with observed ranges · not a ranking</text>` + "\n")
 	if snapshot.Metadata.RepositoryDirty {
-		svg.WriteString(`<rect x="1040" y="35" width="348" height="36" rx="18" fill="#7c2d12" stroke="#fb923c"/><text x="1214" y="58" fill="#ffedd5" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="700">LOCAL DIRTY-TREE PREVIEW · DO NOT PUBLISH</text>` + "\n")
+		svg.WriteString(`<rect x="1040" y="35" width="348" height="36" rx="8" fill="#FF5E3A"/><text x="1214" y="58" fill="#08070A" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="700">LOCAL DIRTY-TREE PREVIEW · DO NOT PUBLISH</text>` + "\n")
 	}
-	svg.WriteString(`<rect x="52" y="116" width="18" height="4" rx="2" fill="#38bdf8"/><text x="80" y="123" fill="#cbd5e1" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">GoForj Web</text>` + "\n")
-	svg.WriteString(`<line x1="194" y1="118" x2="218" y2="118" stroke="#c4d4e7" stroke-width="1.5"/><line x1="194" y1="114" x2="194" y2="122" stroke="#c4d4e7" stroke-width="1.5"/><line x1="218" y1="114" x2="218" y2="122" stroke="#c4d4e7" stroke-width="1.5"/><text x="230" y="123" fill="#cbd5e1" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">Observed sample min–max</text>` + "\n")
+	svg.WriteString(`<rect x="52" y="116" width="18" height="4" rx="2" fill="#FF5E3A"/><text x="80" y="123" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13">GoForj Web</text>` + "\n")
+	svg.WriteString(`<line x1="194" y1="118" x2="218" y2="118" stroke="#FFC24D" stroke-width="1.5"/><line x1="194" y1="114" x2="194" y2="122" stroke="#FFC24D" stroke-width="1.5"/><line x1="218" y1="114" x2="218" y2="122" stroke="#FFC24D" stroke-width="1.5"/><text x="230" y="123" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13">Observed sample min–max</text>` + "\n")
 
 	positions := [][2]int{{52, 154}, {730, 154}, {52, 584}, {730, 584}}
 	for index, panel := range panels {
@@ -1172,16 +1172,16 @@ func renderBenchmarkSVG(snapshot benchmarkSnapshot) ([]byte, error) {
 	}
 	footer := fmt.Sprintf("%s · %s/%s · %s · GOMAXPROCS=%d · median of %s · benchtime=%s · revision %s",
 		metadata.GoVersion, metadata.GOOS, metadata.GOARCH, metadata.CPU, metadata.GOMAXPROCS, formatSampleCount(metadata.SampleCount), metadata.BenchmarkTime, revision)
-	svg.WriteString(`<line x1="52" y1="1022" x2="1388" y2="1022" stroke="#243247"/>` + "\n")
-	fmt.Fprintf(&svg, `<text x="52" y="1055" fill="#cbd5e1" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="14">%s</text>`+"\n", escapeSVG(footer))
-	svg.WriteString(`<text x="52" y="1083" fill="#8293aa" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">Loopback is HTTP/1.1 req/s; other panels are in-process ServeHTTP ops/s. Small differences and overlapping ranges are not rankings.</text>` + "\n")
+	svg.WriteString(`<line x1="52" y1="1022" x2="1388" y2="1022" stroke="#2A2333"/>` + "\n")
+	fmt.Fprintf(&svg, `<text x="52" y="1055" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="14">%s</text>`+"\n", escapeSVG(footer))
+	svg.WriteString(`<text x="52" y="1083" fill="#746C80" font-family="Inter, system-ui, sans-serif" font-size="13">Loopback is HTTP/1.1 req/s; other panels are in-process ServeHTTP ops/s. Small differences and overlapping ranges are not rankings.</text>` + "\n")
 	footerY := 1111
 	for index, line := range environmentLines {
 		prefix := ""
 		if index == 0 {
 			prefix = "Environment: "
 		}
-		fmt.Fprintf(&svg, `<text x="52" y="%d" fill="#8293aa" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">%s</text>`+"\n", footerY+index*22, escapeSVG(prefix+line))
+		fmt.Fprintf(&svg, `<text x="52" y="%d" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13">%s</text>`+"\n", footerY+index*22, escapeSVG(prefix+line))
 	}
 	footerY += len(environmentLines) * 22
 	for index, line := range dependencyLines {
@@ -1189,7 +1189,7 @@ func renderBenchmarkSVG(snapshot benchmarkSnapshot) ([]byte, error) {
 		if index == 0 {
 			prefix = "Dependencies: "
 		}
-		fmt.Fprintf(&svg, `<text x="52" y="%d" fill="#8293aa" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13">%s</text>`+"\n", footerY+index*22, escapeSVG(prefix+line))
+		fmt.Fprintf(&svg, `<text x="52" y="%d" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13">%s</text>`+"\n", footerY+index*22, escapeSVG(prefix+line))
 	}
 	svg.WriteString("</svg>\n")
 	return []byte(svg.String()), nil
@@ -1234,35 +1234,35 @@ func renderPanel(svg *strings.Builder, x, y, width, height int, panel panelDefin
 		return fmt.Errorf("render benchmark SVG: %s has no positive throughput", panel.scenario)
 	}
 
-	fmt.Fprintf(svg, `<rect x="%d" y="%d" width="%d" height="%d" rx="16" fill="#0d1929" stroke="#243247"/>`+"\n", x, y, width, height)
-	fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#f1f5f9" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="20" font-weight="650">%s</text>`+"\n", x+22, y+34, escapeSVG(panel.title))
-	fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#8293aa" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12">%s</text>`+"\n", x+22, y+56, escapeSVG(panel.subtitle))
+	fmt.Fprintf(svg, `<rect x="%d" y="%d" width="%d" height="%d" rx="8" fill="#1D1923" stroke="#3D3349"/>`+"\n", x, y, width, height)
+	fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#FFFFFF" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="20" font-weight="700">%s</text>`+"\n", x+22, y+34, escapeSVG(panel.title))
+	fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#746C80" font-family="Inter, system-ui, sans-serif" font-size="12">%s</text>`+"\n", x+22, y+56, escapeSVG(panel.subtitle))
 	for index, aggregate := range rows {
 		rowY := y + 91 + index*43
 		label := frameworkLabels[aggregate.Framework]
-		color := "#66809f"
+		color := "#746C80"
 		if aggregate.Framework == "goforj_web" {
-			color = "#38bdf8"
+			color = "#FF5E3A"
 		}
 		barX := x + 133
 		barWidth := int(math.Round((aggregate.ThroughputPerSecondMedian / maximum) * 270))
 		if barWidth < 2 {
 			barWidth = 2
 		}
-		fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#dbe7f4" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600">%s</text>`+"\n", x+22, rowY, escapeSVG(label))
-		fmt.Fprintf(svg, `<rect x="%d" y="%d" width="270" height="9" rx="4.5" fill="#18273a"/><rect x="%d" y="%d" width="%d" height="9" rx="4.5" fill="%s"/>`+"\n", barX, rowY-11, barX, rowY-11, barWidth, color)
+		fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">%s</text>`+"\n", x+22, rowY, escapeSVG(label))
+		fmt.Fprintf(svg, `<rect x="%d" y="%d" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="%d" y="%d" width="%d" height="9" rx="4.5" fill="%s"/>`+"\n", barX, rowY-11, barX, rowY-11, barWidth, color)
 		observed := ranges[panel.scenario+"\x00"+aggregate.Framework]
 		minimumX := barX + int(math.Round((observed.minimum/maximum)*270))
 		maximumX := barX + int(math.Round((observed.maximum/maximum)*270))
-		whiskerColor := "#c4d4e7"
+		whiskerColor := "#A9A1B3"
 		if aggregate.Framework == "goforj_web" {
-			whiskerColor = "#e0f2fe"
+			whiskerColor = "#FFC24D"
 		}
 		fmt.Fprintf(svg, `<line data-sample-range="%s/%s" x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="1.5" stroke-linecap="round"/><line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="1.5"/><line x1="%d" y1="%d" x2="%d" y2="%d" stroke="%s" stroke-width="1.5"/>`+"\n",
 			escapeSVG(panel.scenario), escapeSVG(aggregate.Framework), minimumX, rowY-7, maximumX, rowY-7, whiskerColor,
 			minimumX, rowY-11, minimumX, rowY-3, whiskerColor,
 			maximumX, rowY-11, maximumX, rowY-3, whiskerColor)
-		fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#f8fafc" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="650">%s</text>`+"\n", x+width-22, rowY-2, escapeSVG(formatThroughput(aggregate.ThroughputPerSecondMedian, panel.live)))
+		fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">%s</text>`+"\n", x+width-22, rowY-2, escapeSVG(formatThroughput(aggregate.ThroughputPerSecondMedian, panel.live)))
 		if !panel.live {
 			detail := fmt.Sprintf("%s ns/op · %s B/op · %s allocs/op", formatNumber(aggregate.NanosecondsPerOpMedian), formatNumber(aggregate.BytesPerOpMedian), formatNumber(aggregate.AllocsPerOpMedian))
 			if panel.scenario == "middleware_chain" {
@@ -1271,7 +1271,7 @@ func renderPanel(svg *strings.Builder, x, y, width, height int, panel panelDefin
 				}
 				detail += " · " + formatAddedLatency(*aggregate.MiddlewareAddedLatencyMedian)
 			}
-			fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#8293aa" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11">%s</text>`+"\n", x+133, rowY+11, escapeSVG(detail))
+			fmt.Fprintf(svg, `<text x="%d" y="%d" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">%s</text>`+"\n", x+133, rowY+11, escapeSVG(detail))
 		}
 	}
 	return nil
