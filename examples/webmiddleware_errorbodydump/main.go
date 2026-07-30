@@ -12,6 +12,7 @@ func main() {
 
 	router.Use(webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
 		log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+		// GET /reports/42 failed with 404
 	}))
 
 	router.GET("/reports/:id", func(c web.Context) error {

@@ -13,6 +13,7 @@ func main() {
 	router.Use(webmiddleware.RequestLoggerWithConfig(webmiddleware.RequestLoggerConfig{
 		LogValuesFunc: func(c web.Context, values webmiddleware.RequestLoggerValues) error {
 			log.Printf("%s %s %d %s", values.Method, values.URI, values.Status, values.Latency)
+			// GET /users/42 204 125µs
 			return nil
 		},
 	}))

@@ -441,13 +441,13 @@ adapter := echoweb.New()
 adapter.Router().GET("/healthz", func(c web.Context) error {
 	_, ok := echoweb.UnwrapContext(c)
 	fmt.Println(ok)
+	// true
 	return c.NoContent(http.StatusOK)
 })
 
 rr := httptest.NewRecorder()
 req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 adapter.ServeHTTP(rr, req)
-// true
 ```
 
 #### <a id="echoweb-unwrapwebsocketconn"></a>echoweb.UnwrapWebSocketConn
@@ -845,6 +845,7 @@ router := echoweb.New().Router()
 
 router.Use(webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {
 	log.Printf("%s %s -> %d bytes", c.Method(), c.URI(), len(resBody))
+	// POST /webhooks -> 16 bytes
 }))
 
 router.POST("/webhooks", func(c web.Context) error {
@@ -865,6 +866,7 @@ router.Use(webmiddleware.BodyDumpWithConfig(webmiddleware.BodyDumpConfig{
 	},
 	Handler: func(c web.Context, reqBody, resBody []byte) {
 		log.Printf("%s %s -> %d bytes", c.Method(), c.URI(), len(resBody))
+		// POST /webhooks -> 16 bytes
 	},
 }))
 ```
@@ -907,6 +909,7 @@ router := echoweb.New().Router()
 
 router.Use(webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
 	log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+	// GET /reports/42 failed with 404
 }))
 
 router.GET("/reports/:id", func(c web.Context) error {
@@ -927,6 +930,7 @@ router.Use(webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConf
 	},
 	Handler: func(c web.Context, status int, body []byte) {
 		log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+		// GET /reports/42 failed with 404
 	},
 }))
 ```
@@ -1268,6 +1272,7 @@ router := echoweb.New().Router()
 router.Use(webmiddleware.RequestLoggerWithConfig(webmiddleware.RequestLoggerConfig{
 	LogValuesFunc: func(c web.Context, values webmiddleware.RequestLoggerValues) error {
 		log.Printf("%s %s %d %s", values.Method, values.URI, values.Status, values.Latency)
+		// GET /users/42 204 125µs
 		return nil
 	},
 }))
