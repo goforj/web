@@ -284,7 +284,7 @@ Whiskers in every panel show the observed sample minimum and maximum. The first 
 
 Bars are scaled independently within each panel, and small differences should not be treated as rankings. These are microbenchmarks and loopback ceilings, not production capacity forecasts.
 
-Measured with `go1.26.1` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.11-orbstack-00360-gc9bc4d96ac70`, revision `07fbcb90c743`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:e0bc4ee1182815f973c31c2bb571f3381750335af043730bc406839bdfd34814`. Dependencies: net/http go1.26.1, GoForj Web local checkout, Echo v5.1.0, Gin v1.12.0, Chi v5.3.1, Gorilla Mux v1.8.1, httprouter v1.3.0.
+Measured with `go1.26.1` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.11-orbstack-00360-gc9bc4d96ac70`, revision `d29d29af01ea`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:b0dc11f44fd0a2f7c12ddbca4f5f6b379fd7b661261242978a2dd8380f76fca5`. Dependencies: net/http go1.26.1, GoForj Web local checkout, Echo v5.1.0, Gin v1.12.0, Chi v5.3.1, Gorilla Mux v1.8.1, httprouter v1.3.0.
 
 Fiber is omitted because its `fasthttp` engine is not directly comparable in this shared `net/http` suite. See the [benchmark methodology](docs/bench/README.md) and [recorded sample rows](docs/bench/benchmarks_rows.json).
 
@@ -441,13 +441,13 @@ adapter := echoweb.New()
 adapter.Router().GET("/healthz", func(c web.Context) error {
 	_, ok := echoweb.UnwrapContext(c)
 	fmt.Println(ok)
+	// true
 	return c.NoContent(http.StatusOK)
 })
 
 rr := httptest.NewRecorder()
 req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 adapter.ServeHTTP(rr, req)
-// true
 ```
 
 #### <a id="echoweb-unwrapwebsocketconn"></a>echoweb.UnwrapWebSocketConn
@@ -845,6 +845,7 @@ router := echoweb.New().Router()
 
 router.Use(webmiddleware.BodyDump(func(c web.Context, reqBody, resBody []byte) {
 	log.Printf("%s %s -> %d bytes", c.Method(), c.URI(), len(resBody))
+	// POST /webhooks -> 16 bytes
 }))
 
 router.POST("/webhooks", func(c web.Context) error {
@@ -865,6 +866,7 @@ router.Use(webmiddleware.BodyDumpWithConfig(webmiddleware.BodyDumpConfig{
 	},
 	Handler: func(c web.Context, reqBody, resBody []byte) {
 		log.Printf("%s %s -> %d bytes", c.Method(), c.URI(), len(resBody))
+		// POST /webhooks -> 16 bytes
 	},
 }))
 ```
@@ -907,6 +909,7 @@ router := echoweb.New().Router()
 
 router.Use(webmiddleware.ErrorBodyDump(func(c web.Context, status int, body []byte) {
 	log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+	// GET /reports/42 failed with 404
 }))
 
 router.GET("/reports/:id", func(c web.Context) error {
@@ -927,6 +930,7 @@ router.Use(webmiddleware.ErrorBodyDumpWithConfig(webmiddleware.ErrorBodyDumpConf
 	},
 	Handler: func(c web.Context, status int, body []byte) {
 		log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+		// GET /reports/42 failed with 404
 	},
 }))
 ```
@@ -1268,6 +1272,7 @@ router := echoweb.New().Router()
 router.Use(webmiddleware.RequestLoggerWithConfig(webmiddleware.RequestLoggerConfig{
 	LogValuesFunc: func(c web.Context, values webmiddleware.RequestLoggerValues) error {
 		log.Printf("%s %s %d %s", values.Method, values.URI, values.Status, values.Latency)
+		// GET /users/42 204 125µs
 		return nil
 	},
 }))

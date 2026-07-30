@@ -16,6 +16,7 @@ func main() {
 		},
 		Handler: func(c web.Context, reqBody, resBody []byte) {
 			log.Printf("%s %s -> %d bytes", c.Method(), c.URI(), len(resBody))
+			// POST /webhooks -> 16 bytes
 		},
 	}))
 }

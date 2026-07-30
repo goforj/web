@@ -14,11 +14,11 @@ func main() {
 	adapter.Router().GET("/healthz", func(c web.Context) error {
 		_, ok := echoweb.UnwrapContext(c)
 		fmt.Println(ok)
+		// true
 		return c.NoContent(http.StatusOK)
 	})
 
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	adapter.ServeHTTP(rr, req)
-	// true
 }

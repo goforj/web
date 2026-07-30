@@ -11,151 +11,151 @@
 <text x="74" y="188" fill="#FFFFFF" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="20" font-weight="700">HTTP/1.1 loopback</text>
 <text x="74" y="210" fill="#746C80" font-family="Inter, system-ui, sans-serif" font-size="12">Single-core end-to-end requests/sec · reused keep-alive connection</text>
 <text x="74" y="245" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">GoForj Web</text>
-<rect x="185" y="234" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="234" width="261" height="9" rx="4.5" fill="#FF5E3A"/>
-<line data-sample-range="live_plain_text/goforj_web" x1="435" y1="238" x2="455" y2="238" stroke="#FFC24D" stroke-width="1.5" stroke-linecap="round"/><line x1="435" y1="234" x2="435" y2="242" stroke="#FFC24D" stroke-width="1.5"/><line x1="455" y1="234" x2="455" y2="242" stroke="#FFC24D" stroke-width="1.5"/>
-<text x="688" y="243" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">115.8k req/s</text>
+<rect x="185" y="234" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="234" width="266" height="9" rx="4.5" fill="#FF5E3A"/>
+<line data-sample-range="live_plain_text/goforj_web" x1="450" y1="238" x2="452" y2="238" stroke="#FFC24D" stroke-width="1.5" stroke-linecap="round"/><line x1="450" y1="234" x2="450" y2="242" stroke="#FFC24D" stroke-width="1.5"/><line x1="452" y1="234" x2="452" y2="242" stroke="#FFC24D" stroke-width="1.5"/>
+<text x="688" y="243" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">117.7k req/s</text>
 <text x="74" y="288" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">net/http</text>
-<rect x="185" y="277" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="277" width="259" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="live_plain_text/net_http" x1="408" y1="281" x2="446" y2="281" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="408" y1="277" x2="408" y2="285" stroke="#A9A1B3" stroke-width="1.5"/><line x1="446" y1="277" x2="446" y2="285" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="286" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">115.0k req/s</text>
+<rect x="185" y="277" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="277" width="262" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="live_plain_text/net_http" x1="446" y1="281" x2="451" y2="281" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="446" y1="277" x2="446" y2="285" stroke="#A9A1B3" stroke-width="1.5"/><line x1="451" y1="277" x2="451" y2="285" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="286" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">116.0k req/s</text>
 <text x="74" y="331" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Echo</text>
-<rect x="185" y="320" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="320" width="258" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="live_plain_text/echo" x1="439" y1="324" x2="447" y2="324" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="439" y1="320" x2="439" y2="328" stroke="#A9A1B3" stroke-width="1.5"/><line x1="447" y1="320" x2="447" y2="328" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="329" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">114.7k req/s</text>
+<rect x="185" y="320" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="320" width="264" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="live_plain_text/echo" x1="446" y1="324" x2="453" y2="324" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="446" y1="320" x2="446" y2="328" stroke="#A9A1B3" stroke-width="1.5"/><line x1="453" y1="320" x2="453" y2="328" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="329" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">116.8k req/s</text>
 <text x="74" y="374" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Gin</text>
-<rect x="185" y="363" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="363" width="260" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="live_plain_text/gin" x1="422" y1="367" x2="449" y2="367" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="422" y1="363" x2="422" y2="371" stroke="#A9A1B3" stroke-width="1.5"/><line x1="449" y1="363" x2="449" y2="371" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="372" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">115.4k req/s</text>
+<rect x="185" y="363" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="363" width="267" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="live_plain_text/gin" x1="450" y1="367" x2="455" y2="367" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="450" y1="363" x2="450" y2="371" stroke="#A9A1B3" stroke-width="1.5"/><line x1="455" y1="363" x2="455" y2="371" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="372" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">117.9k req/s</text>
 <text x="74" y="417" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Chi</text>
-<rect x="185" y="406" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="406" width="256" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="live_plain_text/chi" x1="431" y1="410" x2="442" y2="410" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="431" y1="406" x2="431" y2="414" stroke="#A9A1B3" stroke-width="1.5"/><line x1="442" y1="406" x2="442" y2="414" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="415" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">113.7k req/s</text>
+<rect x="185" y="406" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="406" width="262" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="live_plain_text/chi" x1="446" y1="410" x2="450" y2="410" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="446" y1="406" x2="446" y2="414" stroke="#A9A1B3" stroke-width="1.5"/><line x1="450" y1="406" x2="450" y2="414" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="415" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">116.1k req/s</text>
 <text x="74" y="460" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Gorilla Mux</text>
-<rect x="185" y="449" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="449" width="248" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="live_plain_text/gorilla_mux" x1="421" y1="453" x2="436" y2="453" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="421" y1="449" x2="421" y2="457" stroke="#A9A1B3" stroke-width="1.5"/><line x1="436" y1="449" x2="436" y2="457" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="458" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">109.9k req/s</text>
+<rect x="185" y="449" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="449" width="257" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="live_plain_text/gorilla_mux" x1="435" y1="453" x2="444" y2="453" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="435" y1="449" x2="435" y2="457" stroke="#A9A1B3" stroke-width="1.5"/><line x1="444" y1="449" x2="444" y2="457" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="458" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">113.5k req/s</text>
 <text x="74" y="503" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">httprouter</text>
-<rect x="185" y="492" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="492" width="262" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="live_plain_text/httprouter" x1="424" y1="496" x2="451" y2="496" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="424" y1="492" x2="424" y2="500" stroke="#A9A1B3" stroke-width="1.5"/><line x1="451" y1="492" x2="451" y2="500" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="501" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">116.3k req/s</text>
+<rect x="185" y="492" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="492" width="269" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="live_plain_text/httprouter" x1="453" y1="496" x2="455" y2="496" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="453" y1="492" x2="453" y2="500" stroke="#A9A1B3" stroke-width="1.5"/><line x1="455" y1="492" x2="455" y2="500" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="501" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">119.1k req/s</text>
 <rect x="730" y="154" width="658" height="402" rx="8" fill="#1D1923" stroke="#3D3349"/>
 <text x="752" y="188" fill="#FFFFFF" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="20" font-weight="700">Plaintext route</text>
 <text x="752" y="210" fill="#746C80" font-family="Inter, system-ui, sans-serif" font-size="12">In-process ServeHTTP operations/sec</text>
 <text x="752" y="245" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">GoForj Web</text>
 <rect x="863" y="234" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="234" width="187" height="9" rx="4.5" fill="#FF5E3A"/>
-<line data-sample-range="static_text/goforj_web" x1="1046" y1="238" x2="1054" y2="238" stroke="#FFC24D" stroke-width="1.5" stroke-linecap="round"/><line x1="1046" y1="234" x2="1046" y2="242" stroke="#FFC24D" stroke-width="1.5"/><line x1="1054" y1="234" x2="1054" y2="242" stroke="#FFC24D" stroke-width="1.5"/>
-<text x="1366" y="243" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">10.91M ops/s</text>
-<text x="863" y="256" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">91.66 ns/op · 16 B/op · 1 allocs/op</text>
+<line data-sample-range="static_text/goforj_web" x1="1044" y1="238" x2="1058" y2="238" stroke="#FFC24D" stroke-width="1.5" stroke-linecap="round"/><line x1="1044" y1="234" x2="1044" y2="242" stroke="#FFC24D" stroke-width="1.5"/><line x1="1058" y1="234" x2="1058" y2="242" stroke="#FFC24D" stroke-width="1.5"/>
+<text x="1366" y="243" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">10.88M ops/s</text>
+<text x="863" y="256" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">91.93 ns/op · 16 B/op · 1 allocs/op</text>
 <text x="752" y="288" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">net/http</text>
-<rect x="863" y="277" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="277" width="137" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="static_text/net_http" x1="992" y1="281" x2="1002" y2="281" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="992" y1="277" x2="992" y2="285" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1002" y1="277" x2="1002" y2="285" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="286" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">7.95M ops/s</text>
-<text x="863" y="299" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">125.80 ns/op · 16 B/op · 1 allocs/op</text>
+<rect x="863" y="277" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="277" width="133" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="static_text/net_http" x1="991" y1="281" x2="1002" y2="281" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="991" y1="277" x2="991" y2="285" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1002" y1="277" x2="1002" y2="285" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="286" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">7.72M ops/s</text>
+<text x="863" y="299" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">129.50 ns/op · 16 B/op · 1 allocs/op</text>
 <text x="752" y="331" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Echo</text>
-<rect x="863" y="320" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="320" width="125" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="static_text/echo" x1="978" y1="324" x2="990" y2="324" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="978" y1="320" x2="978" y2="328" stroke="#A9A1B3" stroke-width="1.5"/><line x1="990" y1="320" x2="990" y2="328" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="329" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">7.30M ops/s</text>
-<text x="863" y="342" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">136.90 ns/op · 40 B/op · 2 allocs/op</text>
+<rect x="863" y="320" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="320" width="128" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="static_text/echo" x1="988" y1="324" x2="1002" y2="324" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="988" y1="320" x2="988" y2="328" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1002" y1="320" x2="1002" y2="328" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="329" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">7.46M ops/s</text>
+<text x="863" y="342" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">134 ns/op · 40 B/op · 2 allocs/op</text>
 <text x="752" y="374" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Gin</text>
-<rect x="863" y="363" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="363" width="161" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="static_text/gin" x1="1020" y1="367" x2="1025" y2="367" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1020" y1="363" x2="1020" y2="371" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1025" y1="363" x2="1025" y2="371" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="372" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">9.35M ops/s</text>
-<text x="863" y="385" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">106.90 ns/op · 48 B/op · 1 allocs/op</text>
+<rect x="863" y="363" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="363" width="163" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="static_text/gin" x1="1025" y1="367" x2="1044" y2="367" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1025" y1="363" x2="1025" y2="371" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1044" y1="363" x2="1044" y2="371" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="372" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">9.47M ops/s</text>
+<text x="863" y="385" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">105.60 ns/op · 48 B/op · 1 allocs/op</text>
 <text x="752" y="417" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Chi</text>
-<rect x="863" y="406" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="406" width="69" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="static_text/chi" x1="928" y1="410" x2="932" y2="410" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="928" y1="406" x2="928" y2="414" stroke="#A9A1B3" stroke-width="1.5"/><line x1="932" y1="406" x2="932" y2="414" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="415" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">4.02M ops/s</text>
-<text x="863" y="428" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">249 ns/op · 384 B/op · 3 allocs/op</text>
+<rect x="863" y="406" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="406" width="70" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="static_text/chi" x1="933" y1="410" x2="941" y2="410" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="933" y1="406" x2="933" y2="414" stroke="#A9A1B3" stroke-width="1.5"/><line x1="941" y1="406" x2="941" y2="414" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="415" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">4.07M ops/s</text>
+<text x="863" y="428" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">245.70 ns/op · 384 B/op · 3 allocs/op</text>
 <text x="752" y="460" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Gorilla Mux</text>
-<rect x="863" y="449" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="449" width="37" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="static_text/gorilla_mux" x1="900" y1="453" x2="900" y2="453" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="900" y1="449" x2="900" y2="457" stroke="#A9A1B3" stroke-width="1.5"/><line x1="900" y1="449" x2="900" y2="457" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="458" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">2.17M ops/s</text>
-<text x="863" y="471" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">461.70 ns/op · 864 B/op · 8 allocs/op</text>
+<rect x="863" y="449" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="449" width="38" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="static_text/gorilla_mux" x1="899" y1="453" x2="909" y2="453" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="899" y1="449" x2="899" y2="457" stroke="#A9A1B3" stroke-width="1.5"/><line x1="909" y1="449" x2="909" y2="457" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="458" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">2.20M ops/s</text>
+<text x="863" y="471" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">454.90 ns/op · 864 B/op · 8 allocs/op</text>
 <text x="752" y="503" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">httprouter</text>
-<rect x="863" y="492" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="492" width="269" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="static_text/httprouter" x1="1117" y1="496" x2="1133" y2="496" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1117" y1="492" x2="1117" y2="500" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1133" y1="492" x2="1133" y2="500" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="501" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">15.66M ops/s</text>
-<text x="863" y="514" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">63.86 ns/op · 16 B/op · 1 allocs/op</text>
+<rect x="863" y="492" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="492" width="268" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="static_text/httprouter" x1="1124" y1="496" x2="1133" y2="496" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1124" y1="492" x2="1124" y2="500" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1133" y1="492" x2="1133" y2="500" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="501" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">15.59M ops/s</text>
+<text x="863" y="514" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">64.15 ns/op · 16 B/op · 1 allocs/op</text>
 <rect x="52" y="584" width="658" height="402" rx="8" fill="#1D1923" stroke="#3D3349"/>
 <text x="74" y="618" fill="#FFFFFF" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="20" font-weight="700">Path parameter + JSON</text>
 <text x="74" y="640" fill="#746C80" font-family="Inter, system-ui, sans-serif" font-size="12">In-process ServeHTTP operations/sec</text>
 <text x="74" y="675" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">GoForj Web</text>
-<rect x="185" y="664" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="664" width="253" height="9" rx="4.5" fill="#FF5E3A"/>
-<line data-sample-range="path_param_json/goforj_web" x1="433" y1="668" x2="441" y2="668" stroke="#FFC24D" stroke-width="1.5" stroke-linecap="round"/><line x1="433" y1="664" x2="433" y2="672" stroke="#FFC24D" stroke-width="1.5"/><line x1="441" y1="664" x2="441" y2="672" stroke="#FFC24D" stroke-width="1.5"/>
-<text x="688" y="673" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">5.84M ops/s</text>
-<text x="185" y="686" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">171.30 ns/op · 32 B/op · 2 allocs/op</text>
+<rect x="185" y="664" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="664" width="230" height="9" rx="4.5" fill="#FF5E3A"/>
+<line data-sample-range="path_param_json/goforj_web" x1="413" y1="668" x2="428" y2="668" stroke="#FFC24D" stroke-width="1.5" stroke-linecap="round"/><line x1="413" y1="664" x2="413" y2="672" stroke="#FFC24D" stroke-width="1.5"/><line x1="428" y1="664" x2="428" y2="672" stroke="#FFC24D" stroke-width="1.5"/>
+<text x="688" y="673" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">5.88M ops/s</text>
+<text x="185" y="686" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">170 ns/op · 32 B/op · 2 allocs/op</text>
 <text x="74" y="718" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">net/http</text>
-<rect x="185" y="707" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="707" width="183" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="path_param_json/net_http" x1="355" y1="711" x2="370" y2="711" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="355" y1="707" x2="355" y2="715" stroke="#A9A1B3" stroke-width="1.5"/><line x1="370" y1="707" x2="370" y2="715" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="716" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">4.23M ops/s</text>
-<text x="185" y="729" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">236.50 ns/op · 48 B/op · 3 allocs/op</text>
+<rect x="185" y="707" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="707" width="169" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="path_param_json/net_http" x1="353" y1="711" x2="365" y2="711" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="353" y1="707" x2="353" y2="715" stroke="#A9A1B3" stroke-width="1.5"/><line x1="365" y1="707" x2="365" y2="715" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="716" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">4.33M ops/s</text>
+<text x="185" y="729" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">231 ns/op · 48 B/op · 3 allocs/op</text>
 <text x="74" y="761" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Echo</text>
-<rect x="185" y="750" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="750" width="227" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="path_param_json/echo" x1="408" y1="754" x2="414" y2="754" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="408" y1="750" x2="408" y2="758" stroke="#A9A1B3" stroke-width="1.5"/><line x1="414" y1="750" x2="414" y2="758" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="759" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">5.25M ops/s</text>
-<text x="185" y="772" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">190.50 ns/op · 32 B/op · 2 allocs/op</text>
+<rect x="185" y="750" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="750" width="209" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="path_param_json/echo" x1="389" y1="754" x2="401" y2="754" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="389" y1="750" x2="389" y2="758" stroke="#A9A1B3" stroke-width="1.5"/><line x1="401" y1="750" x2="401" y2="758" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="759" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">5.35M ops/s</text>
+<text x="185" y="772" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">186.90 ns/op · 32 B/op · 2 allocs/op</text>
 <text x="74" y="804" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Gin</text>
-<rect x="185" y="793" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="793" width="229" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="path_param_json/gin" x1="412" y1="797" x2="420" y2="797" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="412" y1="793" x2="412" y2="801" stroke="#A9A1B3" stroke-width="1.5"/><line x1="420" y1="793" x2="420" y2="801" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="802" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">5.29M ops/s</text>
-<text x="185" y="815" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">188.90 ns/op · 48 B/op · 3 allocs/op</text>
+<rect x="185" y="793" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="793" width="208" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="path_param_json/gin" x1="389" y1="797" x2="417" y2="797" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="389" y1="793" x2="389" y2="801" stroke="#A9A1B3" stroke-width="1.5"/><line x1="417" y1="793" x2="417" y2="801" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="802" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">5.32M ops/s</text>
+<text x="185" y="815" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">187.90 ns/op · 48 B/op · 3 allocs/op</text>
 <text x="74" y="847" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Chi</text>
-<rect x="185" y="836" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="836" width="95" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="path_param_json/chi" x1="278" y1="840" x2="281" y2="840" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="278" y1="836" x2="278" y2="844" stroke="#A9A1B3" stroke-width="1.5"/><line x1="281" y1="836" x2="281" y2="844" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="845" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">2.20M ops/s</text>
-<text x="185" y="858" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">454.50 ns/op · 736 B/op · 6 allocs/op</text>
+<rect x="185" y="836" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="836" width="88" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="path_param_json/chi" x1="272" y1="840" x2="285" y2="840" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="272" y1="836" x2="272" y2="844" stroke="#A9A1B3" stroke-width="1.5"/><line x1="285" y1="836" x2="285" y2="844" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="845" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">2.24M ops/s</text>
+<text x="185" y="858" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">446.50 ns/op · 736 B/op · 6 allocs/op</text>
 <text x="74" y="890" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Gorilla Mux</text>
-<rect x="185" y="879" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="879" width="65" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="path_param_json/gorilla_mux" x1="248" y1="883" x2="251" y2="883" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="248" y1="879" x2="248" y2="887" stroke="#A9A1B3" stroke-width="1.5"/><line x1="251" y1="879" x2="251" y2="887" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="888" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">1.51M ops/s</text>
-<text x="185" y="901" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">662.80 ns/op · 1184 B/op · 10 allocs/op</text>
+<rect x="185" y="879" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="879" width="60" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="path_param_json/gorilla_mux" x1="244" y1="883" x2="256" y2="883" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="244" y1="879" x2="244" y2="887" stroke="#A9A1B3" stroke-width="1.5"/><line x1="256" y1="879" x2="256" y2="887" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="888" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">1.54M ops/s</text>
+<text x="185" y="901" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">651.30 ns/op · 1184 B/op · 10 allocs/op</text>
 <text x="74" y="933" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">httprouter</text>
-<rect x="185" y="922" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="922" width="267" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="path_param_json/httprouter" x1="442" y1="926" x2="455" y2="926" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="442" y1="922" x2="442" y2="930" stroke="#A9A1B3" stroke-width="1.5"/><line x1="455" y1="922" x2="455" y2="930" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="688" y="931" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">6.15M ops/s</text>
-<text x="185" y="944" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">162.50 ns/op · 64 B/op · 3 allocs/op</text>
+<rect x="185" y="922" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="185" y="922" width="246" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="path_param_json/httprouter" x1="427" y1="926" x2="455" y2="926" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="427" y1="922" x2="427" y2="930" stroke="#A9A1B3" stroke-width="1.5"/><line x1="455" y1="922" x2="455" y2="930" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="688" y="931" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">6.29M ops/s</text>
+<text x="185" y="944" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">159.10 ns/op · 64 B/op · 3 allocs/op</text>
 <rect x="730" y="584" width="658" height="402" rx="8" fill="#1D1923" stroke="#3D3349"/>
 <text x="752" y="618" fill="#FFFFFF" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="20" font-weight="700">Middleware: state + header + validation</text>
 <text x="752" y="640" fill="#746C80" font-family="Inter, system-ui, sans-serif" font-size="12">In-process ops/sec · paired added latency vs the same sample&#39;s plaintext route</text>
 <text x="752" y="675" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">GoForj Web</text>
-<rect x="863" y="664" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="664" width="265" height="9" rx="4.5" fill="#FF5E3A"/>
-<line data-sample-range="middleware_chain/goforj_web" x1="1119" y1="668" x2="1133" y2="668" stroke="#FFC24D" stroke-width="1.5" stroke-linecap="round"/><line x1="1119" y1="664" x2="1119" y2="672" stroke="#FFC24D" stroke-width="1.5"/><line x1="1133" y1="664" x2="1133" y2="672" stroke="#FFC24D" stroke-width="1.5"/>
-<text x="1366" y="673" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">5.76M ops/s</text>
-<text x="863" y="686" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">173.60 ns/op · 32 B/op · 2 allocs/op · +81.43 ns added</text>
+<rect x="863" y="664" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="664" width="260" height="9" rx="4.5" fill="#FF5E3A"/>
+<line data-sample-range="middleware_chain/goforj_web" x1="1117" y1="668" x2="1133" y2="668" stroke="#FFC24D" stroke-width="1.5" stroke-linecap="round"/><line x1="1117" y1="664" x2="1117" y2="672" stroke="#FFC24D" stroke-width="1.5"/><line x1="1133" y1="664" x2="1133" y2="672" stroke="#FFC24D" stroke-width="1.5"/>
+<text x="1366" y="673" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">5.82M ops/s</text>
+<text x="863" y="686" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">172 ns/op · 32 B/op · 2 allocs/op · +81.47 ns added</text>
 <text x="752" y="718" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">net/http</text>
 <rect x="863" y="707" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="707" width="150" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="middleware_chain/net_http" x1="1009" y1="711" x2="1015" y2="711" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1009" y1="707" x2="1009" y2="715" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1015" y1="707" x2="1015" y2="715" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="716" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">3.26M ops/s</text>
-<text x="863" y="729" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">307.10 ns/op · 400 B/op · 4 allocs/op · +181.30 ns added</text>
+<line data-sample-range="middleware_chain/net_http" x1="1010" y1="711" x2="1034" y2="711" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1010" y1="707" x2="1010" y2="715" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1034" y1="707" x2="1034" y2="715" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="716" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">3.36M ops/s</text>
+<text x="863" y="729" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">297.20 ns/op · 400 B/op · 4 allocs/op · +166.10 ns added</text>
 <text x="752" y="761" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Echo</text>
-<rect x="863" y="750" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="750" width="118" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="middleware_chain/echo" x1="970" y1="754" x2="985" y2="754" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="970" y1="750" x2="970" y2="758" stroke="#A9A1B3" stroke-width="1.5"/><line x1="985" y1="750" x2="985" y2="758" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="759" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">2.56M ops/s</text>
-<text x="863" y="772" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">390.20 ns/op · 440 B/op · 8 allocs/op · +244.80 ns added</text>
+<rect x="863" y="750" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="750" width="120" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="middleware_chain/echo" x1="982" y1="754" x2="1008" y2="754" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="982" y1="750" x2="982" y2="758" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1008" y1="750" x2="1008" y2="758" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="759" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">2.68M ops/s</text>
+<text x="863" y="772" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">373.80 ns/op · 440 B/op · 8 allocs/op · +237.80 ns added</text>
 <text x="752" y="804" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Gin</text>
-<rect x="863" y="793" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="793" width="159" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="middleware_chain/gin" x1="1015" y1="797" x2="1024" y2="797" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1015" y1="793" x2="1015" y2="801" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1024" y1="793" x2="1024" y2="801" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="802" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">3.45M ops/s</text>
-<text x="863" y="815" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">290.20 ns/op · 400 B/op · 4 allocs/op · +183.30 ns added</text>
+<rect x="863" y="793" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="793" width="158" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="middleware_chain/gin" x1="1021" y1="797" x2="1046" y2="797" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1021" y1="793" x2="1021" y2="801" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1046" y1="793" x2="1046" y2="801" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="802" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">3.53M ops/s</text>
+<text x="863" y="815" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">283.30 ns/op · 400 B/op · 4 allocs/op · +177.50 ns added</text>
 <text x="752" y="847" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Chi</text>
-<rect x="863" y="836" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="836" width="111" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="middleware_chain/chi" x1="970" y1="840" x2="975" y2="840" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="970" y1="836" x2="970" y2="844" stroke="#A9A1B3" stroke-width="1.5"/><line x1="975" y1="836" x2="975" y2="844" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="845" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">2.41M ops/s</text>
-<text x="863" y="858" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">415.20 ns/op · 768 B/op · 6 allocs/op · +165.70 ns added</text>
+<rect x="863" y="836" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="836" width="110" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="middleware_chain/chi" x1="973" y1="840" x2="989" y2="840" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="973" y1="836" x2="973" y2="844" stroke="#A9A1B3" stroke-width="1.5"/><line x1="989" y1="836" x2="989" y2="844" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="845" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">2.46M ops/s</text>
+<text x="863" y="858" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">407.30 ns/op · 768 B/op · 6 allocs/op · +161.40 ns added</text>
 <text x="752" y="890" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">Gorilla Mux</text>
-<rect x="863" y="879" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="879" width="64" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="middleware_chain/gorilla_mux" x1="925" y1="883" x2="927" y2="883" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="925" y1="879" x2="925" y2="887" stroke="#A9A1B3" stroke-width="1.5"/><line x1="927" y1="879" x2="927" y2="887" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="888" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">1.39M ops/s</text>
-<text x="863" y="901" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">717.30 ns/op · 1320 B/op · 14 allocs/op · +256.10 ns added</text>
+<rect x="863" y="879" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="879" width="63" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="middleware_chain/gorilla_mux" x1="924" y1="883" x2="942" y2="883" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="924" y1="879" x2="924" y2="887" stroke="#A9A1B3" stroke-width="1.5"/><line x1="942" y1="879" x2="942" y2="887" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="888" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">1.42M ops/s</text>
+<text x="863" y="901" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">705.70 ns/op · 1320 B/op · 14 allocs/op · +250.80 ns added</text>
 <text x="752" y="933" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="600">httprouter</text>
-<rect x="863" y="922" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="922" width="197" height="9" rx="4.5" fill="#746C80"/>
-<line data-sample-range="middleware_chain/httprouter" x1="1059" y1="926" x2="1063" y2="926" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1059" y1="922" x2="1059" y2="930" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1063" y1="922" x2="1063" y2="930" stroke="#A9A1B3" stroke-width="1.5"/>
-<text x="1366" y="931" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">4.27M ops/s</text>
-<text x="863" y="944" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">233.90 ns/op · 400 B/op · 4 allocs/op · +170.26 ns added</text>
+<rect x="863" y="922" width="270" height="9" rx="4.5" fill="#2C2734"/><rect x="863" y="922" width="194" height="9" rx="4.5" fill="#746C80"/>
+<line data-sample-range="middleware_chain/httprouter" x1="1055" y1="926" x2="1089" y2="926" stroke="#A9A1B3" stroke-width="1.5" stroke-linecap="round"/><line x1="1055" y1="922" x2="1055" y2="930" stroke="#A9A1B3" stroke-width="1.5"/><line x1="1089" y1="922" x2="1089" y2="930" stroke="#A9A1B3" stroke-width="1.5"/>
+<text x="1366" y="931" fill="#FFFFFF" text-anchor="end" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13" font-weight="650">4.34M ops/s</text>
+<text x="863" y="944" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="11">230.70 ns/op · 400 B/op · 4 allocs/op · +166.67 ns added</text>
 <line x1="52" y1="1022" x2="1388" y2="1022" stroke="#2A2333"/>
-<text x="52" y="1055" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="14">go1.26.1 · linux/arm64 · arm64 (CPU model unavailable) · GOMAXPROCS=1 · median of 7 samples · benchtime=1s · revision 07fbcb90c743</text>
+<text x="52" y="1055" fill="#A9A1B3" font-family="Inter, system-ui, sans-serif" font-size="14">go1.26.1 · linux/arm64 · arm64 (CPU model unavailable) · GOMAXPROCS=1 · median of 7 samples · benchtime=1s · revision d29d29af01ea</text>
 <text x="52" y="1083" fill="#746C80" font-family="Inter, system-ui, sans-serif" font-size="13">Loopback is HTTP/1.1 req/s; other panels are in-process ServeHTTP ops/s. Small differences and overlapping ranges are not rankings.</text>
 <text x="52" y="1111" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13">Environment: Kernel Linux 7.0.11-orbstack-00360-gc9bc4d96ac70 · CGO_ENABLED=1 · GOARM64=v8.0 · GODEBUG=(unset) · GOEXPERIMENT=(unset) · GOFLAGS=(unset)</text>
-<text x="52" y="1133" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13">Inputs sha256:e0bc4ee1182815f973c31c2bb571f3381750335af043730bc406839bdfd34814</text>
+<text x="52" y="1133" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13">Inputs sha256:b0dc11f44fd0a2f7c12ddbca4f5f6b379fd7b661261242978a2dd8380f76fca5</text>
 <text x="52" y="1155" fill="#746C80" font-family="JetBrains Mono, ui-monospace, monospace" font-size="13">Dependencies: net/http go1.26.1 · GoForj Web local checkout · Echo v5.1.0 · Gin v1.12.0 · Chi v5.3.1 · Gorilla Mux v1.8.1 · httprouter v1.3.0</text>
 </svg>

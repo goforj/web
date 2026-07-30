@@ -16,6 +16,7 @@ func main() {
 		},
 		Handler: func(c web.Context, status int, body []byte) {
 			log.Printf("%s %s failed with %d", c.Method(), c.URI(), status)
+			// GET /reports/42 failed with 404
 		},
 	}))
 }
