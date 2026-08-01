@@ -55,7 +55,7 @@ jobs:
 
       - name: Verify benchmark rendering matches the committed snapshot
         run: |
-          make benchmark-svg-verify
+          make bench-svg-verify
           git diff --exit-code -- README.md docs/bench/benchmarks_rows.json docs/bench/framework_comparison.svg
           test -z "$(git ls-files --others --exclude-standard -- docs/bench/benchmarks_rows.json docs/bench/framework_comparison.svg)"
 
