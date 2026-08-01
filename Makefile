@@ -5,32 +5,33 @@ HELP_FUN = %help; while (<>) { /^([A-Za-z0-9_-]+)\s*:.*\#\#(?:@([A-Za-z0-9_-]+))
 help: ##@other Show this help.
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
-##@benchmark
-bench: ##@benchmark Benchmark the Echo adapter.
+##@benchmarks
+bench: ##@benchmarks Benchmark the Echo adapter.
 	go test ./adapter/echoweb -run '^$$' -bench 'Benchmark(Echo|Web)(PlainText|ParamsJSON|MiddlewareChain|MiddlewareChainSingleUse|GroupAndRouteMiddleware|Compress|BodyDump|WebSocketJSON|WebSocketJSONPersistent)$$' -benchmem
 
-bench-frameworks: ##@benchmark Benchmark supported HTTP frameworks.
+bench-frameworks: ##@benchmarks Benchmark supported HTTP frameworks.
 	cd docs && GOWORK=off go test ./bench -run '^$$' -bench '^BenchmarkHTTPStacks$$' -benchmem -count=1 -cpu=1
 
-benchmark-svg: ##@benchmark Render and verify benchmark SVG snapshots.
+bench-svg: ##@benchmarks Render and verify benchmark SVG snapshots.
 	cd docs && BENCH_RENDER=1 BENCH_REQUIRE_CLEAN_SNAPSHOT=1 GOWORK=off go test -tags=benchrender ./bench -run '^TestRenderBenchmarks$$' -count=1 -v
 
-benchmark-svg-preview: ##@benchmark Render benchmark SVG previews without a clean snapshot.
+bench-svg-preview: ##@benchmarks Render benchmark SVG previews without a clean snapshot.
 	cd docs && BENCH_RENDER=1 BENCH_ALLOW_DIRTY=1 GOWORK=off go test -tags=benchrender ./bench -run '^TestRenderBenchmarks$$' -count=1 -v
 
-benchmark-svg-render: ##@benchmark Render benchmark SVGs without verification.
+bench-svg-render: ##@benchmarks Render benchmark SVGs without verification.
 	cd docs && BENCH_RENDER=1 BENCH_RENDER_ONLY=1 GOWORK=off go test -tags=benchrender ./bench -run '^TestRenderBenchmarks$$' -count=1 -v
 
-benchmark-svg-verify: ##@benchmark Verify benchmark SVG snapshots.
+bench-svg-verify: ##@benchmarks Verify benchmark SVG snapshots.
 	cd docs && BENCH_RENDER=1 BENCH_RENDER_ONLY=1 BENCH_REQUIRE_CLEAN_SNAPSHOT=1 GOWORK=off go test -tags=benchrender ./bench -run '^TestRenderBenchmarks$$' -count=1 -v
 
-##@quality
-test: ##@quality Run the test suites.
+##@tests
+test: ##@tests Run the test suites.
 	go test ./...
 	go -C docs test ./...
 	go -C examples test ./...
 
-vet: ##@quality Run Go vet for every module.
+##@analysis
+vet: ##@analysis Run Go vet for every module.
 	go vet ./...
 	go -C docs vet ./...
 	go -C examples vet ./...
