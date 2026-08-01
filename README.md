@@ -83,7 +83,7 @@ The quick start owns the `http.Server` directly to keep the first example small.
 | Start with | Use it when |
 | --- | --- |
 | `echoweb.New()` and `router.GET(...)` | Routes are registered directly and your application owns the `http.Server`. |
-| `web.NewRouteGroup(...)` and `web.RegisterRoutes(...)` | Routes should be reusable declarations for reporting, indexing, or generated application composition. |
+| `web.NewRouteGroup(...)` and `web.RegisterRoutes(...)` | Routes should be reusable declarations for reporting, indexing, or framework-managed App composition. |
 | `echoweb.NewServer(...)` | The adapter should register route groups and own graceful HTTP shutdown. |
 | `echoweb.Wrap(engine)` | An existing Echo engine needs to expose the app-facing `web.Router` contract. |
 
@@ -1796,3 +1796,13 @@ fmt.Println(ctx.Param("id"), ctx.Query("expand"))
 // 42 roles
 ```
 <!-- api:embed:end -->
+
+## Development
+
+Use the repository targets to validate every module and refresh executable documentation:
+
+```bash
+make test
+make vet
+make generate
+```
