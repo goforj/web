@@ -83,7 +83,7 @@ The quick start owns the `http.Server` directly to keep the first example small.
 | Start with | Use it when |
 | --- | --- |
 | `echoweb.New()` and `router.GET(...)` | Routes are registered directly and your application owns the `http.Server`. |
-| `web.NewRouteGroup(...)` and `web.RegisterRoutes(...)` | Routes should be reusable declarations for reporting, indexing, or generated application composition. |
+| `web.NewRouteGroup(...)` and `web.RegisterRoutes(...)` | Routes should be reusable declarations for reporting, indexing, or framework-managed App composition. |
 | `echoweb.NewServer(...)` | The adapter should register route groups and own graceful HTTP shutdown. |
 | `echoweb.Wrap(engine)` | An existing Echo engine needs to expose the app-facing `web.Router` contract. |
 
@@ -284,14 +284,14 @@ Whiskers in every panel show the observed sample minimum and maximum. The first 
 
 Bars are scaled independently within each panel, and small differences should not be treated as rankings. These are microbenchmarks and loopback ceilings, not production capacity forecasts.
 
-Measured with `go1.26.1` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.11-orbstack-00360-gc9bc4d96ac70`, revision `d29d29af01ea`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:b0dc11f44fd0a2f7c12ddbca4f5f6b379fd7b661261242978a2dd8380f76fca5`. Dependencies: net/http go1.26.1, GoForj Web local checkout, Echo v5.1.0, Gin v1.12.0, Chi v5.3.1, Gorilla Mux v1.8.1, httprouter v1.3.0.
+Measured with `go1.26.1` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.11-orbstack-00360-gc9bc4d96ac70`, revision `df4a3d1f75f6`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:34d8f1b557a3681b44748966456fee27d79c89111d49b01fa6da04ae6b6323c2`. Dependencies: net/http go1.26.1, GoForj Web local checkout, Echo v5.1.0, Gin v1.12.0, Chi v5.3.1, Gorilla Mux v1.8.1, httprouter v1.3.0.
 
 Fiber is omitted because its `fasthttp` engine is not directly comparable in this shared `net/http` suite. See the [benchmark methodology](docs/bench/README.md) and [recorded sample rows](docs/bench/benchmarks_rows.json).
 
 Regenerate the measurement and image with:
 
 ```sh
-make benchmark-svg
+make bench-svg
 ```
 <!-- bench:embed:end -->
 
@@ -1796,3 +1796,13 @@ fmt.Println(ctx.Param("id"), ctx.Query("expand"))
 // 42 roles
 ```
 <!-- api:embed:end -->
+
+## Development
+
+Use the repository targets to validate every module and refresh executable documentation:
+
+```bash
+make test
+make vet
+make generate
+```

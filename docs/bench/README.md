@@ -26,19 +26,19 @@ The in-process cases reuse a request and resettable response writer so the chart
 Run a fresh measurement and regenerate the snapshot, SVG, and README block:
 
 ```sh
-make benchmark-svg
+make bench-svg
 ```
 
 Publication measurements must start from a clean working tree. For local iteration on uncommitted code, generate an explicitly marked, non-publishable preview instead:
 
 ```sh
-make benchmark-svg-preview
+make bench-svg-preview
 ```
 
 Regenerate only the deterministic documentation output from the checked-in snapshot:
 
 ```sh
-make benchmark-svg-render
+make bench-svg-render
 ```
 
 For benchmark artifacts, CI runs only the render-only publication check. It verifies that the SVG and README match the committed snapshot and rejects snapshots recorded from a dirty tree. It also recomputes a deterministic fingerprint over the local runtime sources compiled into the handlers, the benchmark harness, and the root and docs module pins. A generated-artifact commit therefore remains valid, while a later benchmark input change requires a new measurement. This is source-currentness validation; CI does not execute the benchmarks, compare different machines, or enforce performance thresholds.

@@ -346,7 +346,7 @@ func validateSnapshotInputFingerprint(root string, snapshot benchmarkSnapshot) e
 		return fmt.Errorf("fingerprint current benchmark inputs: %w", err)
 	}
 	if current != snapshot.Metadata.BenchmarkInputFingerprint {
-		return fmt.Errorf("benchmark inputs differ from measured snapshot: current %s, recorded %s; rerun make benchmark-svg from a clean source commit", current, snapshot.Metadata.BenchmarkInputFingerprint)
+		return fmt.Errorf("benchmark inputs differ from measured snapshot: current %s, recorded %s; rerun make bench-svg from a clean source commit", current, snapshot.Metadata.BenchmarkInputFingerprint)
 	}
 	return nil
 }
@@ -1394,7 +1394,7 @@ Fiber is omitted because its `+"`fasthttp`"+` engine is not directly comparable 
 Regenerate the measurement and image with:
 
 `+"```sh"+`
-make benchmark-svg
+make bench-svg
 `+"```"+``, warning, formatSampleCount(metadata.SampleCount), metadata.BenchmarkTime, metadata.GoVersion, metadata.GOOS, metadata.GOARCH, metadata.CPU, metadata.Kernel, revision, strings.Join(settings, ", "), metadata.BenchmarkInputFingerprint, strings.Join(dependencies, ", "))
 	return []byte(block)
 }
