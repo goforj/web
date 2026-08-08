@@ -112,7 +112,16 @@ func Run(ctx context.Context, opts IndexOptions) (Manifest, error) {
 // When the active build cannot be fingerprinted safely, RunCached falls back to a full run without persisting state.
 // @group Indexing
 func RunCached(ctx context.Context, opts IndexOptions, cachePath string) (Manifest, error) {
-	return run(ctx, opts, cachePath, nil)
+	return runCachedWithRetry(ctx, opts, cachePath, nil)
+}
+
+// runCachedWithRetry restarts analysis once when a concurrent edit invalidates the source snapshot before publication.
+func runCachedWithRetry(ctx context.Context, opts IndexOptions, cachePath string, loadPackages typedPackageLoader) (Manifest, error) {
+	manifest, err := run(ctx, opts, cachePath, loadPackages)
+	if !errors.Is(err, errIndexCacheInputsChanged) {
+		return manifest, err
+	}
+	return run(ctx, opts, cachePath, loadPackages)
 }
 
 // run keeps cache selection and package-loading observation scoped to one invocation so parallel callers cannot affect each other.

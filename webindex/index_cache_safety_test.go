@@ -130,6 +130,39 @@ func TestRunCachedDoesNotPublishMissWhenSourceChangesDuringAnalysis(t *testing.T
 	}
 }
 
+// TestRunCachedRetriesAfterSourceChangesDuringAnalysis verifies a superseded snapshot becomes a fresh successful generation.
+func TestRunCachedRetriesAfterSourceChangesDuringAnalysis(t *testing.T) {
+	root, handlerPath := writeTypedSchemaFixture(t)
+	artifactDirectory := t.TempDir()
+	cachePath := filepath.Join(t.TempDir(), "webindex.cache")
+	options := indexCacheIntegrationOptions(root, artifactDirectory)
+	loads := 0
+	loader := func(config *packages.Config, patterns ...string) ([]*packages.Package, error) {
+		loaded, err := packages.Load(config, patterns...)
+		loads++
+		if err == nil && loads == 1 {
+			appendIndexCacheTestFile(t, handlerPath, "\n// The next analysis should use this complete source generation.\n")
+		}
+		return loaded, err
+	}
+
+	manifest, err := runCachedWithRetry(context.Background(), options, cachePath, loader)
+	if err != nil {
+		t.Fatalf("retry cached analysis after source change: %v", err)
+	}
+	if loads != 2 {
+		t.Fatalf("package loads = %d, want one initial analysis and one retry", loads)
+	}
+	if manifest.Version != ManifestVersion {
+		t.Fatalf("manifest version = %q, want %q", manifest.Version, ManifestVersion)
+	}
+	for _, path := range []string{options.OutPath, options.DiagnosticsPath, options.OpenAPIPath, cachePath} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("retried analysis did not publish %s: %v", filepath.Base(path), err)
+		}
+	}
+}
+
 // TestRunCachedColdMissUsesFingerprintOverlay verifies an ABA edit cannot mix initial syntax with transient package types.
 func TestRunCachedColdMissUsesFingerprintOverlay(t *testing.T) {
 	root, _ := writeTypedSchemaFixture(t)
