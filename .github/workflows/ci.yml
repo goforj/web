@@ -162,7 +162,7 @@ jobs:
           if-no-files-found: error
 
   dependency-review:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.ENABLE_GITHUB_ADVANCED_SECURITY == 'true'
     runs-on: ubuntu-latest
 
     steps:
