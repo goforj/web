@@ -26,4 +26,4 @@ require (
 	google.golang.org/protobuf v1.36.8 // indirect
 )
 
-replace github.com/goforj/web => ..
+replace github.com/goforj/web => ./..
