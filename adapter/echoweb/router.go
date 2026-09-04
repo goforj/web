@@ -28,17 +28,17 @@ type groupLike interface {
 }
 
 type routerAdapter struct {
-	engine      *echo.Echo
-	group       groupLike
-	parent      *routerAdapter
-	middlewares []web.Middleware
+	engine          *echo.Echo
+	group           groupLike
+	parent          *routerAdapter
+	middlewares     []web.Middleware
+	middlewareIndex int
 
 	middlewareMu      sync.RWMutex
 	rootMiddlewareMu  sync.Mutex
 	rootMiddleware    atomic.Pointer[rootMiddlewareHandler]
 	rootMiddlewareEnd *rootMiddlewareLink
 	rootContexts      sync.Pool
-	webRoutes         sync.Map
 }
 
 // rootMiddlewareContext carries Echo's request-selected handler through the
@@ -262,104 +262,76 @@ func (r *routerAdapter) newWebRouteHandler(handler web.Handler) *webRouteHandler
 	return adapted
 }
 
-// registerWebRoute retains the Web continuation so root middleware can preserve
-// its lifecycle when Echo compiles global middleware before route selection.
-func (r *routerAdapter) registerWebRoute(route echo.RouteInfo, handler web.Handler) {
-	r.rootRouter().webRoutes.Store(webRouteKey(route), handler)
-}
-
-// registerWebRoutes retains every method-specific continuation returned by Echo.
-func (r *routerAdapter) registerWebRoutes(routes echo.Routes, handler web.Handler) {
-	for _, route := range routes {
-		r.registerWebRoute(route, handler)
-	}
-}
-
-// webRouteKey identifies a selected Echo route independently of its handler closure.
-func webRouteKey(route echo.RouteInfo) string {
-	return route.Method + "\x00" + route.Path
-}
-
-// webRouteHandlerFor returns the Web continuation selected by Echo for this request.
-func (r *routerAdapter) webRouteHandlerFor(c *echo.Context) web.Handler {
-	if c == nil {
-		return nil
-	}
-	handler, _ := r.webRoutes.Load(webRouteKey(c.RouteInfo()))
-	webHandler, _ := handler.(web.Handler)
-	return webHandler
-}
-
 // CONNECT registers a CONNECT route.
 func (r *routerAdapter) CONNECT(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.CONNECT(path, adapted.routeHandler), adapted.handler)
+	r.group.CONNECT(path, adapted.routeHandler)
 }
 
 // DELETE registers a DELETE route.
 func (r *routerAdapter) DELETE(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.DELETE(path, adapted.routeHandler), adapted.handler)
+	r.group.DELETE(path, adapted.routeHandler)
 }
 
 // GET registers a GET route.
 func (r *routerAdapter) GET(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.GET(path, adapted.routeHandler), adapted.handler)
+	r.group.GET(path, adapted.routeHandler)
 }
 
 // GETWS registers a GET websocket route.
 func (r *routerAdapter) GETWS(path string, handler web.WebSocketHandler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyWebSocketHandler(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.GET(path, adapted.routeHandler), adapted.handler)
+	r.group.GET(path, adapted.routeHandler)
 }
 
 // HEAD registers a HEAD route.
 func (r *routerAdapter) HEAD(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.HEAD(path, adapted.routeHandler), adapted.handler)
+	r.group.HEAD(path, adapted.routeHandler)
 }
 
 // OPTIONS registers an OPTIONS route.
 func (r *routerAdapter) OPTIONS(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.OPTIONS(path, adapted.routeHandler), adapted.handler)
+	r.group.OPTIONS(path, adapted.routeHandler)
 }
 
 // PATCH registers a PATCH route.
 func (r *routerAdapter) PATCH(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.PATCH(path, adapted.routeHandler), adapted.handler)
+	r.group.PATCH(path, adapted.routeHandler)
 }
 
 // POST registers a POST route.
 func (r *routerAdapter) POST(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.POST(path, adapted.routeHandler), adapted.handler)
+	r.group.POST(path, adapted.routeHandler)
 }
 
 // PUT registers a PUT route.
 func (r *routerAdapter) PUT(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.PUT(path, adapted.routeHandler), adapted.handler)
+	r.group.PUT(path, adapted.routeHandler)
 }
 
 // TRACE registers a TRACE route.
 func (r *routerAdapter) TRACE(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.TRACE(path, adapted.routeHandler), adapted.handler)
+	r.group.TRACE(path, adapted.routeHandler)
 }
 
 // Any registers a route for every standard HTTP method.
 func (r *routerAdapter) Any(path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoute(r.group.Any(path, adapted.routeHandler), adapted.handler)
+	r.group.Any(path, adapted.routeHandler)
 }
 
 // Match registers a route for the provided set of HTTP methods.
 func (r *routerAdapter) Match(methods []string, path string, handler web.Handler, middleware ...web.Middleware) {
 	adapted := r.newWebRouteHandler(applyMiddlewares(handler, r.routeMiddlewares(middleware)...))
-	r.registerWebRoutes(r.group.Match(methods, path, adapted.routeHandler), adapted.handler)
+	r.group.Match(methods, path, adapted.routeHandler)
 }
 
 // Group creates a child router with a prefixed path scope.
@@ -395,7 +367,7 @@ func (r *routerAdapter) rootMiddlewareHandler(next echo.HandlerFunc) echo.Handle
 		if head == nil {
 			return next(c)
 		}
-		ctx := r.acquireRootContext(c, next, r.webRouteHandlerFor(c))
+		ctx := r.acquireRootContext(c, next, r.dispatch)
 		ctx.nativeState = true
 		defer func() {
 			ctx.promoteStateToNative()
@@ -403,6 +375,24 @@ func (r *routerAdapter) rootMiddlewareHandler(next echo.HandlerFunc) echo.Handle
 		}()
 		return head.handler(ctx)
 	}
+}
+
+// dispatch repeats route selection for detached contexts, then applies only the
+// Echo middleware registered after this adapter. Earlier middleware already
+// surrounds the adapter in Echo's compiled chain.
+func (r *routerAdapter) dispatch(ctx web.Context) error {
+	native, ok := UnwrapContext(ctx)
+	if !ok || native == nil || r == nil || r.engine == nil {
+		return echo.ErrInternalServerError
+	}
+	handler := r.engine.Router().Route(native)
+	middlewares := r.engine.Middlewares()
+	if r.middlewareIndex+1 < len(middlewares) {
+		for index := len(middlewares) - 1; index > r.middlewareIndex; index-- {
+			handler = middlewares[index](handler)
+		}
+	}
+	return handler(native)
 }
 
 // appendRootMiddlewares extends the shared chain without reconstructing existing middleware.

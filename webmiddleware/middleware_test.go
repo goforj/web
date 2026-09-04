@@ -1016,6 +1016,38 @@ func TestStaticServesFilesAndHTML5Fallback(t *testing.T) {
 	}
 }
 
+// TestStaticRejectsEncodedPathSeparators keeps URL decoding from changing the route boundary that authorized a static response.
+func TestStaticRejectsEncodedPathSeparators(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(pathJoin(root, "secret.txt"), []byte("secret"), 0o644); err != nil {
+		t.Fatalf("WriteFile secret: %v", err)
+	}
+
+	for _, rawPath := range []string{"/%2Fsecret.txt", "/%5Csecret.txt", "/%252Fsecret.txt", "/%255Csecret.txt"} {
+		t.Run(rawPath, func(t *testing.T) {
+			adapter := echoweb.New()
+			adapter.Router().Use(Static(root))
+			called := false
+			adapter.Router().GET("/*", func(r web.Context) error {
+				called = true
+				return r.Text(http.StatusOK, "route")
+			})
+
+			recorder := httptest.NewRecorder()
+			adapter.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, rawPath, nil))
+			if recorder.Code != http.StatusNotFound {
+				t.Fatalf("status = %d body=%q", recorder.Code, recorder.Body.String())
+			}
+			if recorder.Body.String() == "secret" {
+				t.Fatal("encoded separator served a static file")
+			}
+			if called {
+				t.Fatal("encoded separator reached the matched route")
+			}
+		})
+	}
+}
+
 func TestStaticBrowseListsDirectoryContents(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(pathJoin(root, "a.txt"), []byte("a"), 0o644); err != nil {

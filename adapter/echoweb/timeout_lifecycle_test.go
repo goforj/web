@@ -184,6 +184,78 @@ func TestTimeoutContextBridgesNativeValuesThroughWebGet(t *testing.T) {
 	}
 }
 
+// TestTimeoutContextRedispatchesDetachedContexts preserves later Echo middleware for Web, native, and fallback routes.
+func TestTimeoutContextRedispatchesDetachedContexts(t *testing.T) {
+	engine := echo.New()
+	events := make([]string, 0, 5)
+	engine.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(ctx *echo.Context) error {
+			events = append(events, "before")
+			err := next(ctx)
+			events = append(events, "before-return")
+			return err
+		}
+	})
+
+	adapter := echoweb.Wrap(engine)
+	adapter.Router().Use(webmiddleware.TimeoutWithConfig(webmiddleware.TimeoutConfig{Timeout: time.Second}))
+	engine.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(ctx *echo.Context) error {
+			events = append(events, "after")
+			ctx.Response().Header().Set("X-Later-Echo-Middleware", "on")
+			err := next(ctx)
+			events = append(events, "after-return")
+			return err
+		}
+	})
+	adapter.Router().GET("/web", func(ctx web.Context) error {
+		events = append(events, "web")
+		return ctx.Text(http.StatusOK, "web")
+	})
+	engine.GET("/native", func(ctx *echo.Context) error {
+		events = append(events, "native")
+		return ctx.String(http.StatusAccepted, "native")
+	})
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		status int
+		body   string
+		event  string
+	}{
+		{name: "web route", method: http.MethodGet, path: "/web", status: http.StatusOK, body: "web", event: "web"},
+		{name: "native route", method: http.MethodGet, path: "/native", status: http.StatusAccepted, body: "native", event: "native"},
+		{name: "not found", method: http.MethodGet, path: "/missing", status: http.StatusNotFound},
+		{name: "method not allowed", method: http.MethodPost, path: "/web", status: http.StatusMethodNotAllowed},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events = events[:0]
+			recorder := httptest.NewRecorder()
+			adapter.ServeHTTP(recorder, httptest.NewRequest(test.method, test.path, nil))
+			if recorder.Code != test.status {
+				t.Fatalf("status = %d body=%q, want %d", recorder.Code, recorder.Body.String(), test.status)
+			}
+			if test.body != "" && recorder.Body.String() != test.body {
+				t.Fatalf("body = %q, want %q", recorder.Body.String(), test.body)
+			}
+			if got := recorder.Header().Get("X-Later-Echo-Middleware"); got != "on" {
+				t.Fatalf("X-Later-Echo-Middleware = %q, want on", got)
+			}
+			want := []string{"before", "after"}
+			if test.event != "" {
+				want = append(want, test.event)
+			}
+			want = append(want, "after-return", "before-return")
+			if got := strings.Join(events, ","); got != strings.Join(want, ",") {
+				t.Fatalf("events = %q, want %q", got, strings.Join(want, ","))
+			}
+		})
+	}
+}
+
 // TestTimeoutContextIsolatesLateHandlerFromReusedEchoContext verifies request and response ownership after a deadline.
 func TestTimeoutContextIsolatesLateHandlerFromReusedEchoContext(t *testing.T) {
 	adapter := echoweb.New()
