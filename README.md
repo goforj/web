@@ -284,7 +284,7 @@ Whiskers in every panel show the observed sample minimum and maximum. The first 
 
 Bars are scaled independently within each panel, and small differences should not be treated as rankings. These are microbenchmarks and loopback ceilings, not production capacity forecasts.
 
-Measured with `go1.26.1` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.11-orbstack-00360-gc9bc4d96ac70`, revision `df4a3d1f75f6`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:34d8f1b557a3681b44748966456fee27d79c89111d49b01fa6da04ae6b6323c2`. Dependencies: net/http go1.26.1, GoForj Web local checkout, Echo v5.1.0, Gin v1.12.0, Chi v5.3.1, Gorilla Mux v1.8.1, httprouter v1.3.0.
+Measured with `go1.27.0` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.11-orbstack-00360-gc9bc4d96ac70`, revision `33193fb8c1cf`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:774402884da6f5cbdb1ff8f1c32411ae8e7d5ac36f7a351c882c79435a394ce8`. Dependencies: net/http go1.27.0, GoForj Web local checkout, Echo v5.2.0, Gin v1.12.0, Chi v5.3.1, Gorilla Mux v1.8.1, httprouter v1.3.0.
 
 Fiber is omitted because its `fasthttp` engine is not directly comparable in this shared `net/http` suite. See the [benchmark methodology](docs/bench/README.md) and [recorded sample rows](docs/bench/benchmarks_rows.json).
 
@@ -1298,8 +1298,11 @@ router.GET("/healthz", func(c web.Context) error {
 #### <a id="webmiddleware-timeoutwithconfig"></a>webmiddleware.TimeoutWithConfig
 
 TimeoutWithConfig returns a response-timeout middleware with config.
-Timed work may run on an isolated native adapter context; request state that
-must cross the timeout boundary should use web.Context.Set and web.Context.Get.
+Timed work may run on an isolated native adapter context. With the Echo adapter,
+native echo.Context.Set and echo.Context.Get values do not cross that timeout
+detachment boundary because sharing Echo's pooled store would permit post-timeout
+request races. Store middleware values that must cross the boundary with
+web.Context.Set and web.Context.Get instead.
 
 ```go
 router := echoweb.New().Router()

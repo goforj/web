@@ -95,9 +95,13 @@ func StaticWithConfig(config StaticConfig) web.Middleware {
 				return next(r)
 			}
 
+			rawPath := r.Request().URL.EscapedPath()
 			p := r.Request().URL.Path
 			if strings.HasSuffix(r.Path(), "*") {
 				p = r.Param("*")
+			}
+			if hasEncodedPathSeparator(rawPath) || hasEncodedPathSeparator(p) {
+				return r.NoContent(http.StatusNotFound)
 			}
 			p, err = url.PathUnescape(p)
 			if err != nil {
@@ -159,6 +163,21 @@ func StaticWithConfig(config StaticConfig) web.Middleware {
 			http.ServeContent(r.ResponseWriter(), r.Request(), info.Name(), info.ModTime(), file)
 			return nil
 		}
+	}
+}
+
+// hasEncodedPathSeparator rejects separators hidden behind one or more URL encodings.
+func hasEncodedPathSeparator(value string) bool {
+	for {
+		lower := strings.ToLower(value)
+		if strings.Contains(lower, "%2f") || strings.Contains(lower, "%5c") {
+			return true
+		}
+		decoded, err := url.PathUnescape(value)
+		if err != nil || decoded == value {
+			return false
+		}
+		value = decoded
 	}
 }
 

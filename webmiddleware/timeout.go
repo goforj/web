@@ -40,8 +40,11 @@ func Timeout() web.Middleware {
 }
 
 // TimeoutWithConfig returns a response-timeout middleware with config.
-// Timed work may run on an isolated native adapter context; request state that
-// must cross the timeout boundary should use web.Context.Set and web.Context.Get.
+// Timed work may run on an isolated native adapter context. With the Echo adapter,
+// native echo.Context.Set and echo.Context.Get values do not cross that timeout
+// detachment boundary because sharing Echo's pooled store would permit post-timeout
+// request races. Store middleware values that must cross the boundary with
+// web.Context.Set and web.Context.Get instead.
 // @group Middleware - Request Lifecycle
 // Example:
 // router := echoweb.New().Router()

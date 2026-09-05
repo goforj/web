@@ -3,7 +3,6 @@ package echoweb
 import (
 	"fmt"
 	"net/http"
-	"reflect"
 	"sync"
 	"sync/atomic"
 
@@ -29,19 +28,17 @@ type groupLike interface {
 }
 
 type routerAdapter struct {
-	engine      *echo.Echo
-	group       groupLike
-	parent      *routerAdapter
-	middlewares []web.Middleware
+	engine          *echo.Echo
+	group           groupLike
+	parent          *routerAdapter
+	middlewares     []web.Middleware
+	middlewareIndex int
 
 	middlewareMu      sync.RWMutex
 	rootMiddlewareMu  sync.Mutex
 	rootMiddleware    atomic.Pointer[rootMiddlewareHandler]
 	rootMiddlewareEnd *rootMiddlewareLink
 	rootContexts      sync.Pool
-
-	webRouteHandlerCode uintptr
-	directWebRoutes     bool
 }
 
 // rootMiddlewareContext carries Echo's request-selected handler through the
@@ -54,6 +51,7 @@ type rootMiddlewareContext struct {
 	stateValue  any
 	stateSet    bool
 	nativeState bool
+	detached    bool
 }
 
 // echoContext returns the native request context behind a root middleware invocation.
@@ -132,6 +130,7 @@ func (c *rootMiddlewareContext) DetachedContext() (web.Context, func()) {
 		contextAdapter: detached.(*contextAdapter),
 		nextEcho:       c.nextEcho,
 		nextWeb:        c.nextWeb,
+		detached:       true,
 	}
 	return detachedContext, func() {
 		detachedContext.promoteStateToNative()
@@ -160,6 +159,7 @@ func (r *routerAdapter) releaseRootContext(ctx *rootMiddlewareContext) {
 	ctx.stateValue = nil
 	ctx.stateSet = false
 	ctx.nativeState = false
+	ctx.detached = false
 	r.rootContexts.Put(ctx)
 }
 
@@ -189,29 +189,19 @@ func (l *rootMiddlewareStaticLink) handle(ctx web.Context) error {
 	return l.next(ctx)
 }
 
-// webRouteHandler lets an already-selected Echo route enter the shared root middleware chain directly.
+// webRouteHandler keeps Web-owned routes compatible with Echo's selected-handler dispatch.
 type webRouteHandler struct {
 	handler      web.Handler
 	root         *routerAdapter
 	routeHandler echo.HandlerFunc
 }
 
-// handle invokes root middleware inside Web-owned routes when no other Echo middleware changes ordering.
+// handle invokes the route after Echo has applied the shared root middleware chain.
 func (h *webRouteHandler) handle(c *echo.Context) error {
 	if h == nil || h.root == nil || h.handler == nil {
 		return echo.ErrInternalServerError
 	}
-	head := h.root.rootMiddleware.Load()
-	if head == nil || !h.root.directWebRoutes || len(h.root.engine.Middlewares()) != 1 || len(h.root.engine.PreMiddlewares()) != 0 {
-		return h.handler(acquireContextAdapter(c))
-	}
-	ctx := h.root.acquireRootContext(c, nil, h.handler)
-	err := head.handler(ctx)
-	if err != nil {
-		ctx.promoteStateToNative()
-	}
-	h.root.releaseRootContext(ctx)
-	return err
+	return h.handler(acquireContextAdapter(c))
 }
 
 var _ web.Router = (*routerAdapter)(nil)
@@ -265,13 +255,10 @@ func (r *routerAdapter) Handle(method string, path string, handler web.Handler, 
 	return nil
 }
 
-// newWebRouteHandler binds one adapted handler to the root middleware owner selected at request time.
+// newWebRouteHandler creates an Echo route handler for a Web handler.
 func (r *routerAdapter) newWebRouteHandler(handler web.Handler) *webRouteHandler {
 	adapted := &webRouteHandler{handler: handler, root: r.rootRouter()}
 	adapted.routeHandler = adapted.handle
-	if adapted.root.directWebRoutes && adapted.root.webRouteHandlerCode == 0 {
-		adapted.root.webRouteHandlerCode = reflect.ValueOf(adapted.routeHandler).Pointer()
-	}
 	return adapted
 }
 
@@ -375,18 +362,12 @@ func adaptRouterMiddlewares(r *routerAdapter) echo.MiddlewareFunc {
 
 // rootMiddlewareHandler binds Echo's request-selected continuation to the shared middleware chain.
 func (r *routerAdapter) rootMiddlewareHandler(next echo.HandlerFunc) echo.HandlerFunc {
-	head := r.rootMiddleware.Load()
-	if head == nil {
-		return next
-	}
-	// Native middleware and additional wrapped adapters can obscure which
-	// receiver owns a method-value code pointer, so they use the dynamic path.
-	if r.directWebRoutes && len(r.engine.Middlewares()) == 1 && len(r.engine.PreMiddlewares()) == 0 && r.webRouteHandlerCode != 0 && reflect.ValueOf(next).Pointer() == r.webRouteHandlerCode {
-		return next
-	}
-
 	return func(c *echo.Context) error {
-		ctx := r.acquireRootContext(c, next, nil)
+		head := r.rootMiddleware.Load()
+		if head == nil {
+			return next(c)
+		}
+		ctx := r.acquireRootContext(c, next, r.dispatch)
 		ctx.nativeState = true
 		defer func() {
 			ctx.promoteStateToNative()
@@ -394,6 +375,24 @@ func (r *routerAdapter) rootMiddlewareHandler(next echo.HandlerFunc) echo.Handle
 		}()
 		return head.handler(ctx)
 	}
+}
+
+// dispatch repeats route selection for detached contexts, then applies only the
+// Echo middleware registered after this adapter. Earlier middleware already
+// surrounds the adapter in Echo's compiled chain.
+func (r *routerAdapter) dispatch(ctx web.Context) error {
+	native, ok := UnwrapContext(ctx)
+	if !ok || native == nil || r == nil || r.engine == nil {
+		return echo.ErrInternalServerError
+	}
+	handler := r.engine.Router().Route(native)
+	middlewares := r.engine.Middlewares()
+	if r.middlewareIndex+1 < len(middlewares) {
+		for index := len(middlewares) - 1; index > r.middlewareIndex; index-- {
+			handler = middlewares[index](handler)
+		}
+	}
+	return handler(native)
 }
 
 // appendRootMiddlewares extends the shared chain without reconstructing existing middleware.
@@ -443,7 +442,7 @@ func (r *routerAdapter) invokeRootMiddlewareNext(ctx web.Context) error {
 		if root == nil || root.contextAdapter == nil {
 			return echo.ErrInternalServerError
 		}
-		if root.nextWeb != nil {
+		if root.detached && root.nextWeb != nil {
 			return root.nextWeb(root)
 		}
 		if root.nextEcho != nil {
