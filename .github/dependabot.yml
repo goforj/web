@@ -1,21 +1,47 @@
 version: 2
+# Compatible releases are batched by dependency surface to keep CI evidence
+# complete without opening one pull request per package.
 updates:
   - package-ecosystem: gomod
     directory: "/"
     schedule:
       interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      root-go-compatible:
+        patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: gomod
     directory: "/docs"
     schedule:
       interval: weekly
+      day: tuesday
+    open-pull-requests-limit: 3
+    groups:
+      docs-go-compatible:
+        patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: gomod
     directory: "/examples"
     schedule:
       interval: weekly
+      day: wednesday
+    open-pull-requests-limit: 3
+    groups:
+      examples-go-compatible:
+        patterns: ["*"]
+        update-types: [minor, patch]
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+      day: friday
+    open-pull-requests-limit: 3
+    groups:
+      actions-compatible:
+        patterns: ["*"]
+        update-types: [minor, patch]
