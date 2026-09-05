@@ -2,7 +2,7 @@ module github.com/goforj/web
 
 go 1.25.0
 
-require github.com/labstack/echo/v5 v5.2.0
+require github.com/labstack/echo/v5 v5.3.1
 
 require (
 	github.com/goforj/str v1.3.0
