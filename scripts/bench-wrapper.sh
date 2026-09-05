@@ -82,7 +82,7 @@ run_benchstat() {
     return
   fi
 
-  go run golang.org/x/perf/cmd/benchstat@latest "$normalized_before" "$normalized_after"
+  go run golang.org/x/perf/cmd/benchstat@v0.0.0-20260825160852-19be9d8e6c70 "$normalized_before" "$normalized_after"
 }
 
 with_comparison() {
