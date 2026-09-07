@@ -21,7 +21,9 @@ type Adapter struct {
 //
 //	// true true
 func New() *Adapter {
-	engine := echo.New()
+	engine := echo.NewWithConfig(echo.Config{
+		Router: echo.NewRouter(echo.RouterConfig{AllowOverwritingRoute: false}),
+	})
 	engine.IPExtractor = echo.LegacyIPExtractor()
 	router := &routerAdapter{engine: engine, group: engine, middlewareIndex: len(engine.Middlewares())}
 	engine.Use(adaptRouterMiddlewares(router))
@@ -40,7 +42,9 @@ func New() *Adapter {
 //	// true
 func Wrap(engine *echo.Echo) *Adapter {
 	if engine == nil {
-		engine = echo.New()
+		engine = echo.NewWithConfig(echo.Config{
+			Router: echo.NewRouter(echo.RouterConfig{AllowOverwritingRoute: false}),
+		})
 	}
 	if engine.IPExtractor == nil {
 		engine.IPExtractor = echo.LegacyIPExtractor()
