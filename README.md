@@ -284,7 +284,7 @@ Whiskers in every panel show the observed sample minimum and maximum. The first 
 
 Bars are scaled independently within each panel, and small differences should not be treated as rankings. These are microbenchmarks and loopback ceilings, not production capacity forecasts.
 
-Measured with `go1.27.0` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.14-orbstack-00380-ga7e0a2dc9535`, revision `d35a5199547f`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:2514265b65f31492e826b6632b098c8ab9fea2cee4af3e8de235b434b13635f9`. Dependencies: net/http go1.27.0, GoForj Web local checkout, Echo v5.3.1, Gin v1.12.0, Chi v5.3.2, Gorilla Mux v1.8.1, httprouter v1.3.0.
+Measured with `go1.27.0` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.14-orbstack-00380-ga7e0a2dc9535`, revision `51e98aa8a711`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:17adde14b9550f2b96814037427589a53d623f1ec1ea4cfbe7695b7385eb6456`. Dependencies: net/http go1.27.0, GoForj Web local checkout, Echo v5.3.1, Gin v1.12.0, Chi v5.3.2, Gorilla Mux v1.8.1, httprouter v1.3.0.
 
 Fiber is omitted because its `fasthttp` engine is not directly comparable in this shared `net/http` suite. See the [benchmark methodology](docs/bench/README.md) and [recorded sample rows](docs/bench/benchmarks_rows.json).
 
