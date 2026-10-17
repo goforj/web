@@ -154,7 +154,7 @@ func TestTypedSchemaRegistryRejectsCustomMarshalerUnderlyingShapes(t *testing.T)
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod": "module example.com/marshalers\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod": "module example.com/marshalers\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"contracts/contracts.go": `package contracts
 type JSONDTO struct { Internal string ` + "`json:\"internal\"`" + ` }
 func (JSONDTO) MarshalJSON() ([]byte, error) { return []byte("{}"), nil }
@@ -252,7 +252,7 @@ func TestTypedSchemaRegistryProjectsWireTagsAndTypedValidation(t *testing.T) {
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod": "module example.com/wiretypes\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod": "module example.com/wiretypes\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"contracts/contracts.go": `package contracts
 import "encoding/json"
 
@@ -583,7 +583,7 @@ func writeMultiPackageTypedSchemaFixture(t testing.TB, packageCount int) (string
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	files := map[string]string{
-		"go.mod": "module example.com/typedmulti\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod": "module example.com/typedmulti\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 	}
 	handlerFiles := make([]string, 0, packageCount)
 	for index := 0; index < packageCount; index++ {
@@ -619,7 +619,7 @@ func writeTypedSchemaFixture(t testing.TB) (string, string) {
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	files := map[string]string{
-		"go.mod":        "module example.com/typed\n\ngo 1.25.0\n\nrequire (\n\tgithub.com/goforj/web v0.0.0\n\tgithub.com/google/uuid v0.0.0\n)\n\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\nreplace github.com/google/uuid => ./uuid\n",
+		"go.mod":        "module example.com/typed\n\ngo 1.26.0\n\nrequire (\n\tgithub.com/goforj/web v0.0.0\n\tgithub.com/google/uuid v0.0.0\n)\n\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\nreplace github.com/google/uuid => ./uuid\n",
 		"uuid/go.mod":   "module github.com/google/uuid\n\ngo 1.25.0\n",
 		"uuid/uuid.go":  "package uuid\ntype UUID [16]byte\n",
 		"alpha/user.go": "package models\ntype User struct { Alpha string `json:\"alpha\"` }\n",
@@ -730,7 +730,7 @@ func writeTypedCollisionFixture(t testing.TB, includeUnrelatedHelper bool) (stri
 	handler := "package handler\n\nimport (\n" + imports + ")\n\n" +
 		"func Handle(ctx web.Context) error { return ctx.JSON(200, alpha.User{}) }\n" + helper
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod":        "module example.com/collision\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod":        "module example.com/collision\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"alpha/user.go": "package models\ntype User struct { Alpha string `json:\"alpha\"` }\n",
 		"beta/user.go":  "package models\ntype User struct { Beta string `json:\"beta\"` }\n",
 		"handler.go":    handler,

@@ -10,7 +10,7 @@
   <a href="https://pkg.go.dev/github.com/goforj/web"><img src="https://pkg.go.dev/badge/github.com/goforj/web.svg" alt="Go Reference"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://github.com/goforj/web/actions/workflows/ci.yml"><img src="https://github.com/goforj/web/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://go.dev"><img src="https://img.shields.io/badge/go-1.25%2B-blue?logo=go" alt="Go 1.25 or newer"></a>
+  <a href="https://go.dev"><img src="https://img.shields.io/badge/go-1.26%2B-blue?logo=go" alt="Go 1.26 or newer"></a>
   <a href="https://github.com/goforj/web/releases"><img src="https://img.shields.io/github/v/tag/goforj/web?label=version&sort=semver" alt="Latest release"></a>
   <a href="https://codecov.io/gh/goforj/web"><img src="https://codecov.io/gh/goforj/web/graph/badge.svg?token=Q0S6BVOM7R" alt="Coverage"></a>
 </p>
@@ -21,7 +21,7 @@ The contracts deliberately expose less than Echo. Applications can stay on the s
 
 ## Installation
 
-Requires Go 1.25 or newer.
+Requires Go 1.26 or newer.
 
 ```sh
 go get github.com/goforj/web
@@ -284,7 +284,7 @@ Whiskers in every panel show the observed sample minimum and maximum. The first 
 
 Bars are scaled independently within each panel, and small differences should not be treated as rankings. These are microbenchmarks and loopback ceilings, not production capacity forecasts.
 
-Measured with `go1.27.0` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.14-orbstack-00380-ga7e0a2dc9535`, revision `51e98aa8a711`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:17adde14b9550f2b96814037427589a53d623f1ec1ea4cfbe7695b7385eb6456`. Dependencies: net/http go1.27.0, GoForj Web local checkout, Echo v5.3.1, Gin v1.12.0, Chi v5.3.2, Gorilla Mux v1.8.1, httprouter v1.3.0.
+Measured with `go1.27.2` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.14-orbstack-00380-ga7e0a2dc9535`, revision `21287a15a0c4`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:298e74c4514885f4bf4b5cd192d05bddda3ed5bf1b0282a79a5670590f14a226`. Dependencies: net/http go1.27.2, GoForj Web local checkout, Echo v5.3.1, Gin v1.12.0, Chi v5.3.2, Gorilla Mux v1.8.1, httprouter v1.3.0.
 
 Fiber is omitted because its `fasthttp` engine is not directly comparable in this shared `net/http` suite. See the [benchmark methodology](docs/bench/README.md) and [recorded sample rows](docs/bench/benchmarks_rows.json).
 

@@ -299,7 +299,7 @@ func writeRepresentativeScaleFixture(t testing.TB) representativeScaleFixture {
 	t.Setenv("GOPACKAGESDRIVER", "off")
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
-	writeRepresentativeScaleFile(t, filepath.Join(root, "go.mod"), "module example.com/representativescale\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => "+filepath.ToSlash(webRoot)+"\n")
+	writeRepresentativeScaleFile(t, filepath.Join(root, "go.mod"), "module example.com/representativescale\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => "+filepath.ToSlash(webRoot)+"\n")
 	writeRepresentativeScaleFile(t, filepath.Join(root, ".env"), "APP_NAME=Representative Scale Fixture\n")
 
 	for packageIndex := 0; packageIndex < representativeScaleHandlerPackages; packageIndex++ {

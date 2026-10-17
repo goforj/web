@@ -182,7 +182,7 @@ func TestRunCachedColdMissUsesFingerprintOverlay(t *testing.T) {
 func TestRunCachedColdMissUsesModuleOverlay(t *testing.T) {
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
-	stableModule := "module example.com/module-snapshot\n\ngo 1.25.0\n\nrequire (\n\texample.com/contracts v0.0.0\n\tgithub.com/goforj/web v0.0.0\n)\n\nreplace example.com/contracts => ./contracts-stable\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n"
+	stableModule := "module example.com/module-snapshot\n\ngo 1.26.0\n\nrequire (\n\texample.com/contracts v0.0.0\n\tgithub.com/goforj/web v0.0.0\n)\n\nreplace example.com/contracts => ./contracts-stable\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n"
 	transientModule := strings.Replace(stableModule, "./contracts-stable", "./contracts-transient", 1)
 	writeTypedFixtureFiles(t, root, map[string]string{
 		"go.mod":                         stableModule,
@@ -253,7 +253,7 @@ func TestRunCachedPinsEffectiveGoEnvironment(t *testing.T) {
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod": "module example.com/environment-snapshot\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod": "module example.com/environment-snapshot\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"handler/handler_special.go": `//go:build special
 
 package handler
@@ -275,12 +275,12 @@ func (c *Controller) Handle(ctx web.Context) error {
 `,
 	})
 	goEnvironmentPath := filepath.Join(t.TempDir(), "go.env")
-	stableEnvironment := []byte("GOARCH=386\nCGO_ENABLED=0\nGOFLAGS=-tags=special\n")
-	transientEnvironment := []byte("GOARCH=amd64\nCGO_ENABLED=0\nGOFLAGS=\n")
+	stableEnvironment := []byte("GOOS=linux\nGOARCH=386\nCGO_ENABLED=0\nGOFLAGS=-tags=special\n")
+	transientEnvironment := []byte("GOOS=linux\nGOARCH=amd64\nCGO_ENABLED=0\nGOFLAGS=\n")
 	if err := os.WriteFile(goEnvironmentPath, stableEnvironment, 0o644); err != nil {
 		t.Fatalf("write custom Go environment: %v", err)
 	}
-	unsetIndexCacheTestEnvironment(t, "GOARCH", "CGO_ENABLED", "GOFLAGS")
+	unsetIndexCacheTestEnvironment(t, "GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS")
 	t.Setenv("GOENV", goEnvironmentPath)
 	t.Setenv("GOWORK", "off")
 
@@ -288,8 +288,8 @@ func (c *Controller) Handle(ctx web.Context) error {
 	loader := func(config *packages.Config, patterns ...string) ([]*packages.Package, error) {
 		loaderCalls++
 		environment := indexCacheTestEnvironment(config.Env)
-		if environment["GOENV"] != "off" || environment["GOPACKAGESDRIVER"] != "off" || environment["GOWORK"] != "off" || environment["GOARCH"] != "386" || environment["CGO_ENABLED"] != "0" || environment["GOFLAGS"] != "-tags=special" {
-			t.Fatalf("package loader environment was not pinned: GOENV=%q GOPACKAGESDRIVER=%q GOWORK=%q GOARCH=%q CGO_ENABLED=%q GOFLAGS=%q", environment["GOENV"], environment["GOPACKAGESDRIVER"], environment["GOWORK"], environment["GOARCH"], environment["CGO_ENABLED"], environment["GOFLAGS"])
+		if environment["GOENV"] != "off" || environment["GOPACKAGESDRIVER"] != "off" || environment["GOWORK"] != "off" || environment["GOOS"] != "linux" || environment["GOARCH"] != "386" || environment["CGO_ENABLED"] != "0" || environment["GOFLAGS"] != "-tags=special" {
+			t.Fatalf("package loader environment was not pinned: GOENV=%q GOPACKAGESDRIVER=%q GOWORK=%q GOOS=%q GOARCH=%q CGO_ENABLED=%q GOFLAGS=%q", environment["GOENV"], environment["GOPACKAGESDRIVER"], environment["GOWORK"], environment["GOOS"], environment["GOARCH"], environment["CGO_ENABLED"], environment["GOFLAGS"])
 		}
 		if err := os.WriteFile(goEnvironmentPath, transientEnvironment, 0o644); err != nil {
 			t.Fatalf("write transient Go environment: %v", err)
@@ -431,7 +431,7 @@ func TestRunCachedColdMissRejectsTransientNestedModule(t *testing.T) {
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod": "module example.com/stable\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod": "module example.com/stable\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"handler/handler.go": `package handler
 
 import (
@@ -448,7 +448,7 @@ func (c *Controller) Handle(ctx web.Context) error { return ctx.JSON(200, UUID{}
 	})
 	modulePath := filepath.Join(root, "handler", "go.mod")
 	loader := func(config *packages.Config, patterns ...string) ([]*packages.Package, error) {
-		transient := "module github.com/google/uuid\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n"
+		transient := "module github.com/google/uuid\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n"
 		if err := os.WriteFile(modulePath, []byte(transient), 0o644); err != nil {
 			t.Fatalf("write transient nested module: %v", err)
 		}
