@@ -332,7 +332,7 @@ func TestRunReportsMultipleBindContracts(t *testing.T) {
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeFixtureFiles(t, root, map[string]string{
-		"go.mod": "module example.com/multibind\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod": "module example.com/multibind\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"internal/report/controller.go": `package report
 import (
 	"net/http"

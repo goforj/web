@@ -13,6 +13,37 @@ permissions:
   contents: read
 
 jobs:
+  minimum-go:
+    runs-on: ubuntu-latest
+    env:
+      GOTOOLCHAIN: local
+      GOWORK: "off"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up minimum Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26.0"
+          cache: false
+
+      - name: Validate every Go module on the minimum version
+        run: |
+          mapfile -t modules < <(find . -type f -name go.mod -not -path './.git/*' -not -path './vendor/*' -print | LC_ALL=C sort)
+          test "${#modules[@]}" -gt 0
+          for module in "${modules[@]}"; do
+            (
+              cd "$(dirname "$module")"
+              go mod tidy -diff
+              go test ./...
+              go vet ./...
+              if [ "$module" = "./docs/go.mod" ]; then
+                go test -tags=benchrender ./...
+              fi
+            )
+          done
+
   unit:
     runs-on: ubuntu-latest
 

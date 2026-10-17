@@ -108,7 +108,7 @@ func TestTypedSchemaIncrementalStateRestoresLiteralSchemas(t *testing.T) {
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod": "module example.com/incrementalliterals\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod": "module example.com/incrementalliterals\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"handler.go": `package handler
 
 import "github.com/goforj/web"
@@ -709,7 +709,7 @@ func TestTypedSchemaIncrementalStateFallsBackAcrossUnselectedDependent(t *testin
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod": "module example.com/transitive\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod": "module example.com/transitive\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"a/handler.go": `package a
 
 import "github.com/goforj/web"

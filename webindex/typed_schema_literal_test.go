@@ -13,7 +13,7 @@ func TestTypedSchemaRegistryProjectsLiteralValuesAndNilCapableContainers(t *test
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod": "module example.com/literals\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod": "module example.com/literals\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"contracts/contracts.go": `package contracts
 type Tagged struct {
 	Display string ` + "`json:\"display_name\"`" + `
@@ -144,7 +144,7 @@ func TestTypedSchemaRegistryAllocatesGloballyUniqueComponentNames(t *testing.T) 
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod":        "module example.com/names\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod":        "module example.com/names\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"lower/user.go": "package models\ntype User struct { Lower string `json:\"lower\"` }\n",
 		"upper/user.go": "package Models\ntype User struct { Upper string `json:\"upper\"` }\n",
 		"contracts/contracts.go": `package contracts
@@ -236,7 +236,7 @@ func TestRunNamesComponentsFromReachableContractsOnly(t *testing.T) {
 	root := t.TempDir()
 	webRoot := typedFixtureWebRoot(t)
 	writeTypedFixtureFiles(t, root, map[string]string{
-		"go.mod":        "module example.com/reachable\n\ngo 1.25.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
+		"go.mod":        "module example.com/reachable\n\ngo 1.26.0\n\nrequire github.com/goforj/web v0.0.0\nreplace github.com/goforj/web => " + filepath.ToSlash(webRoot) + "\n",
 		"alpha/user.go": "package models\ntype User struct { Active string `json:\"active\"` }\n",
 		"beta/user.go":  "package models\ntype User struct { Inactive string `json:\"inactive\"` }\n",
 		"handler.go": `package handler
