@@ -273,6 +273,24 @@ adapter.Echo().IPExtractor = echo.ExtractIPDirect()
 
 Behind a trusted proxy, configure `echo.ExtractIPFromXFFHeader` or `echo.ExtractIPFromRealIPHeader` with trust options that match the deployment, and ensure the edge proxy removes client-supplied forwarding headers before adding its own.
 
+## Request scheme and proxy trust
+
+Echo 5.4 accepts scheme headers only from trusted peers. By default, loopback, link-local, private addresses and Unix sockets are trusted. Public clients cannot bypass `HTTPSRedirect` by claiming to use HTTPS.
+
+A proxy connecting from a public address or `100.64.0.0/10` now needs explicit trust. Without it, TLS termination can cause redirect loops and suppress HSTS. Configure the actual proxy ranges through the underlying engine:
+
+```go
+// Replace this documentation range with the proxy's actual network.
+_, proxyRange, err := net.ParseCIDR("203.0.113.0/24")
+if err != nil {
+    return err
+}
+adapter := echoweb.New()
+adapter.Echo().SchemeExtractor = echo.ExtractSchemeFromHeaders(echo.TrustIPRange(proxyRange))
+```
+
+The proxy must overwrite client-supplied `X-Forwarded-Proto`. Scheme trust is independent of `IPExtractor`. For other security behavior changes, including static paths, JSONP callbacks and method overrides, review the [Echo 5.4 migration notes](https://github.com/labstack/echo/releases/tag/v5.4.0).
+
 ## Performance
 
 <!-- bench:embed:start -->
