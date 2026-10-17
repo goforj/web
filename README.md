@@ -273,6 +273,24 @@ adapter.Echo().IPExtractor = echo.ExtractIPDirect()
 
 Behind a trusted proxy, configure `echo.ExtractIPFromXFFHeader` or `echo.ExtractIPFromRealIPHeader` with trust options that match the deployment, and ensure the edge proxy removes client-supplied forwarding headers before adding its own.
 
+## Request scheme and proxy trust
+
+Echo 5.4 accepts scheme headers only from trusted peers. By default, loopback, link-local, private addresses and Unix sockets are trusted. Public clients cannot bypass `HTTPSRedirect` by claiming to use HTTPS.
+
+A proxy connecting from a public address or `100.64.0.0/10` now needs explicit trust. Without it, TLS termination can cause redirect loops and suppress HSTS. Configure the actual proxy ranges through the underlying engine:
+
+```go
+// Replace this documentation range with the proxy's actual network.
+_, proxyRange, err := net.ParseCIDR("203.0.113.0/24")
+if err != nil {
+    return err
+}
+adapter := echoweb.New()
+adapter.Echo().SchemeExtractor = echo.ExtractSchemeFromHeaders(echo.TrustIPRange(proxyRange))
+```
+
+The proxy must overwrite client-supplied `X-Forwarded-Proto`. Scheme trust is independent of `IPExtractor`. For other security behavior changes, including static paths, JSONP callbacks and method overrides, review the [Echo 5.4 migration notes](https://github.com/labstack/echo/releases/tag/v5.4.0).
+
 ## Performance
 
 <!-- bench:embed:start -->
@@ -284,7 +302,7 @@ Whiskers in every panel show the observed sample minimum and maximum. The first 
 
 Bars are scaled independently within each panel, and small differences should not be treated as rankings. These are microbenchmarks and loopback ceilings, not production capacity forecasts.
 
-Measured with `go1.27.2` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.14-orbstack-00380-ga7e0a2dc9535`, revision `21287a15a0c4`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:298e74c4514885f4bf4b5cd192d05bddda3ed5bf1b0282a79a5670590f14a226`. Dependencies: net/http go1.27.2, GoForj Web local checkout, Echo v5.3.1, Gin v1.12.0, Chi v5.3.2, Gorilla Mux v1.8.1, httprouter v1.3.0.
+Measured with `go1.27.2` on `linux/arm64` (arm64 (CPU model unavailable)), kernel `Linux 7.0.14-orbstack-00380-ga7e0a2dc9535`, revision `2fbfff3e9bdd`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:eff62bca838bd3525e0fafda21e289c042a159bd83e7816ee1cdfca729f52bf0`. Dependencies: net/http go1.27.2, GoForj Web local checkout, Echo v5.4.0, Gin v1.12.0, Chi v5.3.2, Gorilla Mux v1.8.1, httprouter v1.3.0.
 
 Fiber is omitted because its `fasthttp` engine is not directly comparable in this shared `net/http` suite. See the [benchmark methodology](docs/bench/README.md) and [recorded sample rows](docs/bench/benchmarks_rows.json).
 
