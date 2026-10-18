@@ -10,6 +10,31 @@ import (
 	echo "github.com/labstack/echo/v5"
 )
 
+// TestRootMiddlewareReusesDispatchContinuation prevents a router-bound method allocation on every request.
+func TestRootMiddlewareReusesDispatchContinuation(t *testing.T) {
+	adapter := New()
+	router := adapter.router.(*routerAdapter)
+	router.Use(func(next web.Handler) web.Handler { return next })
+	native := adapter.engine.NewContext(httptest.NewRequest(http.MethodGet, "/", nil), httptest.NewRecorder())
+	called := 0
+	handler := router.rootMiddlewareHandler(func(*echo.Context) error {
+		called++
+		return nil
+	})
+	allocations := testing.AllocsPerRun(1000, func() {
+		if err := handler(native); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if called == 0 {
+		t.Fatal("middleware did not invoke its continuation")
+	}
+	// Race instrumentation drops pooled contexts, so allow occasional misses while rejecting one allocation per request.
+	if allocations >= 1 {
+		t.Fatalf("middleware dispatch allocated %g objects per request, want fewer than one", allocations)
+	}
+}
+
 // TestRootMiddlewareContextPromotesInternalAndInlineState verifies internal metadata bypasses inline application state.
 func TestRootMiddlewareContextPromotesInternalAndInlineState(t *testing.T) {
 	var missing *rootMiddlewareContext

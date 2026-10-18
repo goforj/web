@@ -362,12 +362,14 @@ func adaptRouterMiddlewares(r *routerAdapter) echo.MiddlewareFunc {
 
 // rootMiddlewareHandler binds Echo's request-selected continuation to the shared middleware chain.
 func (r *routerAdapter) rootMiddlewareHandler(next echo.HandlerFunc) echo.HandlerFunc {
+	// The continuation owns only router state, so capture it once when Echo compiles the middleware chain.
+	dispatch := r.dispatch
 	return func(c *echo.Context) error {
 		head := r.rootMiddleware.Load()
 		if head == nil {
 			return next(c)
 		}
-		ctx := r.acquireRootContext(c, next, r.dispatch)
+		ctx := r.acquireRootContext(c, next, dispatch)
 		ctx.nativeState = true
 		defer func() {
 			ctx.promoteStateToNative()
