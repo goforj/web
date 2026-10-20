@@ -1827,3 +1827,7 @@ make test
 make vet
 make generate
 ```
+
+## Documentation
+
+Read the [web library documentation](https://goforj.dev/web) for standalone installation, usage, and API reference.
