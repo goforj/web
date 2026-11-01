@@ -8,7 +8,7 @@ require (
 	github.com/goforj/str v1.3.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/prometheus/client_golang v1.25.0
-	github.com/prometheus/common v0.72.0
+	github.com/prometheus/common v0.72.1
 	golang.org/x/mod v0.42.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/time v0.16.0
