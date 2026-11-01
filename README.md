@@ -302,7 +302,7 @@ Whiskers in every panel show the observed sample minimum and maximum. The first 
 
 Bars are scaled independently within each panel, and small differences should not be treated as rankings. These are microbenchmarks and loopback ceilings, not production capacity forecasts.
 
-Measured with `go1.26.10` on `darwin/arm64` (Apple M4 Max), kernel `Darwin 25.5.0`, revision `aeab43e925d4`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:6018a10a835ecec741723bccf78382882c555dc2f3eb2cdab9392403824888e5`. Dependencies: net/http go1.26.10, GoForj Web local checkout, Echo v5.4.4, Gin v1.12.0, Chi v5.5.0, Gorilla Mux v1.8.1, httprouter v1.3.0.
+Measured with `go1.26.10` on `darwin/arm64` (Apple M4 Max), kernel `Darwin 25.5.0`, revision `7364bc9b23b4`. Build settings: `CGO_ENABLED=1`, `GOARM64=v8.0`, `GODEBUG=(unset)`, `GOEXPERIMENT=(unset)`, `GOFLAGS=(unset)`. Benchmark inputs: `sha256:c2f7f512564f90c73eed58944c26f264b2b32fa872bce7790b188513e433b803`. Dependencies: net/http go1.26.10, GoForj Web local checkout, Echo v5.4.4, Gin v1.12.0, Chi v5.5.0, Gorilla Mux v1.8.1, httprouter v1.3.0.
 
 Fiber is omitted because its `fasthttp` engine is not directly comparable in this shared `net/http` suite. See the [benchmark methodology](docs/bench/README.md) and [recorded sample rows](docs/bench/benchmarks_rows.json).
 
